@@ -10,7 +10,6 @@
     {
       "name": "claude-skills-exporter",
       "source": "./",
-      "version": "1.0.1",
       "description": "Extrae las skills de un repositorio con un plugin de Claude, audita su portabilidad y las empaqueta para Perplexity Computer y Mistral Vibe Work.",
       "homepage": "https://github.com/novanoticia/claude-skills-exporter",
       "category": "productivity",

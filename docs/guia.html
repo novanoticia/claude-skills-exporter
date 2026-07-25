@@ -354,52 +354,38 @@ git push -u origin main</code></pre>
     <tr><td><code>reload-plugins</code></td><td>Lo activa en la sesión actual sin reiniciar</td></tr>
   </table>
   <p>Comprueba con <code>/plugin</code>: debe aparecer <em>Claude Skills Exporter</em> en la lista.</p>
+  <p>Desde la aplicación de escritorio es lo mismo por interfaz:
+  <strong>Ajustes → Plugins → Añadir → marketplace</strong>, pegas la URL y
+  <strong>Sincronizar</strong>.</p>
 </div>
 
 <div class="note">
-  <strong>Cuando lo actualices más adelante</strong>
-  El campo <code>version</code> de <code>plugin.json</code> está fijado en <code>1.0.0</code>.
-  Eso significa que subir cambios a GitHub <em>no</em> basta: hasta que no subas ese número
-  (<code>1.0.1</code>, <code>1.1.0</code>…), Claude Code seguirá usando la copia en caché y
-  <code>/plugin update</code> te dirá que ya estás al día. Súbelo en cada cambio que quieras
-  publicar.
+  <strong>Este plugin no fija versión, y es deliberado</strong>
+  Sus manifiestos <em>no</em> llevan campo <code>version</code>. Claude Code usa entonces
+  el hash del commit como identificador, de modo que cada <code>git push</code> cuenta
+  automáticamente como versión nueva. Combinado con «Sincronizar automáticamente», no
+  hay que hacer nada más al publicar un cambio.
 </div>
 
 <h2 id="actualizar">7 · Actualizar el plugin después</h2>
 
-<p>Cada vez que cambies algo —una skill, el conversor, esta misma guía— hacen falta
-<strong>tres pasos</strong>. Saltarse el primero es el error más frecuente y el más
-desconcertante, porque todo parece funcionar y no cambia nada.</p>
+<p>Cada vez que cambies algo —una skill, el conversor, esta misma guía— publicar es
+un solo <code>push</code>. Este plugin está configurado para que sea así.</p>
 
-<div class="danger">
-  <strong>Paso obligatorio: sube el número de versión</strong>
-  Claude Code decide si hay actualización comparando el campo <code>version</code> de
-  <code>plugin.json</code>. Si no lo cambias, seguirá usando la copia guardada en caché
-  y <code>/plugin update</code> te dirá <em>«already at the latest version»</em> aunque
-  hayas subido cien commits.
+<div class="note">
+  <strong>Por qué no hay que tocar ningún número de versión</strong>
+  Los manifiestos de este plugin <strong>no llevan campo <code>version</code></strong>.
+  Cuando falta, Claude Code usa el hash del commit como identificador, así que cada
+  <code>git push</code> es automáticamente una versión nueva. Es lo coherente con tener
+  «Sincronizar automáticamente» activado en el marketplace.
 </div>
 
 <div class="step">
-  <h3><span class="n">1</span> Sube la versión en dos sitios</h3>
-  <p>En <code>.claude-plugin/plugin.json</code>:</p>
-  <pre><code>"version": "1.0.0"   →   "version": "1.0.1"</code></pre>
-  <p>Y el mismo número en <code>.claude-plugin/marketplace.json</code>, dentro de la
-  entrada del plugin. (Si difieren, manda el de <code>plugin.json</code>; mantenerlos
-  iguales evita confusiones.)</p>
-  <table>
-    <tr><th>Qué cambiaste</th><th>Nuevo número</th></tr>
-    <tr><td>Una errata, un texto, un ajuste menor</td><td><code>1.0.1</code>, <code>1.0.2</code>…</td></tr>
-    <tr><td>Una skill nueva, una opción nueva</td><td><code>1.1.0</code></td></tr>
-    <tr><td>Algo que rompe el uso anterior</td><td><code>2.0.0</code></td></tr>
-  </table>
-</div>
-
-<div class="step">
-  <h3><span class="n">2</span> Sube los cambios a GitHub</h3>
+  <h3><span class="n">1</span> Sube los cambios a GitHub</h3>
   <p><strong>Con Terminal</strong> (el repositorio ya está enlazado, así que basta con):</p>
-  <pre><button class="copy">copiar</button><code>cd ~/Descargas/claude-skills-exporter
+  <pre><button class="copy">copiar</button><code>cd ~/Desktop/claude-skills-exporter
 git add -A
-git commit -m "v1.0.1: descripción corta del cambio"
+git commit -m "descripción corta del cambio"
 git push</code></pre>
   <p><strong>Sin Terminal</strong>, para un fichero suelto: ábrelo en GitHub, pulsa el
   <strong>lápiz</strong>, edita y <strong>Commit changes</strong>. Para varios ficheros,
@@ -417,26 +403,27 @@ git push</code></pre>
 </div>
 
 <div class="step">
-  <h3><span class="n">3</span> Refresca en Claude Code</h3>
+  <h3><span class="n">2</span> Refresca en Claude Code</h3>
+  <p>Con «Sincronizar automáticamente» activado, <strong>no hace falta hacer nada</strong>:
+  el cambio llega solo. Si lo tienes desactivado, o quieres forzarlo ya:</p>
   <pre><button class="copy">copiar</button><code>/plugin marketplace update pablo-skills-tools
 /plugin update claude-skills-exporter
 /reload-plugins</code></pre>
   <table>
     <tr><th>Comando</th><th>Qué hace</th></tr>
-    <tr><td><code>marketplace update</code></td><td>Baja el catálogo actualizado de tu repositorio. Sin esto, Claude Code ni se entera de que hay versión nueva</td></tr>
-    <tr><td><code>plugin update</code></td><td>Reinstala el plugin si la versión cambió</td></tr>
+    <tr><td><code>marketplace update</code></td><td>Baja el catálogo actualizado de tu repositorio</td></tr>
+    <tr><td><code>plugin update</code></td><td>Reinstala el plugin si el commit cambió</td></tr>
     <tr><td><code>reload-plugins</code></td><td>Lo activa en la sesión actual, sin reiniciar</td></tr>
   </table>
-  <p>Verifícalo con <code>/plugin</code>: junto al nombre debe aparecer el número nuevo.</p>
 </div>
 
-<div class="note">
-  <strong>Alternativa: no fijar la versión</strong>
-  Si estás iterando mucho y te cansa subir el número a mano, <em>borra</em> el campo
-  <code>version</code> de <code>plugin.json</code> y de <code>marketplace.json</code>.
-  Claude Code usará entonces el identificador del commit, y cada <code>git push</code>
-  contará automáticamente como versión nueva. Es cómodo mientras desarrollas, y mala
-  idea si otras personas dependen del plugin: recibirán cada cambio a medio hacer.
+<div class="warn">
+  <strong>El precio de no fijar versión</strong>
+  Cada commit llega a quien tenga el plugin instalado, incluidos los que dejaste a medias.
+  Irrelevante si eres el único usuario; molesto si lo comparte un equipo. Si llega ese
+  momento, añade <code>"version": "1.2.0"</code> a <code>plugin.json</code> y a la entrada
+  de <code>marketplace.json</code>, y a partir de ahí publica subiendo ese número — con la
+  contrapartida de tener que acordarte de hacerlo en cada release.
 </div>
 
 <h2 id="patch">8 · Aplicar un <code>.patch</code> o un cambio propuesto</h2>

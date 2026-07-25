@@ -46,30 +46,28 @@ O pídeselo en lenguaje natural: *"exporta las skills de este repo para Perplexi
 
 ### Actualizar
 
-Tres pasos. El primero no es opcional:
+Este plugin **no fija `version`** en sus manifiestos. Claude Code usa entonces el hash
+del commit como identificador, así que cada `push` cuenta automáticamente como versión
+nueva. Publicar un cambio es sólo:
 
 ```bash
-# 1. Subir la versión en .claude-plugin/plugin.json y marketplace.json
-#    "version": "1.0.0"  →  "1.0.1"
-
-# 2. Publicar
-git add -A && git commit -m "v1.0.1: …" && git push
+git add -A && git commit -m "descripción del cambio" && git push
 ```
 
+Con «Sincronizar automáticamente» activado en el marketplace, no hay que hacer nada
+más. Si lo tienes desactivado:
+
 ```
-# 3. Refrescar en Claude Code
 /plugin marketplace update pablo-skills-tools
 /plugin update claude-skills-exporter
 /reload-plugins
 ```
 
-Claude Code detecta actualizaciones comparando el campo `version`. Si no lo cambias,
-sirve la copia cacheada y `/plugin update` responde *"already at the latest version"*
-por muchos commits que hayas subido.
-
-Si prefieres no tocar el número en cada cambio, **borra** el campo `version` de ambos
-manifiestos: entonces se usa el identificador del commit y cada `git push` cuenta como
-versión nueva. Cómodo mientras desarrollas; mala idea si alguien más depende del plugin.
+> **Si algún día quieres releases estables**, añade `"version": "1.2.0"` a
+> `plugin.json` y a la entrada de `marketplace.json`. A partir de ahí los usuarios sólo
+> reciben cambios cuando subas ese número — y tendrás que acordarte de subirlo en cada
+> release, o `/plugin update` responderá *"already at the latest version"* por muchos
+> commits que hayas publicado.
 
 ## Uso
 
