@@ -1,0 +1,32 @@
+name: Validar plugin
+
+# Se ejecuta en cada push y en cada pull request sobre main.
+# Con el marketplace en modo autosync, un manifiesto roto llega a los usuarios
+# de inmediato: esto lo detecta antes.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validar manifiestos, skills y comandos
+        run: python3 .github/validate_plugin.py .
+
+      - name: Prueba de humo del conversor
+        run: |
+          python3 skills/plugin-to-agentskills/scripts/convert.py --help
+          python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida
+          test -f /tmp/salida/INFORME-PORTABILIDAD.md
+          test -n "$(ls /tmp/salida/*.zip)"
+          echo "El conversor se ejecuta y produce salida."

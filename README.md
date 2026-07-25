@@ -123,6 +123,29 @@ dist-agentskills/
 Cada hallazgo se clasifica en 🔴 alto (no funcionará), 🟡 medio (funcionará degradado)
 o 🔵 bajo (cosmético).
 
+## Validación automática
+
+Cada `push` y cada pull request sobre `main` ejecuta
+[`.github/workflows/validar.yml`](.github/workflows/validar.yml), que comprueba lo que
+rompe la carga del plugin en silencio:
+
+- Los manifiestos parsean como JSON y tienen los campos obligatorios.
+- El nombre del plugin coincide entre `plugin.json` y `marketplace.json`, y el `source`
+  apunta a un directorio existente.
+- Cada `SKILL.md` tiene frontmatter con `name` y `description`, en kebab-case y con el
+  nombre igual al de su carpeta.
+- Los `.py` compilan.
+- El conversor arranca y produce salida (prueba de humo).
+
+Para lanzarlo en local antes de publicar:
+
+```bash
+python3 .github/validate_plugin.py .
+```
+
+Esto importa especialmente con el marketplace en modo autosync: sin versión fija, un
+manifiesto roto llegaría a los usuarios en el mismo `push`.
+
 ## Limitaciones conocidas
 
 - No convierte comandos, agentes ni MCP: no hay equivalente en el destino.
