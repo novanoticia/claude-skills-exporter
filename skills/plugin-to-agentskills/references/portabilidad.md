@@ -1,0 +1,136 @@
+# Portabilidad Claude → Perplexity / Mistral / otros
+
+Consulta este fichero cuando haya que reescribir una skill a mano o explicar por qué
+un aviso del informe importa.
+
+## 1. Qué acepta cada destino
+
+| | Perplexity Computer | Mistral Vibe Work | Claude Code |
+|---|---|---|---|
+| Ruta de instalación | `perplexity.ai/computer/skills` → Create skill → Upload a skill | `chat.mistral.ai/work` → Context → Skills → New Skill | `/plugin install` o carpeta `skills/` |
+| Formato | `.zip` (carpeta de la skill en la raíz) o `.md` suelto | Formulario: Título + Descripción + cuerpo `SKILL.md` + adjuntos | Carpeta con `SKILL.md` |
+| Varias skills a la vez | No fiable — una por zip | No — una por formulario | Sí |
+| Ficheros auxiliares | Sí, dentro del zip | Adjuntos junto a la skill | Sí |
+| Ejecuta `scripts/` | Sí, en su sandbox | No garantizado | Sí |
+| Frontmatter mínimo | `name`, `description` | `name`, `description` | `name`, `description` |
+
+## 2. Frontmatter
+
+Sólo `name` y `description` son universales.
+
+```yaml
+---
+name: mi-skill              # minúsculas, guiones, = nombre de la carpeta
+description: Cárgala cuando...   # condición de activación, no descripción del contenido
+---
+```
+
+Se retiran al exportar porque no existen fuera de Claude:
+
+| Clave | Por qué se cae |
+|---|---|
+| `allowed-tools` / `allowed_tools` | La lista de herramientas permitidas es un concepto de Claude Code |
+| `model` | El destino elige su propio modelo |
+| `argument-hint` | Pertenece a los slash commands, no a las skills |
+| `disable-model-invocation` | Control de invocación propio de Claude |
+| `user-invocable`, `context` | Idem |
+
+`license`, `version`, `depends` y `metadata` se conservan: forman parte del estándar
+abierto o son inocuos.
+
+## 3. La descripción: el campo que decide todo
+
+El destino no lee el cuerpo de la skill para decidir si cargarla. Lee **sólo la
+descripción**, y la paga en tokens en cada sesión. Por eso:
+
+| Mal | Bien |
+|---|---|
+| "Esta skill genera informes financieros." | "Cárgala cuando el usuario pida un informe financiero, un cierre mensual o una comparativa presupuesto-real." |
+| "Ayuda con reuniones." | "Cárgala cuando el usuario pegue notas o una transcripción de reunión y pida un resumen o los acuerdos." |
+| "Herramienta de análisis." | (No dice nada. Reescríbela entera.) |
+
+Reglas prácticas:
+
+- Empieza por *"Cárgala cuando…"* / *"Use when…"*.
+- Describe la **intención del usuario**, con las palabras que él usaría.
+- Por debajo de ~350 caracteres. Perplexity presupuesta ~100 tokens por skill en su
+  índice, y ese coste lo pagan todos los usuarios en todas las sesiones.
+- Incluye dos o tres ejemplos de frases reales.
+- Máximo duro habitual: 1024 caracteres.
+
+## 4. Patrones que hay que reescribir a mano
+
+### `${CLAUDE_PLUGIN_ROOT}`
+Se reescribe automáticamente como ruta relativa. Si queda alguno suelto, sustitúyelo
+por la ruta relativa a la carpeta de la skill.
+
+```diff
+- python3 ${CLAUDE_PLUGIN_ROOT}/skills/mi-skill/scripts/run.py
++ python3 scripts/run.py
+```
+
+### Herramientas MCP (`mcp__servidor__accion`)
+No hay arreglo automático. Opciones, de mejor a peor:
+
+1. Reescribir el paso como instrucción neutral: *"consulta la base de datos de clientes
+   con la herramienta que tengas disponible"*.
+2. Sustituir por una llamada HTTP directa a la API, si la skill trae credenciales.
+3. Marcar el paso como no disponible y decirle al agente que lo declare.
+
+Lo que **no** debe hacerse es dejar la llamada tal cual sin aviso: el modelo tenderá a
+narrar que la ejecutó.
+
+### Subagentes (`Task tool`, `subagent_type`)
+Colapsa el subagente en instrucciones en línea. Si la skill delegaba análisis pesado,
+conviértelo en una sección del propio `SKILL.md` o en un fichero de `references/` que
+se cargue bajo condición.
+
+### Comandos con namespace (`/mi-plugin:comando`)
+No existen fuera de Claude. Si el comando era esencial, incorpora su contenido a la
+skill. Si era un atajo, elimina la referencia.
+
+### Herramientas nombradas de Claude
+`TodoWrite`, `AskUserQuestion`, `WebFetch`, `ToolSearch`, `ExitPlanMode`… Cámbialas por
+la acción genérica: "pregunta al usuario", "busca en la web", "anota la tarea".
+
+### Hooks
+No se exportan. Si la skill dependía de un hook `PreToolUse` para validar algo, esa
+validación tiene que pasar al cuerpo de la skill como instrucción explícita.
+
+## 5. Tamaño
+
+| Nivel | Presupuesto | Cuándo se paga |
+|---|---|---|
+| Índice (`name` + `description`) | ~100 tokens | Siempre, en cada sesión |
+| Cuerpo del `SKILL.md` | <5.000 tokens | Al cargarse la skill |
+| `references/`, `scripts/`, `assets/` | Sin límite práctico | Sólo si el agente los abre |
+
+Si el cuerpo se pasa, mueve lo condicional a `references/` y deja en el `SKILL.md` una
+línea del tipo *"si la API devuelve un error, lee `references/errores.md`"*.
+
+## 6. Estructura recomendada de la skill exportada
+
+```
+mi-skill/
+├── SKILL.md          # frontmatter + procedimiento (el hub)
+├── references/       # documentación pesada, cargada bajo condición
+├── scripts/          # código determinista que el agente ejecuta
+└── assets/           # plantillas, esquemas, ejemplos de salida
+```
+
+## 7. Comprobación antes de subir
+
+- [ ] El nombre del frontmatter es igual al de la carpeta, en minúsculas con guiones.
+- [ ] La descripción dice *cuándo*, no *qué*, y baja de 350 caracteres.
+- [ ] No queda ninguna referencia a `${CLAUDE_PLUGIN_ROOT}`, `mcp__`, `Task tool` sin aviso.
+- [ ] Las rutas de `scripts/` y `references/` son relativas y los ficheros están dentro del zip.
+- [ ] El zip tiene la carpeta de la skill en la raíz (no un nivel extra de por medio).
+- [ ] Se ha leído el `INFORME-PORTABILIDAD.md`.
+
+## 8. Fuentes
+
+- Agent Skills (estándar abierto): https://agentskills.io/home
+- Perplexity — *How to use Computer Skills*: https://www.perplexity.ai/help-center/en/articles/13914413-how-to-use-computer-skills
+- Perplexity Research — *Designing, Refining, and Maintaining Agent Skills*: https://research.perplexity.ai/articles/designing-refining-and-maintaining-agent-skills-at-perplexity
+- Mistral Docs — *Create your first Skill*: https://docs.mistral.ai/getting-started/quickstarts/vibe-work/create-first-skill
+- Claude Code — *Plugins reference*: https://docs.claude.com/en/docs/claude-code/plugins-reference
