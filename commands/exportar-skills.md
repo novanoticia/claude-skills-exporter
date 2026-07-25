@@ -5,9 +5,13 @@ argument-hint: <url-del-repo-o-ruta-local>
 
 Exporta las skills del repositorio `$1` al estándar abierto Agent Skills.
 
-Sigue la skill `plugin-to-agentskills` de este plugin. En concreto:
+Sigue la skill `plugin-to-agentskills` de este plugin, **empezando por su «Paso 0:
+localiza el conversor»**. No asumas que `${CLAUDE_PLUGIN_ROOT}` resuelve en este
+entorno: en shells aislados no lo hace, y hay que caer al clon del repositorio.
 
-1. Ejecuta `python3 ${CLAUDE_PLUGIN_ROOT}/skills/plugin-to-agentskills/scripts/convert.py $1 --out ./dist-agentskills --per-skill`
+Después:
+
+1. Ejecuta el conversor: `python3 "$CONV" $1 --out ./dist-agentskills --per-skill`
 2. Lee `dist-agentskills/INFORME-PORTABILIDAD.md`.
 3. Resume: cuántas skills salieron, cuáles tienen riesgo alto y qué habría que
    reescribir a mano antes de subirlas.

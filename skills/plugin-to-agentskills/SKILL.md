@@ -36,14 +36,43 @@ Y cada destino instala distinto:
 
 Por eso la salida trae las dos formas.
 
+## Paso 0: localiza el conversor antes de nada
+
+El shell no siempre alcanza el directorio del plugin. En Claude Code sí; en Cowork y
+otros entornos con shell aislado, **no** — `${CLAUDE_PLUGIN_ROOT}` no resuelve allí.
+No des por hecho el primer caso: comprueba y cae al segundo.
+
+```bash
+CONV=""
+# 1. Ruta del plugin (Claude Code)
+if [ -n "$CLAUDE_PLUGIN_ROOT" ] && \
+   [ -f "$CLAUDE_PLUGIN_ROOT/skills/plugin-to-agentskills/scripts/convert.py" ]; then
+  CONV="$CLAUDE_PLUGIN_ROOT/skills/plugin-to-agentskills/scripts/convert.py"
+fi
+# 2. Si no, clona el propio repositorio del plugin en un temporal
+if [ -z "$CONV" ]; then
+  [ -d /tmp/cse ] || git clone --depth 1 \
+    https://github.com/novanoticia/claude-skills-exporter /tmp/cse
+  CONV=/tmp/cse/skills/plugin-to-agentskills/scripts/convert.py
+fi
+python3 "$CONV" --help    # verifica antes de seguir
+```
+
+Recuerda que cada llamada al shell puede ser independiente: si `$CONV` se pierde entre
+llamadas, vuelve a resolverlo o usa la ruta literal que obtuviste.
+
+El segundo camino no es un apaño. La herramienta necesita `git` de todas formas para
+clonar el repositorio que va a convertir, así que si `git` falta, el trabajo no se
+puede hacer por ninguna vía.
+
 ## Flujo
 
 1. **Pide el origen** si no lo dio: URL del repo o ruta local. Si es un repo privado,
    necesitará `git` autenticado o descargarlo a mano.
-2. **Ejecuta el conversor**:
+2. **Ejecuta el conversor** con la ruta resuelta en el paso 0:
 
    ```bash
-   python3 scripts/convert.py <url-o-ruta> --out ./dist-agentskills
+   python3 "$CONV" <url-o-ruta> --out ./dist-agentskills
    ```
 
    Añade `--per-skill` para generar además un zip por skill (lo que Perplexity espera
@@ -87,6 +116,8 @@ Por eso la salida trae las dos formas.
   de fabricar un zip vacío.
 - **No inventes el paso de subida.** Si el usuario pregunta por una plataforma que no
   está en `references/portabilidad.md`, búscalo o admite que no lo sabes.
+- **`python3 convert.py` a secas no funciona** salvo que estés dentro de la carpeta
+  `scripts/`. Usa siempre la ruta resuelta en el paso 0.
 
 ## Referencias
 
