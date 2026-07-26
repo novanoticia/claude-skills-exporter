@@ -121,8 +121,9 @@ puede hacer por ninguna vía.
   siendo útil como procedimiento escrito. Lo grave es que el agente finja haberlas
   usado. Por eso el aviso incrustado dice explícitamente que no simule resultados.
 - **Los `scripts/` viajan pero no su entorno.** Perplexity Computer puede ejecutarlos en
-  su sandbox; Mistral no lo garantiza. Revisa las dependencias declaradas antes de
-  prometer que funcionará.
+  su sandbox; **Mistral no tiene Python** (comprobado), así que los `.py` llegan pero no
+  se ejecutan. Si la lógica de la skill vive en un script, avisa al usuario: sólo
+  funcionará allí si el `SKILL.md` trae un procedimiento manual equivalente.
 - **Sin `skills/` no hay nada que exportar.** Si el repo es un plugin de sólo comandos
   o sólo MCP, el conversor aborta. Es el resultado correcto: díselo al usuario en vez
   de fabricar un zip vacío.

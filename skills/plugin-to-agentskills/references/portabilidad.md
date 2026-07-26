@@ -11,7 +11,7 @@ un aviso del informe importa.
 | Formato | **`.zip`** con la carpeta de la skill en su raíz | **la carpeta descomprimida**, con `SKILL.md` dentro | Carpeta con `SKILL.md` |
 | Varias skills a la vez | No — **una por zip** | No — una por vez | Sí |
 | Ficheros auxiliares | Sí, dentro del zip | Sí — conserva subcarpetas y cualquier extensión (`.md`, `.py`, `.yaml`) | Sí |
-| Ejecuta `scripts/` | Sí, en su sandbox | Los guarda; la ejecución no está confirmada | Sí |
+| Ejecuta `scripts/` | Sí, en su sandbox | **No** — hay shell, pero sin Python | Sí |
 | Frontmatter mínimo | `name`, `description` | `name`, `description` | `name`, `description` |
 
 **Sólo existe un artefacto: el `.zip`.** Es válido tal cual para Perplexity. Para
@@ -34,8 +34,20 @@ el conversor deja las dos formas juntas por comodidad, nada más.
   `description` del frontmatter es lo que se muestra como criterio de activación. Cada
   skill tiene además un interruptor de activación y un botón *Probar skill*.
 
-Sigue sin comprobarse si Mistral **ejecuta** los `scripts/` o sólo los conserva como
-material de consulta. Que el fichero esté ahí no garantiza que haya intérprete detrás.
+- **No ejecuta los `scripts/`, aunque los guarde.** Comprobado en una ejecución real:
+  Mistral tiene *algún* shell (crea directorios, escribe ficheros) pero **no tiene
+  Python**. Los `.py` viajan como material de consulta, no como código ejecutable.
+- **`~` no resuelve al home del usuario.** En esa misma ejecución `$HOME` era `/`, así
+  que `~/.email-triage/` acabó creando `//.email-triage/`. Una skill que escriba en
+  rutas con `~` fallará o escribirá en un sitio inesperado.
+- **Los ficheros que escribe pueden no persistir.** Se observaron escrituras que
+  reportaron éxito y después no existían. No confíes en el estado del disco entre
+  pasos: reléelo antes de darlo por bueno.
+
+**Consecuencia para exportar:** una skill cuya lógica viva en `scripts/` queda inerte en
+Mistral. Sólo sobrevive si el `SKILL.md` incluye un **procedimiento manual equivalente**
+al que el agente pueda caer cuando el script no arranque. El conversor ya marca las
+skills con `scripts/` como riesgo medio; este es el motivo concreto.
 
 ## 2. Frontmatter
 
