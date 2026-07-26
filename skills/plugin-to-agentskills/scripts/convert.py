@@ -6,14 +6,16 @@ empaqueta en formato Agent Skills portable (Perplexity Computer / Mistral Vibe).
 Sólo biblioteca estándar. Python 3.8+.
 
 Uso:
-    python3 convert.py <repo-url-o-ruta> [--out DIR] [--per-skill] [--only NOMBRE ...]
+    python3 convert.py <repo-url-o-ruta> [--out DIR] [--only NOMBRE ...]
 
 Salidas en <out>/:
-    <nombre>-agentskills.zip   zip único con todas las skills (raíz = una carpeta por skill)
-    skills/                    las mismas skills sin comprimir
-    zips/                      un zip por skill (sólo con --per-skill)
-    mistral/                   ficheros listos para pegar en el formulario de Mistral
+    <skill>.zip                el artefacto: se sube tal cual a Perplexity Computer
+    <skill>/                   ese mismo zip descomprimido: se sube a Mistral Vibe Work
     INFORME-PORTABILIDAD.md    qué se adaptó y qué se romperá fuera de Claude
+    resumen.json               lo mismo, en formato máquina
+
+Hay un solo artefacto por skill: el zip. La carpeta es el zip descomprimido, ni más
+ni menos. Una skill por zip — nunca un zip con varias dentro.
 """
 
 from __future__ import annotations
@@ -363,44 +365,25 @@ def zip_dir(src: Path, dest_zip: Path, arc_prefix: str = "") -> None:
                 z.write(p, arc.as_posix())
 
 
-def fence_for(text: str) -> str:
-    """Valla de código más larga que cualquier secuencia de backticks del contenido."""
-    longest = max((len(m) for m in re.findall(r"`+", text)), default=0)
-    return "`" * max(3, longest + 1)
-
-
-def write_mistral(res: SkillResult, skills_dir: Path, mistral_dir: Path) -> None:
-    mistral_dir.mkdir(parents=True, exist_ok=True)
-    md = (skills_dir / res.name / "SKILL.md").read_text(encoding="utf-8")
-    _fm, _raw, body = split_frontmatter(md)
-    body = body.strip()
-    title = res.name.replace("-", " ").capitalize()
-    attach = [f for f in res.extra_files]
-    f_body = fence_for(body)
-    f_desc = fence_for(res.description)
-    lines = [
-        "# Para pegar en Mistral · Vibe Work → Context → Skills → New Skill",
-        "",
-        "## Campo «Title»", "```", title, "```", "",
-        "## Campo «Description»  (es el que decide cuándo se activa)", f_desc,
-        res.description, f_desc, "",
-        "## Campo «SKILL.md»", f_body + "markdown", body, f_body, "",
-    ]
-    if attach:
-        lines += ["## Ficheros a adjuntar junto a la skill", ""]
-        lines += [f"- `{f}`" for f in attach]
-        lines += ["", "Están en la carpeta `skills/" + res.name + "/` de esta misma salida.", ""]
-    (mistral_dir / f"{res.name}.md").write_text("\n".join(lines), encoding="utf-8")
-
-
-def write_report(results: list, out: Path, source: str, single_zip: Path) -> None:
+def write_report(results: list, out: Path, source: str) -> None:
     sev_icon = {"alta": "🔴", "media": "🟡", "baja": "🔵", "ninguna": "🟢"}
     L = [
         "# Informe de portabilidad",
         "",
         f"- **Origen:** `{source}`",
         f"- **Skills exportadas:** {len(results)}",
-        f"- **Zip único:** `{single_zip.name}`",
+        "",
+        "## Dónde sube cada cosa",
+        "",
+        "Hay **un solo artefacto por skill**: el `.zip`. La carpeta del mismo nombre es",
+        "ese zip ya descomprimido — no es un formato distinto.",
+        "",
+        "| Destino | Qué subir | Dónde |",
+        "|---|---|---|",
+        "| Perplexity Computer | `<skill>.zip` — tal cual, sin tocar | "
+        "perplexity.ai/computer/skills → Create skill → Upload a skill |",
+        "| Mistral Vibe Work | `<skill>/` — el zip descomprimido, nada más | "
+        "chat.mistral.ai/work → Context → Skills → New Skill |",
         "",
         "## Resumen",
         "",
@@ -449,26 +432,26 @@ def resolve_source(src: str, workdir: Path) -> Path:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Plugin de Claude → Agent Skills portable")
+    ap = argparse.ArgumentParser(
+        description="Plugin de Claude → Agent Skills portable",
+        epilog="Salida: <skill>.zip (se sube tal cual a Perplexity) y <skill>/ "
+               "(ese mismo zip descomprimido, que es lo que se sube a Mistral).")
     ap.add_argument("source", help="URL del repositorio o ruta local")
     ap.add_argument("--out", default="./dist-agentskills", help="directorio de salida")
-    ap.add_argument("--per-skill", action="store_true",
-                    help="además, un .zip por skill (lo que Perplexity espera realmente)")
     ap.add_argument("--only", nargs="*", default=None, help="exportar sólo estas skills")
+    ap.add_argument("--zip-only", action="store_true",
+                    help="dejar sólo los .zip y borrar las carpetas descomprimidas")
     args = ap.parse_args()
 
     out = Path(args.out).expanduser().resolve()
     if out.exists():
         shutil.rmtree(out)
-    skills_dir = out / "skills"
-    skills_dir.mkdir(parents=True)
+    # Las carpetas de skill cuelgan directamente de <out>: son el contenido del zip
+    # ya descomprimido, no un formato aparte.
+    out.mkdir(parents=True)
 
     with tempfile.TemporaryDirectory() as tmp:
         root = resolve_source(args.source, Path(tmp))
-        label = re.sub(r"\.git$", "", args.source.rstrip("/").split("/")[-1])
-        if sanitize_name(label) in ("", "skill", "."):
-            label = root.resolve().name          # p. ej. cuando el origen es "." o "./"
-        label = sanitize_name(label) or "skills"
 
         skill_files = discover_skills(root)
         if not skill_files:
@@ -481,35 +464,35 @@ def main() -> int:
             nm = sanitize_name(sf.parent.name)
             if args.only and nm not in {sanitize_name(x) for x in args.only}:
                 continue
-            r = audit_and_adapt(sf, skills_dir)
+            r = audit_and_adapt(sf, out)
             results.append(r)
             print(f"  · {r.name:<40} riesgo={r.worst}")
 
         if not results:
             sys.exit("[error] --only no coincidió con ninguna skill.")
 
-        single = out / f"{sanitize_name(label)}-agentskills.zip"
-        zip_dir(skills_dir, single)
-
-        mistral_dir = out / "mistral"
+        # Un zip por skill, con la carpeta de la skill en la raíz del zip:
+        # es la única estructura que Perplexity acepta.
         for r in results:
-            write_mistral(r, skills_dir, mistral_dir)
+            zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
 
-        if args.per_skill:
+        if args.zip_only:
             for r in results:
-                zip_dir(skills_dir / r.name, out / "zips" / f"{r.name}.zip", arc_prefix=r.name)
+                shutil.rmtree(out / r.name)
 
-        write_report(results, out, args.source, single)
+        write_report(results, out, args.source)
         (out / "resumen.json").write_text(json.dumps(
             [{"name": r.name, "risk": r.worst, "findings": [f.__dict__ for f in r.findings],
               "adaptations": r.adaptations} for r in results], ensure_ascii=False, indent=2),
             encoding="utf-8")
 
     print(f"\n[ok] Salida en: {out}")
-    print(f"     zip único → {single.name}")
-    if args.per_skill:
-        print(f"     zips individuales → zips/")
-    print(f"     Mistral → mistral/   ·   Informe → INFORME-PORTABILIDAD.md")
+    print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill: se sube tal cual)")
+    if not args.zip_only:
+        print(f"     Mistral    → <skill>/      (ese mismo zip descomprimido)")
+    else:
+        print(f"     Mistral    → descomprime el .zip y sube la carpeta resultante")
+    print(f"     Informe    → INFORME-PORTABILIDAD.md")
     riesgo = [r.name for r in results if r.worst == "alta"]
     if riesgo:
         print(f"\n[aviso] Riesgo alto en: {', '.join(riesgo)}. Lee el informe antes de subirlas.")

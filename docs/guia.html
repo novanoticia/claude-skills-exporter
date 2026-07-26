@@ -139,7 +139,7 @@ cd claude-skills-exporter</code></pre>
 
 <pre><button class="copy">copiar</button><code>python3 skills/plugin-to-agentskills/scripts/convert.py \
     https://github.com/USUARIO/REPO-CON-EL-PLUGIN \
-    --out ./salida --per-skill</code></pre>
+    --out ./salida</code></pre>
 
 <div class="note">
   <strong>Truco: no escribas la ruta a mano</strong>
@@ -150,18 +150,26 @@ cd claude-skills-exporter</code></pre>
 
 <p>También funciona con una carpeta que ya tengas descargada:</p>
 
-<pre><button class="copy">copiar</button><code>python3 skills/plugin-to-agentskills/scripts/convert.py ~/Descargas/mi-plugin --out ./salida --per-skill</code></pre>
+<pre><button class="copy">copiar</button><code>python3 skills/plugin-to-agentskills/scripts/convert.py ~/Descargas/mi-plugin --out ./salida</code></pre>
 
 <h3>Qué aparece en la carpeta <code>salida/</code></h3>
 
+<div class="note">
+  <strong>Hay un solo archivo que importa por cada skill: su <code>.zip</code></strong>
+  Ese zip vale <em>tal cual</em> para Perplexity. Para Mistral lo único que hace falta es
+  descomprimirlo. La carpeta que verás al lado del zip es exactamente eso: el zip ya
+  descomprimido, para que no tengas ni que abrirlo.
+</div>
+
 <table>
   <tr><th>Carpeta o fichero</th><th>Para qué sirve</th></tr>
-  <tr><td><code>zips/</code></td><td><strong>Un zip por skill.</strong> Esto es lo que sube a Perplexity</td></tr>
-  <tr><td><code>mistral/</code></td><td>Un fichero de texto por skill, con los tres campos del formulario de Mistral listos para copiar</td></tr>
-  <tr><td><code>&lt;repo&gt;-agentskills.zip</code></td><td>Zip único con todo. Sirve de copia de seguridad</td></tr>
-  <tr><td><code>skills/</code></td><td>Las skills sin comprimir, por si quieres editarlas antes de subirlas</td></tr>
+  <tr><td><code>mi-skill.zip</code></td><td><strong>El archivo.</strong> Se sube a Perplexity sin tocarlo</td></tr>
+  <tr><td><code>mi-skill/</code></td><td>Ese mismo zip descomprimido. Es lo que se sube a Mistral</td></tr>
   <tr><td><code>INFORME-PORTABILIDAD.md</code></td><td><strong>Léelo.</strong> Dice qué se rompió y qué se arregló</td></tr>
+  <tr><td><code>resumen.json</code></td><td>Lo mismo que el informe, para procesarlo con otro programa</td></tr>
 </table>
+
+<p>Habrá un <code>.zip</code> y una carpeta por cada skill del repositorio original.</p>
 
 <div class="danger">
   <strong>Lee el informe antes de subir nada</strong>
@@ -182,8 +190,9 @@ cd claude-skills-exporter</code></pre>
 </div>
 <div class="step">
   <h3><span class="n">3</span> Arrastra el zip</h3>
-  <p>Coge <em>un</em> fichero de la carpeta <code>salida/zips/</code> y suéltalo en la
-  ventana. Repite para cada skill que quieras instalar.</p>
+  <p>Coge <em>un</em> fichero <code>.zip</code> de la carpeta <code>salida/</code> y
+  suéltalo en la ventana, sin descomprimirlo ni modificarlo. Repite para cada skill que
+  quieras instalar.</p>
 </div>
 <div class="step">
   <h3><span class="n">4</span> Compruébalo</h3>
@@ -194,14 +203,14 @@ cd claude-skills-exporter</code></pre>
 <div class="warn">
   <strong>Un zip, una skill</strong>
   Perplexity espera encontrar la carpeta de <em>una sola</em> skill en la raíz del zip.
-  Si intentas subir el zip global con todas dentro, lo normal es que falle o sólo
-  reconozca una. Usa siempre los de <code>zips/</code>.
+  Por eso la herramienta genera un zip por skill y nunca uno con todas dentro. Si
+  comprimes varias juntas por tu cuenta, lo normal es que falle o sólo reconozca una.
 </div>
 
 <h2 id="mistral">5 · Subir a Mistral (Vibe Work)</h2>
 
-<p>Mistral no tiene subida de zip: tiene un formulario. Por eso la herramienta te
-prepara el texto ya troceado.</p>
+<p>Es el mismo material que acabas de subir a Perplexity, sólo que abierto: Mistral
+quiere la <strong>carpeta</strong>, no el zip.</p>
 
 <div class="step">
   <h3><span class="n">1</span> Abre el panel de skills</h3>
@@ -210,25 +219,28 @@ prepara el texto ya troceado.</p>
   <strong>Skills</strong> → <strong>New Skill</strong>.</p>
 </div>
 <div class="step">
-  <h3><span class="n">2</span> Abre el fichero de la skill</h3>
-  <p>En <code>salida/mistral/</code> hay un <code>.md</code> por skill. Ábrelo con
-  cualquier editor de texto. Verás tres bloques claramente marcados.</p>
+  <h3><span class="n">2</span> Localiza la carpeta de la skill</h3>
+  <p>En <code>salida/</code>, junto a cada <code>.zip</code>, hay una carpeta con el
+  mismo nombre y sin la extensión: <code>mi-skill.zip</code> → <code>mi-skill/</code>.
+  Esa carpeta es el zip ya descomprimido, con su <code>SKILL.md</code> dentro.</p>
+  <p>Si sólo conservaste el <code>.zip</code>, haz doble clic sobre él para
+  descomprimirlo. Eso es todo: no hay ninguna conversión adicional.</p>
 </div>
 <div class="step">
-  <h3><span class="n">3</span> Copia y pega, bloque a bloque</h3>
-  <table>
-    <tr><th>Bloque del fichero</th><th>Campo del formulario</th></tr>
-    <tr><td>Campo «Title»</td><td>Title</td></tr>
-    <tr><td>Campo «Description»</td><td>Description</td></tr>
-    <tr><td>Campo «SKILL.md»</td><td>SKILL.md</td></tr>
-  </table>
-  <p>Si el fichero lista «Ficheros a adjuntar», súbelos también; los encuentras en
-  <code>salida/skills/&lt;nombre-de-la-skill&gt;/</code>.</p>
+  <h3><span class="n">3</span> Súbela</h3>
+  <p>Entrega la carpeta con su contenido — <code>SKILL.md</code> y, si los hay, los
+  ficheros de <code>references/</code> y <code>scripts/</code>.</p>
 </div>
 <div class="step">
   <h3><span class="n">4</span> Crear y probar</h3>
   <p><strong>Create Skill</strong>, y lanza una tarea que encaje con la descripción.
   Si te sirve al resto del equipo, pulsa <strong>Publish</strong>.</p>
+</div>
+
+<div class="warn">
+  <strong>A Mistral no le subas el <code>.zip</code></strong>
+  Y al revés: a Perplexity no le subas la carpeta. Es el mismo contenido, pero cada
+  plataforma lo quiere en su envoltorio.
 </div>
 
 <h2 id="github">6 · Publicar en GitHub e instalar desde el marketplace</h2>
@@ -501,8 +513,13 @@ verde <strong>Merge pull request</strong> → <strong>Confirm merge</strong>.</p
   </tr>
   <tr>
     <td>Perplexity rechaza el zip</td>
-    <td>Subiste el zip global en vez de uno de <code>zips/</code></td>
-    <td>Vuelve a ejecutar con <code>--per-skill</code> y sube uno a uno</td>
+    <td>El zip lleva varias skills dentro, o lo recomprimiste tú y quedó un nivel de carpeta de más</td>
+    <td>Sube uno de los <code>.zip</code> que generó la herramienta, sin modificarlo</td>
+  </tr>
+  <tr>
+    <td>Mistral no acepta el archivo</td>
+    <td>Le estás subiendo el <code>.zip</code></td>
+    <td>Descomprímelo y sube la carpeta que sale</td>
   </tr>
   <tr>
     <td>La skill se instala pero nunca se activa</td>

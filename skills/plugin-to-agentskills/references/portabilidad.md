@@ -8,11 +8,16 @@ un aviso del informe importa.
 | | Perplexity Computer | Mistral Vibe Work | Claude Code |
 |---|---|---|---|
 | Ruta de instalación | `perplexity.ai/computer/skills` → Create skill → Upload a skill | `chat.mistral.ai/work` → Context → Skills → New Skill | `/plugin install` o carpeta `skills/` |
-| Formato | `.zip` (carpeta de la skill en la raíz) o `.md` suelto | Formulario: Título + Descripción + cuerpo `SKILL.md` + adjuntos | Carpeta con `SKILL.md` |
-| Varias skills a la vez | No fiable — una por zip | No — una por formulario | Sí |
-| Ficheros auxiliares | Sí, dentro del zip | Adjuntos junto a la skill | Sí |
+| Formato | **`.zip`** con la carpeta de la skill en su raíz | **la carpeta descomprimida**, con `SKILL.md` dentro | Carpeta con `SKILL.md` |
+| Varias skills a la vez | No — **una por zip** | No — una por vez | Sí |
+| Ficheros auxiliares | Sí, dentro del zip | Sí, dentro de la carpeta | Sí |
 | Ejecuta `scripts/` | Sí, en su sandbox | No garantizado | Sí |
 | Frontmatter mínimo | `name`, `description` | `name`, `description` | `name`, `description` |
+
+**Sólo existe un artefacto: el `.zip`.** Es válido tal cual para Perplexity. Para
+Mistral, el único paso es descomprimirlo y subir la carpeta resultante. No hay ninguna
+conversión intermedia, ni un «formato Mistral» distinto que haya que generar aparte:
+el conversor deja las dos formas juntas por comodidad, nada más.
 
 ## 2. Frontmatter
 
@@ -123,8 +128,10 @@ mi-skill/
 - [ ] El nombre del frontmatter es igual al de la carpeta, en minúsculas con guiones.
 - [ ] La descripción dice *cuándo*, no *qué*, y baja de 350 caracteres.
 - [ ] No queda ninguna referencia a `${CLAUDE_PLUGIN_ROOT}`, `mcp__`, `Task tool` sin aviso.
-- [ ] Las rutas de `scripts/` y `references/` son relativas y los ficheros están dentro del zip.
-- [ ] El zip tiene la carpeta de la skill en la raíz (no un nivel extra de por medio).
+- [ ] Las rutas de `scripts/` y `references/` son relativas y los ficheros acompañan a la skill.
+- [ ] El zip tiene la carpeta de la skill en la raíz (no un nivel extra de por medio),
+      y contiene **una sola** skill.
+- [ ] A Mistral le subes la carpeta, no el zip.
 - [ ] Se ha leído el `INFORME-PORTABILIDAD.md`.
 
 ## 8. Fuentes

@@ -25,16 +25,17 @@ una viaja:
 Si el usuario dice "convierte mi plugin", **dilo explícitamente**: se exportan las
 skills, el resto se queda. No lo dejes implícito.
 
-Y cada destino instala distinto:
+**Hay un solo artefacto por skill: el `.zip`.** Ese zip es válido tal cual para
+Perplexity. Para Mistral, lo único que hace falta es descomprimirlo y subir la carpeta
+resultante — ninguna conversión más.
 
-- **Perplexity Computer** — `perplexity.ai/computer/skills` → *Create skill* → *Upload a
-  skill* → sube un `.zip` o un `.md`. Espera **una skill por zip**, con la carpeta de la
-  skill en la raíz.
-- **Mistral Vibe Work** — `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill*.
-  Es un **formulario**: Título, Descripción y el cuerpo del `SKILL.md` pegado, más
-  ficheros adjuntos opcionales. No hay instalador de zip equivalente.
+| Destino | Qué subir | Dónde |
+|---|---|---|
+| **Perplexity Computer** | el `.zip` **tal cual** — una skill por zip, con la carpeta de la skill en la raíz | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
+| **Mistral Vibe Work** | ese mismo zip **descomprimido**, con `SKILL.md` dentro | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
 
-Por eso la salida trae las dos formas.
+El conversor deja las dos cosas juntas para ahorrar el paso, pero no son dos formatos:
+la carpeta *es* el zip abierto.
 
 ## Paso 0: localiza el conversor antes de nada
 
@@ -75,8 +76,9 @@ puede hacer por ninguna vía.
    python3 "$CONV" <url-o-ruta> --out ./dist-agentskills
    ```
 
-   Añade `--per-skill` para generar además un zip por skill (lo que Perplexity espera
-   de verdad). Añade `--only nombre1 nombre2` para exportar sólo algunas.
+   Deja en `dist-agentskills/` un `<skill>.zip` por skill y, al lado, ese mismo zip ya
+   descomprimido en `<skill>/`. Añade `--only nombre1 nombre2` para exportar sólo
+   algunas skills, o `--zip-only` si el usuario sólo quiere los zips.
 
 3. **Lee `INFORME-PORTABILIDAD.md`** y resume al usuario: cuántas skills salieron,
    cuáles tienen riesgo alto y por qué. No te limites a decir "listo".
@@ -93,14 +95,17 @@ puede hacer por ninguna vía.
 - Audita el cuerpo y **escribe los avisos dentro del propio `SKILL.md`**, para que el
   agente de destino sepa que hay instrucciones que no podrá cumplir y lo diga en vez
   de inventarse el resultado.
-- Empaqueta: zip único, carpeta `skills/` sin comprimir, `mistral/` con el texto listo
-  para pegar, e informe.
+- Empaqueta cada skill en un `<skill>.zip` (con la carpeta de la skill en su raíz) y
+  deja al lado esa misma carpeta ya descomprimida, más el informe.
 
 ## Gotchas
 
-- **El zip único puede no instalarse en Perplexity.** Perplexity espera la carpeta de
-  *una* skill en la raíz del zip. Si el usuario pidió un zip global, dáselo, pero avisa
-  y ofrécele `--per-skill`. Si falla la subida, esa es la causa.
+- **Nunca un zip con todas las skills dentro.** Perplexity espera la carpeta de *una*
+  skill en la raíz del zip. Un zip global falla o sólo reconoce una. El conversor ya
+  genera uno por skill; no los agrupes tú después.
+- **Mistral quiere el zip abierto, no el zip.** Si el usuario sólo tiene el `.zip`, no
+  hay que regenerar nada: se descomprime y se sube la carpeta que sale. Y a la inversa,
+  no le digas que necesita un formato distinto — no lo necesita.
 - **La descripción es el 80% del resultado.** Si una skill trae una descripción del tipo
   "esta skill hace X", el destino casi nunca la cargará. La descripción debe decir
   *cuándo* activarse. Ofrécete a reescribir las peores; el informe las marca como

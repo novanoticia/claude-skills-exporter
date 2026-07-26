@@ -75,7 +75,7 @@ más. Si lo tienes desactivado:
 
 ```bash
 python3 skills/plugin-to-agentskills/scripts/convert.py https://github.com/usuario/repo \
-    --out ./dist-agentskills --per-skill
+    --out ./dist-agentskills
 ```
 
 Sólo necesita Python 3.8+ y `git`. Sin dependencias externas.
@@ -83,32 +83,40 @@ Sólo necesita Python 3.8+ y `git`. Sin dependencias externas.
 | Opción | Qué hace |
 |---|---|
 | `--out DIR` | Directorio de salida (por defecto `./dist-agentskills`) |
-| `--per-skill` | Genera además un `.zip` por skill — **lo que Perplexity espera de verdad** |
 | `--only a b c` | Exporta sólo esas skills |
+| `--zip-only` | Deja sólo los `.zip` y borra las carpetas descomprimidas |
 
 ## Qué genera
 
+**Hay un único artefacto por skill: el `.zip`.** La carpeta del mismo nombre es ese zip
+ya descomprimido — el conversor te la da hecha para ahorrarte el paso.
+
 ```
 dist-agentskills/
-├── <repo>-agentskills.zip     zip único con todas las skills
-├── skills/                    las mismas skills sin comprimir
-├── zips/                      un zip por skill (con --per-skill)
-├── mistral/                   texto listo para pegar en el formulario de Mistral
+├── mi-skill.zip               ← el artefacto
+├── mi-skill/                  ← el mismo zip, descomprimido
+│   ├── SKILL.md
+│   └── references/ scripts/ ...
+├── otra-skill.zip
+├── otra-skill/
 ├── INFORME-PORTABILIDAD.md    qué se adaptó y qué se romperá
 └── resumen.json               lo mismo, en formato máquina
 ```
 
 ## Dónde se sube cada cosa
 
-| Destino | Fichero | Ruta |
+| Destino | Qué subir | Ruta |
 |---|---|---|
-| **Perplexity Computer** | `zips/<skill>.zip` | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
-| **Mistral Vibe Work** | `mistral/<skill>.md` (copiar y pegar) | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
-| **Claude Code** | `skills/<skill>/` | Copiar a `~/.claude/skills/` |
+| **Perplexity Computer** | `mi-skill.zip` — **tal cual**, sin tocar | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
+| **Mistral Vibe Work** | `mi-skill/` — el zip **descomprimido**, nada más | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
+| **Claude Code** | `mi-skill/` | Copiar a `~/.claude/skills/` |
 
-> **Nota sobre el zip único:** Perplexity espera la carpeta de *una* skill en la raíz
-> del zip. El zip global sirve como copia de seguridad y para importar a mano, pero si
-> la subida falla, usa los de `zips/`.
+Si sólo tienes el `.zip` a mano, para Mistral basta con descomprimirlo: la carpeta que
+sale es exactamente lo que hay que subir. No hay ninguna conversión adicional.
+
+> **Una skill por zip.** Perplexity espera encontrar la carpeta de *una sola* skill en
+> la raíz del zip; un zip con varias falla o sólo reconoce una. Por eso no se genera
+> ningún zip global.
 
 ## Qué audita
 
