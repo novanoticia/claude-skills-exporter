@@ -19,6 +19,11 @@ Mistral, el único paso es descomprimirlo y subir la carpeta resultante. No hay 
 conversión intermedia, ni un «formato Mistral» distinto que haya que generar aparte:
 el conversor deja las dos formas juntas por comodidad, nada más.
 
+Comprobado en la práctica: Mistral valida que el markdown **sea** un `SKILL.md` —con su
+frontmatter— y no un documento que describa la skill. Un fichero con los campos
+troceados para copiar y pegar es rechazado con *«sube un archivo Markdown válido de
+skill»*. Por eso el conversor ya no genera ese intermediario.
+
 ## 2. Frontmatter
 
 Sólo `name` y `description` son universales.
