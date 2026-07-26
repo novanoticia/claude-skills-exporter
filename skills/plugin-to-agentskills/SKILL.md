@@ -110,6 +110,9 @@ puede hacer por ninguna vía.
   subes un documento con los campos troceados para copiar y pegar, responde *"sube un
   archivo Markdown válido de skill"*. Nunca fabriques ese intermediario: lo que quiere
   es el `SKILL.md` real, con su frontmatter, dentro de su carpeta.
+- **Mistral conserva el árbol completo.** Comprobado: mantiene `references/` y
+  `scripts/` como carpetas reales y admite `.py` y `.yaml`, no sólo markdown. Así que
+  sube la carpeta entera; no hay que extraer el `SKILL.md` ni aplanar nada.
 - **La descripción es el 80% del resultado.** Si una skill trae una descripción del tipo
   "esta skill hace X", el destino casi nunca la cargará. La descripción debe decir
   *cuándo* activarse. Ofrécete a reescribir las peores; el informe las marca como

@@ -10,8 +10,8 @@ un aviso del informe importa.
 | Ruta de instalación | `perplexity.ai/computer/skills` → Create skill → Upload a skill | `chat.mistral.ai/work` → Context → Skills → New Skill | `/plugin install` o carpeta `skills/` |
 | Formato | **`.zip`** con la carpeta de la skill en su raíz | **la carpeta descomprimida**, con `SKILL.md` dentro | Carpeta con `SKILL.md` |
 | Varias skills a la vez | No — **una por zip** | No — una por vez | Sí |
-| Ficheros auxiliares | Sí, dentro del zip | Sí, dentro de la carpeta | Sí |
-| Ejecuta `scripts/` | Sí, en su sandbox | No garantizado | Sí |
+| Ficheros auxiliares | Sí, dentro del zip | Sí — conserva subcarpetas y cualquier extensión (`.md`, `.py`, `.yaml`) | Sí |
+| Ejecuta `scripts/` | Sí, en su sandbox | Los guarda; la ejecución no está confirmada | Sí |
 | Frontmatter mínimo | `name`, `description` | `name`, `description` | `name`, `description` |
 
 **Sólo existe un artefacto: el `.zip`.** Es válido tal cual para Perplexity. Para
@@ -19,10 +19,23 @@ Mistral, el único paso es descomprimirlo y subir la carpeta resultante. No hay 
 conversión intermedia, ni un «formato Mistral» distinto que haya que generar aparte:
 el conversor deja las dos formas juntas por comodidad, nada más.
 
-Comprobado en la práctica: Mistral valida que el markdown **sea** un `SKILL.md` —con su
-frontmatter— y no un documento que describa la skill. Un fichero con los campos
-troceados para copiar y pegar es rechazado con *«sube un archivo Markdown válido de
-skill»*. Por eso el conversor ya no genera ese intermediario.
+### Lo comprobado en Mistral Vibe Work
+
+- **Acepta la carpeta completa, con su árbol intacto.** Verificado en una skill con
+  `SKILL.md` en la raíz, una carpeta `references/` con siete `.md`, una `scripts/` con
+  varios `.py` y un `config.yaml` suelto: Mistral los muestra como carpetas reales, no
+  aplanados ni descartados. No hay que subir sólo el `SKILL.md`.
+- **No filtra por extensión.** Los `.py` y `.yaml` viajan igual que los `.md`.
+- **Valida que el markdown *sea* un `SKILL.md`**, con su frontmatter, y no un documento
+  que describa la skill. Un fichero con los campos troceados para copiar y pegar se
+  rechaza con *«sube un archivo Markdown válido de skill»*. Por eso el conversor ya no
+  genera ese intermediario.
+- **El `SKILL.md` se convierte en el panel «Instrucciones»** de la skill, y la
+  `description` del frontmatter es lo que se muestra como criterio de activación. Cada
+  skill tiene además un interruptor de activación y un botón *Probar skill*.
+
+Sigue sin comprobarse si Mistral **ejecuta** los `scripts/` o sólo los conserva como
+material de consulta. Que el fichero esté ahí no garantiza que haya intérprete detrás.
 
 ## 2. Frontmatter
 
