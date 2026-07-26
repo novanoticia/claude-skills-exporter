@@ -124,6 +124,15 @@ puede hacer por ninguna vía.
   su sandbox; **Mistral no tiene Python** (comprobado), así que los `.py` llegan pero no
   se ejecutan. Si la lógica de la skill vive en un script, avisa al usuario: sólo
   funcionará allí si el `SKILL.md` trae un procedimiento manual equivalente.
+- **El estado en disco tampoco viaja.** Reproducido en dos ejecuciones: en Mistral, el
+  anexado a un fichero reporta éxito y luego el fichero no está. Lo grave no es la
+  pérdida, sino que el agente **reconstruye el registro de memoria** y sigue como si nada
+  — un historial inventado con aspecto de real. Si la skill lleva log, caché o registro
+  para deshacer, dilo al exportarla. El conversor lo marca como `estado-persistente`.
+- **La tilde no apunta al home del usuario allí.** La variable de entorno del home vale
+  `/`, así que una ruta que empiece por tilde-barra acaba escribiendo en la raíz con doble
+  barra. El conversor lo marca como `home-tilde`; en el destino hay que sustituirla por
+  una ruta relativa a la skill.
 - **Sin `skills/` no hay nada que exportar.** Si el repo es un plugin de sólo comandos
   o sólo MCP, el conversor aborta. Es el resultado correcto: díselo al usuario en vez
   de fabricar un zip vacío.

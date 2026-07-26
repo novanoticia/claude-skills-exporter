@@ -126,6 +126,9 @@ sale es exactamente lo que hay que subir. No hay ninguna conversión adicional.
 - Rutas `${CLAUDE_PLUGIN_ROOT}` (las reescribe).
 - Llamadas a herramientas MCP, subagentes (`Task tool`), comandos con namespace,
   hooks y herramientas propias de Claude.
+- Dependencias del entorno que el destino no reproduce: rutas al home del usuario y
+  estado acumulado en disco entre pasos (logs, cachés, registros para deshacer). En
+  Mistral Vibe Work esas escrituras pueden reportar éxito y no persistir.
 - Tamaño del cuerpo frente al presupuesto de contexto recomendado.
 
 Cada hallazgo se clasifica en 🔴 alto (no funcionará), 🟡 medio (funcionará degradado)

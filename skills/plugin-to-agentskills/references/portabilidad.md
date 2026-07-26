@@ -40,14 +40,36 @@ el conversor deja las dos formas juntas por comodidad, nada más.
 - **`~` no resuelve al home del usuario.** En esa misma ejecución `$HOME` era `/`, así
   que `~/.email-triage/` acabó creando `//.email-triage/`. Una skill que escriba en
   rutas con `~` fallará o escribirá en un sitio inesperado.
-- **Los ficheros que escribe pueden no persistir.** Se observaron escrituras que
-  reportaron éxito y después no existían. No confíes en el estado del disco entre
-  pasos: reléelo antes de darlo por bueno.
+- **El estado en disco no persiste de forma fiable.** Reproducido en **dos ejecuciones
+  independientes** de la misma skill: el anexado (`>> fichero`) reportó éxito y después
+  el fichero tenía una sola línea, o directamente no existía. En ambos casos el agente
+  acabó **reconstruyendo el registro de memoria** para poder continuar — funcionó porque
+  la conversación seguía viva, pero en una sesión nueva ese estado ya no está.
 
-**Consecuencia para exportar:** una skill cuya lógica viva en `scripts/` queda inerte en
-Mistral. Sólo sobrevive si el `SKILL.md` incluye un **procedimiento manual equivalente**
-al que el agente pueda caer cuando el script no arranque. El conversor ya marca las
-skills con `scripts/` como riesgo medio; este es el motivo concreto.
+**Dos consecuencias para exportar:**
+
+1. Una skill cuya lógica viva en `scripts/` queda inerte en Mistral. Sólo sobrevive si el
+   `SKILL.md` incluye un **procedimiento manual equivalente** al que el agente pueda caer
+   cuando el script no arranque.
+2. Una skill que dependa de un fichero de estado entre pasos (log, caché, historial,
+   registro para deshacer) **no puede fiarse de él**. Y el modo de fallo es peor que el
+   error: el agente rellena el hueco reconstruyendo el fichero de memoria, y sigue como
+   si nada.
+
+### Cómo escribir una skill que sobreviva a ese entorno
+
+| En vez de… | Haz esto |
+|---|---|
+| `~/.mi-skill/estado.jsonl` | Una ruta relativa a la skill, o pedirle al usuario una ruta absoluta |
+| `echo "..." >> log.jsonl` | Escribir el fichero **entero** de una vez; anexar es lo que falla |
+| Dar por escrito lo que reportó éxito | Releer el fichero y comprobar que está lo que esperas |
+| Asumir que el estado sigue ahí en la próxima sesión | Comprobar si existe; si no, decirlo — **nunca reconstruirlo de memoria** |
+
+Esa última línea es la que más importa: si el estado se perdió, la respuesta correcta es
+*"no encuentro el registro, no puedo deshacer"*, no un registro plausible inventado.
+
+El conversor marca automáticamente estos patrones (`scripts`, `home-tilde`,
+`estado-persistente`) como riesgo medio, e incrusta el aviso en el `SKILL.md` exportado.
 
 ## 2. Frontmatter
 
@@ -159,6 +181,8 @@ mi-skill/
 - [ ] La descripción dice *cuándo*, no *qué*, y baja de 350 caracteres.
 - [ ] No queda ninguna referencia a `${CLAUDE_PLUGIN_ROOT}`, `mcp__`, `Task tool` sin aviso.
 - [ ] Las rutas de `scripts/` y `references/` son relativas y los ficheros acompañan a la skill.
+- [ ] No hay rutas con `~` ni `$HOME`.
+- [ ] Si la skill guarda estado, comprueba que existe antes de usarlo y no lo reconstruye de memoria.
 - [ ] El zip tiene la carpeta de la skill en la raíz (no un nivel extra de por medio),
       y contiene **una sola** skill.
 - [ ] A Mistral le subes la carpeta, no el zip.

@@ -73,6 +73,14 @@ PATTERNS = [
      "Referencia a comandos con namespace de plugin (/plugin:comando)."),
     ("hooks", re.compile(r"\bhooks?\.json\b|\bPreToolUse\b|\bPostToolUse\b"), "media",
      "Depende de hooks del plugin, que no se exportan."),
+    ("home-tilde", re.compile(r"(?<![\w/])(?:~/|\$HOME/)[\w.\-]"), "media",
+     "Lee o escribe en rutas con ~ o $HOME. Comprobado en Mistral Vibe Work: $HOME vale "
+     "'/', así que '~/.mi-skill/' termina creando '//.mi-skill/'. Usa rutas relativas a "
+     "la carpeta de la skill, o pide al usuario una ruta absoluta explícita."),
+    ("estado-persistente", re.compile(r">>\s*[\"']?[~$./][^\s\"'|;)]*"), "media",
+     "Acumula estado con anexado (>>). Comprobado en Mistral Vibe Work: la escritura "
+     "puede reportar éxito y el fichero no existir después. Reléelo para confirmarlo, o "
+     "reescribe el fichero entero de una vez en lugar de ir anexando."),
     ("claude-md", re.compile(r"\bCLAUDE\.md\b"), "baja",
      "Referencia a CLAUDE.md, convención específica de Claude Code."),
     ("claude-brand", re.compile(r"\bClaude Code\b|\bCowork\b"), "baja",
@@ -304,7 +312,9 @@ def audit_and_adapt(skill_md: Path, out_dir: Path) -> SkillResult:
     if any(f.startswith("scripts/") for f in res.extra_files):
         res.findings.append(Finding("media", "scripts",
             "Incluye scripts/. Perplexity Computer puede ejecutarlos en su sandbox; "
-            "Mistral Vibe Work no garantiza ejecución equivalente. Verifica dependencias."))
+            "Mistral Vibe Work los guarda pero NO tiene Python (comprobado), así que allí "
+            "no se ejecutan. Si la lógica vive en el script, el SKILL.md debe traer un "
+            "procedimiento manual equivalente al que caer."))
 
     fm_out = {"name": name, "description": res.description}
     for k in PORTABLE_KEYS:
