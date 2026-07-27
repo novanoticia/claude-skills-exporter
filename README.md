@@ -5,7 +5,9 @@ Coge un repositorio con un plugin (o unas skills) de Claude, extrae las skills,
 **Perplexity Computer** y **Mistral Vibe Work**.
 
 👉 **Si no manejas GitHub, empieza por la [guía paso a paso](docs/guia.html)** —
-ábrela con doble clic en tu navegador.
+descárgala y ábrela con doble clic en el navegador. Cubre la instalación, la exportación
+y la subida a cada plataforma; sus últimas secciones están escritas para quien mantenga
+su propia copia del repositorio.
 
 ## La advertencia importante
 
@@ -32,9 +34,8 @@ cumplir, para que lo declare en vez de simular el resultado.
 /reload-plugins
 ```
 
-`pablo-skills-tools` es el nombre del **marketplace** (campo `name` de
-`.claude-plugin/marketplace.json`), no el usuario de GitHub. El repositorio debe ser
-público para que `marketplace add` pueda descargarlo sin autenticación.
+Lo que va después de la arroba, `pablo-skills-tools`, es el nombre del **marketplace**
+(campo `name` de `.claude-plugin/marketplace.json`), no un usuario de GitHub.
 
 Después:
 
@@ -46,16 +47,10 @@ O pídeselo en lenguaje natural: *"exporta las skills de este repo para Perplexi
 
 ### Actualizar
 
-Este plugin **no fija `version`** en sus manifiestos. Claude Code usa entonces el hash
-del commit como identificador, así que cada `push` cuenta automáticamente como versión
-nueva. Publicar un cambio es sólo:
-
-```bash
-git add -A && git commit -m "descripción del cambio" && git push
-```
-
-Con «Sincronizar automáticamente» activado en el marketplace, no hay que hacer nada
-más. Si lo tienes desactivado:
+Los manifiestos de este plugin **no fijan `version`**: Claude Code usa entonces el hash
+del commit como identificador, de modo que cada publicación cuenta como versión nueva.
+Con «Sincronizar automáticamente» activado en el marketplace, las actualizaciones llegan
+solas. Para forzarlas:
 
 ```
 /plugin marketplace update pablo-skills-tools
@@ -63,11 +58,8 @@ más. Si lo tienes desactivado:
 /reload-plugins
 ```
 
-> **Si algún día quieres releases estables**, añade `"version": "1.2.0"` a
-> `plugin.json` y a la entrada de `marketplace.json`. A partir de ahí los usuarios sólo
-> reciben cambios cuando subas ese número — y tendrás que acordarte de subirlo en cada
-> release, o `/plugin update` responderá *"already at the latest version"* por muchos
-> commits que hayas publicado.
+La contrapartida de no fijar versión: llegan todos los commits, no sólo los que alguien
+haya marcado como release.
 
 ## Uso
 
@@ -84,7 +76,7 @@ Sólo necesita Python 3.8+ y `git`. Sin dependencias externas.
 |---|---|
 | `--out DIR` | Directorio de salida (por defecto `./dist-agentskills`) |
 | `--only a b c` | Exporta sólo esas skills |
-| `--zip-only` | Deja sólo los `.zip` y borra las carpetas descomprimidas |
+| `--zip-only` | Deja sólo los `.zip` — se pierde la variante para Mistral |
 | `--keep-description-order` | No reordena la descripción (por defecto, la activación va primero) |
 
 ## Qué genera
@@ -139,7 +131,12 @@ dist-agentskills/
 Cada hallazgo se clasifica en 🔴 alto (no funcionará), 🟡 medio (funcionará degradado)
 o 🔵 bajo (cosmético).
 
-## Validación automática
+## Contribuir
+
+Los issues y pull requests son bienvenidos, sobre todo los que aporten comportamiento
+observado en un destino concreto: qué acepta, qué rechaza y con qué mensaje de error.
+Buena parte de lo que audita esta herramienta procede de fallos reales al subir skills,
+no de la documentación de las plataformas.
 
 Cada `push` y cada pull request sobre `main` ejecuta
 [`.github/workflows/validar.yml`](.github/workflows/validar.yml), que comprueba lo que
@@ -153,14 +150,15 @@ rompe la carga del plugin en silencio:
 - Los `.py` compilan.
 - El conversor arranca y produce salida (prueba de humo).
 
-Para lanzarlo en local antes de publicar:
+Para lanzarlo en local antes de abrir un pull request:
 
 ```bash
 python3 .github/validate_plugin.py .
 ```
 
-Esto importa especialmente con el marketplace en modo autosync: sin versión fija, un
-manifiesto roto llegaría a los usuarios en el mismo `push`.
+Esta comprobación importa más de lo habitual porque el marketplace se sincroniza solo y
+no hay versión fija: un manifiesto roto llegaría a quien tenga el plugin instalado en el
+mismo `push`.
 
 ## Limitaciones conocidas
 
