@@ -138,6 +138,12 @@ puede hacer por ninguna vía.
   su sandbox; **Mistral no tiene Python** (comprobado), así que los `.py` llegan pero no
   se ejecutan. Si la lógica de la skill vive en un script, avisa al usuario: sólo
   funcionará allí si el `SKILL.md` trae un procedimiento manual equivalente.
+- **Perplexity Computer corta cada llamada a los ~90 s.** Comprobado: ejecuta los
+  `scripts/` e incluso alcanza aplicaciones del Mac del usuario vía AppleScript, pero un
+  lote largo se queda a medias. En una ejecución real eso movió 64 correos que no tocaba y aplicó mal un
+  filtro de fecha. Si la skill modifica cosas en bloque, avísalo: necesita trozos
+  pequeños y verificación releyendo el estado después de cada uno. Avisos
+  `applescript` (medio) y `lote-destructivo` (alto).
 - **El estado en disco tampoco viaja.** Reproducido en dos ejecuciones: en Mistral, el
   anexado a un fichero reporta éxito y luego el fichero no está. Lo grave no es la
   pérdida, sino que el agente **reconstruye el registro de memoria** y sigue como si nada

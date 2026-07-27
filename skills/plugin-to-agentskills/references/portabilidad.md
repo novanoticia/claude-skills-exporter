@@ -11,13 +11,40 @@ un aviso del informe importa.
 | Formato | **`.zip`** con la carpeta de la skill en su raíz | **la carpeta descomprimida**, con `SKILL.md` dentro | Carpeta con `SKILL.md` |
 | Varias skills a la vez | No — **una por zip** | No — una por vez | Sí |
 | Ficheros auxiliares | Sí, dentro del zip | Sí — conserva subcarpetas y cualquier extensión (`.md`, `.py`, `.yaml`) | Sí |
-| Ejecuta `scripts/` | Sí, en su sandbox | **No** — hay shell, pero sin Python | Sí |
+| Ejecuta `scripts/` | Sí — y llega al Mac vía `osascript` | **No** — hay shell, pero sin Python | Sí |
+| Límite de tiempo por llamada | ~90 s (comprobado) | — (no ejecuta) | Sin límite práctico |
 | Frontmatter mínimo | `name`, `description` | `name`, `description` | `name`, `description` |
 
 **Sólo existe un artefacto: el `.zip`.** Es válido tal cual para Perplexity. Para
 Mistral, el único paso es descomprimirlo y subir la carpeta resultante. No hay ninguna
 conversión intermedia, ni un «formato Mistral» distinto que haya que generar aparte:
 el conversor deja las dos formas juntas por comodidad, nada más.
+
+### Lo comprobado en Perplexity Computer
+
+Observado en una ejecución real de `email-triage` sobre un buzón de 358 correos:
+
+- **Ejecuta los `scripts/` y además alcanza el Mac del usuario.** Tenía disponibles
+  `osascript` y acceso a Mail.app: leyó buzones, contó correos y movió mensajes entre
+  carpetas. No es un sandbox aislado como cabría suponer.
+- **Corta cada llamada en torno a 90 segundos.** Con un buzón grande, cada movimiento
+  sincroniza contra iCloud y el lote no termina. El agente tuvo que partirlo en trozos.
+- **Un lote cortado a mitad deja el trabajo inconsistente.** Es el fallo importante: el
+  script de archivado se llevó unos 64 correos que no estaban en el lote evaluado, y un
+  filtro de fecha que debía cortar en junio movió también correos de julio. Se detectó
+  y se revirtió a mano, pero sólo porque la sesión seguía viva.
+
+**Consecuencia para exportar:** una skill que modifique cosas en bloque necesita, para
+sobrevivir aquí, tres propiedades que en Claude podía permitirse no tener:
+
+1. **Trozos pequeños**, dimensionados para terminar dentro del límite de tiempo.
+2. **Verificación después de cada trozo**, releyendo el estado real en vez de fiarse de
+   que la operación devolvió éxito.
+3. **No dar por bueno el filtro.** Comprobar qué elementos se han tocado, no cuántos se
+   pretendía tocar.
+
+El conversor marca `applescript` en riesgo medio y `lote-destructivo` en riesgo **alto**
+justo por esto.
 
 ### Lo comprobado en Mistral Vibe Work
 

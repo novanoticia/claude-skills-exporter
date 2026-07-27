@@ -77,6 +77,19 @@ PATTERNS = [
      "Referencia a comandos con namespace de plugin (/plugin:comando)."),
     ("hooks", re.compile(r"\bhooks?\.json\b|\bPreToolUse\b|\bPostToolUse\b"), "media",
      "Depende de hooks del plugin, que no se exportan."),
+    ("applescript", re.compile(r"\bosascript\b|\btell\s+application\b", re.I), "media",
+     "Usa AppleScript para llegar a aplicaciones del Mac. Perplexity Computer sí lo "
+     "ejecuta (comprobado), pero corta cada llamada en torno a 90 segundos: un lote largo "
+     "se queda a medias y deja el trabajo inconsistente. Trocea los lotes y verifica el "
+     "resultado después de cada trozo. Mistral no lo ejecuta en absoluto."),
+    ("lote-destructivo", re.compile(
+        r"\b(?:move|delete|borra|elimina|mueve|archiva)\b[^.\n]{0,60}\b(?:whose|todos|all|"
+        r"cada|every|lote|batch|masiv)", re.I), "alta",
+     "Modifica o mueve elementos en bloque a partir de un filtro. Si el entorno de destino "
+     "corta la llamada a mitad —Perplexity Computer lo hace— el lote queda parcialmente "
+     "aplicado y sin registro fiable de qué se tocó. Antes de exportar: procesa en trozos "
+     "pequeños, verifica releyendo el estado después de cada uno, y no confíes en que el "
+     "filtro se haya aplicado como esperabas: compruébalo sobre los elementos afectados."),
     ("home-tilde", re.compile(r"(?<![\w/])(?:~/|\$HOME/)[\w.\-]"), "media",
      "Lee o escribe en rutas con ~ o $HOME. Comprobado en Mistral Vibe Work: $HOME vale "
      "'/', así que '~/.mi-skill/' termina creando '//.mi-skill/'. Usa rutas relativas a "
@@ -256,6 +269,60 @@ def reorder_description(desc: str):
     return " ".join(act + rest), True
 
 
+QUOTED_RX = re.compile(r'[“"«][^”"»\n]{2,60}[”"»]')
+
+
+def trim_quoted_examples(sentence: str, target: int) -> str:
+    """Deja los primeros disparadores entrecomillados y resume el resto con '…'.
+
+    Una frase de activación suele ser larga por acumulación de ejemplos, no por
+    complejidad. Con tres o cuatro basta para que el destino reconozca la intención.
+    """
+    quotes = list(QUOTED_RX.finditer(sentence))
+    if len(quotes) < 4:
+        return sentence
+    tail = sentence[quotes[-1].end():].lstrip(" ,;")
+    for keep in range(len(quotes) - 1, 2, -1):
+        cand = sentence[:quotes[keep - 1].end()] + "… " + tail
+        if len(cand) <= target:
+            return cand
+    return sentence[:quotes[2].end()] + "… " + tail
+
+
+def compact_description(desc: str, target: int = SOFT_DESCRIPTION_CHARS) -> str:
+    """Reduce la descripción al presupuesto blando sin perder el criterio de activación.
+
+    Prioridad: la frase que dice cuándo cargar la skill se conserva siempre; los
+    ejemplos repetidos se resumen; las frases que sólo cuentan qué hace la skill se
+    van cayendo por el final hasta que cabe.
+    """
+    desc = " ".join(desc.split())
+    if len(desc) <= target:
+        return desc
+    sents = split_sentences(desc)
+    act = [s for s in sents if ACTIVATION_RX.search(s)]
+    if not act:
+        return desc  # sin activación no hay nada que priorizar; el aviso ya lo marca
+    rest = [s for s in sents if not ACTIVATION_RX.search(s)]
+    head = act[0]
+    # Se resumen los ejemplos también cuando la frase cabe pero está saturada de ellos:
+    # doce disparadores casi sinónimos no discriminan mejor que cuatro, y dejan sitio
+    # para una frase que diga qué hace la skill.
+    if len(head) > target or len(QUOTED_RX.findall(head)) >= 5:
+        head = trim_quoted_examples(head, min(target, int(target * 0.62)))
+    # El presupuesto blando es orientativo: nunca se sacrifica un disparador por
+    # respetarlo. Las frases de activación tienen margen; las descriptivas, no.
+    act_budget = int(target * 1.3)
+    out = head
+    for s in act[1:]:  # sin break: si una frase larga no cabe, se prueba la siguiente
+        if len(out) + 1 + len(s) <= act_budget:
+            out += " " + s
+    for s in rest:
+        if len(out) + 1 + len(s) <= target:
+            out += " " + s
+    return out
+
+
 def clamp_description(desc: str, limit: int = SAFE_DESCRIPTION) -> str:
     """Recorta la descripción por debajo de `limit` en caracteres Y en bytes UTF-8.
 
@@ -378,6 +445,16 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
                 "Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han "
                 "puesto delante de las que describen qué hace. Es lo único que el destino lee "
                 "para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.")
+        # Compactar al presupuesto blando: el índice del destino paga esta descripción
+        # en cada sesión, y una lista de doce disparantes no discrimina mejor que cuatro.
+        compacted = compact_description(res.description)
+        if compacted != res.description:
+            antes = len(res.description)
+            res.description = compacted
+            res.adaptations.append(
+                f"Descripción compactada de {antes} a {len(compacted)} caracteres: se resumen "
+                "los ejemplos de disparadores repetidos y se descartan las frases que sólo "
+                "cuentan qué hace la skill. El criterio de activación se conserva entero.")
     if not ACTIVATION_RX.search(res.description):
         res.findings.append(Finding("alta", "description-sin-activacion",
             "La descripción no dice en ningún momento CUÁNDO cargar la skill: no hay ni un "
