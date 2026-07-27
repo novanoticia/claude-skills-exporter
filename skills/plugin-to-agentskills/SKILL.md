@@ -117,6 +117,14 @@ puede hacer por ninguna vía.
   "esta skill hace X", el destino casi nunca la cargará. La descripción debe decir
   *cuándo* activarse. Ofrécete a reescribir las peores; el informe las marca como
   `description-densa` o `sin-description`.
+- **El límite de 1024 de la descripción se mide en bytes, no en caracteres.** Comprobado:
+  Perplexity rechaza el zip entero con *"exceeds maximum length of 1024 characters"* ante
+  una descripción de 1063 caracteres pero 1085 bytes — en español las tildes cuentan
+  doble. El conversor recorta a 980 y corta por frase, pero eso conserva el principio
+  (*qué hace*) y tira el final (*cuándo activarla*). Si ves `description-larga`, ofrécete
+  a reescribirla tú: el recorte sólo garantiza que el fichero sea válido, no que sirva.
+  Mistral, en cambio, acepta la subida y deja abreviarla a mano — así que probar sólo
+  allí oculta el problema.
 - **Riesgo alto ≠ inservible.** Una skill que llama a herramientas MCP puede seguir
   siendo útil como procedimiento escrito. Lo grave es que el agente finja haberlas
   usado. Por eso el aviso incrustado dice explícitamente que no simule resultados.

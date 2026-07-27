@@ -113,7 +113,38 @@ Reglas prácticas:
 - Por debajo de ~350 caracteres. Perplexity presupuesta ~100 tokens por skill en su
   índice, y ese coste lo pagan todos los usuarios en todas las sesiones.
 - Incluye dos o tres ejemplos de frases reales.
-- Máximo duro habitual: 1024 caracteres.
+- Máximo duro: 1024. **Y se mide en bytes UTF-8, no en caracteres.**
+
+### El límite de 1024 se mide en bytes
+
+Comprobado subiendo `email-triage.zip` a Perplexity Computer:
+
+```
+failed to parse skill file: invalid skill description:
+description exceeds maximum length of 1024 characters
+```
+
+Aunque el mensaje diga *characters*, la cuenta es en bytes. Esa descripción tenía
+1063 caracteres — pero **1085 bytes**, porque cada tilde, cada `ñ` y cada `¿` ocupan
+dos, y cada `—` ocupa tres. Un texto en español se pasa del límite unos 20-30 bytes
+antes de lo que sugiere contar letras. El conversor recorta a 980 para dejar margen.
+
+**Y los dos destinos fallan distinto:**
+
+| | Qué pasa si la descripción se pasa |
+|---|---|
+| Perplexity Computer | **Rechaza el zip entero.** No importa nada más de la skill: no se instala |
+| Mistral Vibe Work | Acepta la subida y **te deja abreviarla a mano** en el panel de la skill |
+
+Es decir: en Mistral es un inconveniente, en Perplexity es un bloqueo. Si sólo pruebas
+en Mistral, no te enteras de que tu skill no es instalable en el otro.
+
+**Cuidado con lo que se pierde al recortar.** El conversor corta por el último final de
+frase que quepa, nunca a mitad de palabra. Pero eso conserva el principio de la
+descripción — que suele decir *qué hace* la skill — y tira el final, que suele ser donde
+está el *"Actívalo cuando el usuario diga…"*. Justo lo que decide si la skill se carga.
+Si ves el aviso `description-larga`, reescribe la descripción a mano: no te fíes del
+recorte automático, que sólo garantiza que el fichero sea válido.
 
 ## 4. Patrones que hay que reescribir a mano
 

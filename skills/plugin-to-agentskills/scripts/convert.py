@@ -37,6 +37,10 @@ from pathlib import Path
 # --------------------------------------------------------------------------
 
 MAX_DESCRIPTION_CHARS = 1024      # límite duro habitual del campo description
+# Perplexity rechaza el zip entero si se pasa, y lo mide en BYTES UTF-8: 1024
+# caracteres en español son ~1045 bytes. Recortamos con margen para que ni el
+# destino más estricto se queje.
+SAFE_DESCRIPTION = 980
 SOFT_DESCRIPTION_CHARS = 350      # ~100 tokens: presupuesto del índice de Perplexity
 SOFT_BODY_TOKENS = 5000           # cuerpo recomendado del SKILL.md
 CHARS_PER_TOKEN = 4               # estimación grosera
@@ -164,6 +168,26 @@ def unquote(v: str) -> str:
     return v
 
 
+def clamp_description(desc: str, limit: int = SAFE_DESCRIPTION) -> str:
+    """Recorta la descripción por debajo de `limit` en caracteres Y en bytes UTF-8.
+
+    Corta en el último final de frase que quepa; si no hay ninguno razonable, en
+    el último espacio. Nunca a mitad de palabra: la descripción es el criterio de
+    activación, y una frase partida no lo es.
+    """
+    if len(desc) <= limit and len(desc.encode("utf-8")) <= limit:
+        return desc
+    # Recorte por bytes (descartando un carácter partido) y luego por caracteres.
+    cut = desc.encode("utf-8")[:limit - 4].decode("utf-8", errors="ignore")[:limit - 4]
+    floor = int(limit * 0.6)  # no dejar un muñón: mejor cortar por palabra que devolver 3 frases
+    ends = list(re.finditer(r"[.!?](?=\s|$)", cut))
+    if ends and ends[-1].end() >= floor:
+        return cut[:ends[-1].end()]
+    sp = cut.rfind(" ")
+    base = cut[:sp] if sp >= floor else cut
+    return base.rstrip(" ,;:—-") + "…"
+
+
 def yaml_escape(v: str) -> str:
     """Serializa un escalar en una sola línea de forma segura."""
     v = " ".join(str(v).split())
@@ -257,11 +281,16 @@ def audit_and_adapt(skill_md: Path, out_dir: Path) -> SkillResult:
             f"('{src_dir.name}'). Se exporta la carpeta con el nombre del frontmatter."))
 
     # Longitud de la descripción
-    if len(res.description) > MAX_DESCRIPTION_CHARS:
-        res.description = res.description[:MAX_DESCRIPTION_CHARS - 3].rstrip() + "..."
+    clamped = clamp_description(res.description)
+    if clamped != res.description:
+        orig_chars, orig_bytes = len(res.description), len(res.description.encode("utf-8"))
+        res.description = clamped
         res.findings.append(Finding("media", "description-larga",
-            f"La descripción superaba {MAX_DESCRIPTION_CHARS} caracteres y se ha truncado. "
-            "Reescríbela a mano: debe decir CUÁNDO cargar la skill, no qué hace."))
+            f"La descripción medía {orig_chars} caracteres ({orig_bytes} bytes) y se ha "
+            f"recortado a {len(clamped)} ({len(clamped.encode('utf-8'))} bytes), cortando por "
+            "frase. Perplexity rechaza el zip entero si se pasa del límite, y lo mide en "
+            "bytes UTF-8, no en caracteres: en español un acento cuenta doble. Reescríbela a "
+            "mano — debe decir CUÁNDO cargar la skill, no qué hace."))
     elif len(res.description) > SOFT_DESCRIPTION_CHARS:
         res.findings.append(Finding("baja", "description-densa",
             f"Descripción de {len(res.description)} caracteres. Perplexity paga este coste "
