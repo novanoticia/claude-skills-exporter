@@ -19,7 +19,10 @@ from __future__ import annotations
 import json
 import py_compile
 import re
+import subprocess
 import sys
+import tempfile
+import zipfile
 from pathlib import Path
 
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
@@ -159,6 +162,46 @@ for py in sorted(ROOT.rglob("*.py")):
         py_compile.compile(str(py), doraise=True, cfile="/tmp/_chk.pyc")
     except py_compile.PyCompileError as e:
         err(f"{py.relative_to(ROOT)}: error de sintaxis — {e.msg.strip().splitlines()[-1]}")
+
+# ------------------------------------------------- prueba de humo del conversor
+# Compilar sólo detecta errores de sintaxis. Un NameError por una constante que se
+# renombró pasa el py_compile y revienta en ejecución, así que hay que ejecutarlo
+# de verdad — sobre este mismo repositorio, que es una entrada real y sin red.
+CONV = ROOT / "skills" / "plugin-to-agentskills" / "scripts" / "convert.py"
+if CONV.exists():
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "salida"
+        proc = subprocess.run([sys.executable, str(CONV), str(ROOT), "--out", str(out)],
+                              capture_output=True, text=True, timeout=180)
+        if proc.returncode != 0:
+            cola = (proc.stderr or proc.stdout).strip().splitlines()[-3:]
+            err("convert.py falla al ejecutarse sobre este repositorio: " + " | ".join(cola))
+        else:
+            zips = list(out.glob("*.zip"))
+            if not zips:
+                err("convert.py terminó sin generar ningún .zip")
+            if not (out / "INFORME-PORTABILIDAD.md").exists():
+                err("convert.py terminó sin generar INFORME-PORTABILIDAD.md")
+            # Los presupuestos por destino son la razón de que Perplexity acepte el zip.
+            for z in zips:
+                carpeta = out / z.stem / "SKILL.md"
+                if not carpeta.exists():
+                    err(f"falta la carpeta para Mistral de '{z.stem}'")
+                    continue
+                for etiqueta, texto, tope in (
+                    ("carpeta", carpeta.read_text(encoding="utf-8"), 490),
+                    ("zip", zipfile.ZipFile(z).read(f"{z.stem}/SKILL.md").decode(), 850),
+                ):
+                    m = re.search(r"^description:\s*(.*)$", texto, re.M)
+                    if not m:
+                        err(f"{z.stem} ({etiqueta}): SKILL.md sin 'description'")
+                        continue
+                    v = m.group(1).strip()
+                    if v.startswith('"'):
+                        v = v[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+                    n = len(v.encode("utf-8"))
+                    if n > tope:
+                        err(f"{z.stem} ({etiqueta}): description de {n} bytes, tope {tope}")
 
 # --------------------------------------------------------------------- salida
 for w in warnings:

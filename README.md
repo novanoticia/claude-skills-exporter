@@ -4,10 +4,13 @@ Coge un repositorio con un plugin (o unas skills) de Claude, extrae las skills,
 **audita qué se romperá fuera de Claude** y las empaqueta para instalarlas en
 **Perplexity Computer** y **Mistral Vibe Work**.
 
-👉 **Si no manejas GitHub, empieza por la [guía paso a paso](docs/guia.html)** —
-descárgala y ábrela con doble clic en el navegador. Cubre la instalación, la exportación
-y la subida a cada plataforma; sus últimas secciones están escritas para quien mantenga
-su propia copia del repositorio.
+👉 **Si no manejas GitHub, empieza por la [guía de uso](docs/guia.html)** — descárgala y
+ábrela con doble clic en el navegador. Cubre instalar la herramienta, exportar un
+repositorio y subir el resultado a cada plataforma.
+
+Para publicar y mantener tu propia copia del repositorio —subirlo a GitHub, instalarlo
+desde el marketplace, publicar cambios, aplicar parches— hay una
+[guía de mantenimiento](docs/mantenimiento.html) aparte.
 
 ## La advertencia importante
 
@@ -148,7 +151,10 @@ rompe la carga del plugin en silencio:
 - Cada `SKILL.md` tiene frontmatter con `name` y `description`, en kebab-case y con el
   nombre igual al de su carpeta.
 - Los `.py` compilan.
-- El conversor arranca y produce salida (prueba de humo).
+- **El conversor se ejecuta de verdad** sobre este mismo repositorio y produce un `.zip`,
+  su carpeta y el informe. Compilar sólo detecta errores de sintaxis: una constante
+  renombrada pasa el `py_compile` y revienta en ejecución.
+- Las descripciones generadas respetan el presupuesto de cada destino (490 y 850 bytes).
 
 Para lanzarlo en local antes de abrir un pull request:
 
@@ -170,9 +176,15 @@ mismo `push`.
 - Repositorios privados: necesitas `git` ya autenticado, o descarga el repo a mano y
   pásale la ruta local.
 
-## Licencia
+## Autoría y licencia
 
-MIT. Ver [LICENSE](LICENSE).
+Creado por **Pablo Rodríguez López** ([@novanoticia](https://github.com/novanoticia)).
+
+Publicado bajo licencia **MIT** — ver [LICENSE](LICENSE). Puedes usarlo, modificarlo,
+integrarlo en otro proyecto y redistribuirlo, incluso comercialmente. La única condición
+es **conservar el aviso de copyright y el texto de la licencia** en las copias o partes
+sustanciales que distribuyas. Si reutilizas el conversor dentro de otra herramienta,
+basta con mantener la cabecera del fichero y acompañarlo del `LICENSE`.
 
 ---
 

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mantenimiento · Claude Skills Exporter</title>
+<style>
+  :root{
+    --bg:#faf9f7; --fg:#1f1d1a; --muted:#6b665e; --line:#e3dfd8;
+    --card:#fff; --accent:#b8562f; --accent-soft:#fdf3ef;
+    --ok:#2f6b45; --warn:#8a6410; --warn-bg:#fdf7e6; --danger:#9c2f2f; --danger-bg:#fcefef;
+    --code-bg:#232019; --code-fg:#f0ece4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#17150f; --fg:#eee9e0; --muted:#a29b8f; --line:#332f26;
+           --card:#201d16; --accent:#e08a5f; --accent-soft:#2b211a;
+           --warn-bg:#2a2314; --danger-bg:#2c1a1a; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;}
+  .wrap{max-width:820px;margin:0 auto;padding:0 20px 100px}
+  header{padding:56px 0 28px;border-bottom:1px solid var(--line);margin-bottom:36px}
+  h1{font-size:2rem;margin:0 0 8px;letter-spacing:-.02em}
+  .sub{color:var(--muted);margin:0;font-size:1.02rem}
+  h2{font-size:1.35rem;margin:52px 0 14px;letter-spacing:-.01em;scroll-margin-top:20px}
+  h3{font-size:1.05rem;margin:28px 0 8px}
+  p{margin:0 0 14px}
+  a{color:var(--accent)}
+  code{background:var(--accent-soft);padding:.12em .38em;border-radius:4px;
+    font:.88em ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid var(--line)}
+  pre{background:var(--code-bg);color:var(--code-fg);padding:16px 18px;border-radius:10px;
+    overflow-x:auto;margin:0 0 16px;position:relative}
+  pre code{background:none;border:none;padding:0;color:inherit;font-size:.86rem;line-height:1.6}
+  .copy{position:absolute;top:8px;right:8px;background:#ffffff1a;color:var(--code-fg);
+    border:1px solid #ffffff33;border-radius:6px;padding:3px 9px;font-size:.72rem;cursor:pointer}
+  .copy:hover{background:#ffffff2e}
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 22px}
+  .toc ol{margin:8px 0 0;padding-left:20px}
+  .toc li{margin:5px 0}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:22px 24px;margin:0 0 18px}
+  .step h3{margin-top:0;display:flex;gap:10px;align-items:baseline}
+  .n{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;
+    width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+    font-size:.82rem;font-weight:700}
+  .note,.warn,.danger{border-left:3px solid;border-radius:0 8px 8px 0;padding:12px 16px;margin:0 0 16px}
+  .note{border-color:var(--ok);background:var(--accent-soft)}
+  .warn{border-color:var(--warn);background:var(--warn-bg)}
+  .danger{border-color:var(--danger);background:var(--danger-bg)}
+  .note strong,.warn strong,.danger strong{display:block;margin-bottom:3px}
+  table{width:100%;border-collapse:collapse;margin:0 0 18px;font-size:.94rem}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-weight:600;color:var(--muted);font-size:.82rem;text-transform:uppercase;letter-spacing:.04em}
+  ul,ol{margin:0 0 14px;padding-left:22px}
+  li{margin:5px 0}
+  kbd{background:var(--card);border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:5px;padding:1px 6px;font:.84em ui-monospace,monospace}
+  footer{margin-top:64px;padding-top:22px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:.86rem}
+  .pill{display:inline-block;background:var(--accent-soft);border:1px solid var(--line);
+    border-radius:999px;padding:2px 11px;font-size:.78rem;color:var(--muted);margin-bottom:10px}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+<header>
+  <span class="pill">Para quien mantiene su propia copia del repositorio</span>
+  <h1>Publicar y mantener el plugin</h1>
+  <p class="sub">Subirlo a GitHub, instalarlo desde el marketplace, publicar cambios y aplicar parches. Si sólo quieres <em>usar</em> la herramienta, está en la <a href="guia.html">guía de uso</a>.</p>
+</header>
+
+<div class="toc">
+  <strong>Qué vas a encontrar</strong>
+  <ol>
+    <li><a href="#github">Publicar en GitHub e instalar desde el marketplace</a></li>
+    <li><a href="#actualizar">Publicar un cambio después</a></li>
+    <li><a href="#patch">Aplicar un <code>.patch</code> o un cambio propuesto</a></li>
+    <li><a href="#problemas-m">Si algo falla al publicar</a></li>
+  </ol>
+</div>
+
+<h2 id="github">1 · Publicar en GitHub e instalar desde el marketplace</h2>
+
+<p>El destino es que puedas escribir en Claude Code
+<code>/plugin marketplace add https://github.com/novanoticia/claude-skills-exporter</code>
+y que funcione. Para eso el repositorio tiene que existir, ser público y llevar dentro
+la carpeta <code>.claude-plugin/</code>.</p>
+
+<div class="step">
+  <h3><span class="n">1</span> Crea el repositorio vacío</h3>
+  <ol>
+    <li>Entra en <a href="https://github.com/new" target="_blank" rel="noopener">github.com/new</a>.</li>
+    <li><strong>Repository name:</strong> <code>claude-skills-exporter</code> — tiene que ser
+      exactamente este, porque es el que aparece en la URL de instalación.</li>
+    <li>Elige <strong>Public</strong>. <em>Si lo pones privado, <code>/plugin marketplace add</code>
+      no podrá descargarlo salvo que tengas git autenticado en esa máquina.</em></li>
+    <li><strong>No marques nada más</strong> — ni README, ni .gitignore, ni licencia. Si los marcas, el repo nace con ficheros y el siguiente paso se complica.</li>
+    <li><strong>Create repository</strong>.</li>
+  </ol>
+</div>
+
+<div class="danger">
+  <strong>El problema de las carpetas que empiezan por punto</strong>
+  Todo el plugin depende de <code>.claude-plugin/</code>, y el Finder y el navegador
+  <strong>ocultan</strong> las carpetas que empiezan por punto. Si la subes arrastrando
+  sin darte cuenta de esto, el repositorio quedará incompleto y
+  <code>marketplace add</code> no encontrará nada. Por eso la opción con Terminal es más
+  fiable aquí: sube lo que hay, sin criterios de visibilidad.
+</div>
+
+<div class="step">
+  <h3><span class="n">2·0</span> Antes de nada: pon la carpeta en un sitio estable</h3>
+  <p>La carpeta <code>claude-skills-exporter</code> que se generó vive en un directorio de
+  trabajo temporal, con una ruta larga que cambia entre sesiones. <strong>Muévela primero</strong>
+  a un sitio fijo: pulsa en la tarjeta de cualquiera de sus ficheros para abrirla en el
+  Finder, sube un nivel hasta ver la carpeta entera, y arrástrala al <strong>Escritorio</strong>.</p>
+  <p>A partir de aquí las instrucciones asumen <code>~/Desktop/claude-skills-exporter</code>.</p>
+</div>
+
+<div class="step">
+  <h3><span class="n">2A</span> Sube los ficheros · con Terminal <em>(recomendado)</em></h3>
+  <p>Pega esto de una vez en la Terminal:</p>
+  <pre><button class="copy">copiar</button><code>cd ~/Desktop/claude-skills-exporter
+git init
+git add -A
+git commit -m "Versión inicial"
+git branch -M main
+git remote add origin https://github.com/novanoticia/claude-skills-exporter.git
+git push -u origin main</code></pre>
+  <p>GitHub te pedirá autenticarte: usa el navegador si te lo ofrece, o un
+  <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">token
+  personal</a> como contraseña (tu contraseña normal de GitHub ya no sirve para git).</p>
+
+  <div class="warn">
+    <strong>Si el <code>push</code> es rechazado</strong>
+    Verás algo como <code>Updates were rejected because the remote contains work that
+    you do not have locally</code>. Significa que al crear el repositorio marcaste alguna
+    casilla (README, .gitignore o licencia) y por tanto <em>no está vacío</em>. Trae ese
+    contenido antes de volver a empujar:
+    <pre><button class="copy">copiar</button><code>git pull --rebase origin main
+git push -u origin main</code></pre>
+    Si <code>pull</code> protesta con <code>refusing to merge unrelated histories</code>,
+    añade esa opción: <code>git pull --rebase --allow-unrelated-histories origin main</code>.
+  </div>
+
+  <div class="danger">
+    <strong>No uses <code>git push --force</code> para salir del paso</strong>
+    Funciona, pero borra del repositorio remoto lo que hubiera allí. En un repo recién
+    creado con sólo un README auto-generado da igual; si el repositorio lleva tiempo y
+    tiene historial, pierdes trabajo de forma irreversible. Coge la costumbre de hacer
+    <code>pull</code> primero.
+  </div>
+</div>
+
+<div class="step">
+  <h3><span class="n">2B</span> Sube los ficheros · arrastrando</h3>
+  <p>En la pantalla que aparece tras crear el repo, pulsa el enlace
+  <strong>uploading an existing file</strong>. Se abre una zona de arrastre.</p>
+  <p><strong>Antes de arrastrar</strong>, en el Finder pulsa
+  <kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>.</kbd> (comando, mayúsculas, punto) para que aparezcan
+  las carpetas ocultas. Verás <code>.claude-plugin</code> en gris claro.</p>
+  <p>Selecciona <em>el contenido</em> de la carpeta <code>claude-skills-exporter</code>
+  (no la carpeta en sí), <code>.claude-plugin</code> incluida, y arrástralo a la zona.
+  Escribe un mensaje en <em>Commit changes</em> y pulsa <strong>Commit changes</strong>.</p>
+  <p>Si aun así <code>.claude-plugin</code> no sube, créala a mano con el paso 3.</p>
+  <p><em>Esta vía sirve igual con el repositorio ya creado y vacío: en lugar del enlace de
+  la pantalla inicial, entra en el repositorio y usa <strong>Add file</strong> →
+  <strong>Upload files</strong>.</em></p>
+</div>
+
+<div class="step">
+  <h3><span class="n">3</span> Crear un fichero dentro de una carpeta oculta</h3>
+  <p>En tu repositorio: <strong>Add file</strong> → <strong>Create new file</strong>.
+  En la casilla del nombre escribe, <em>incluyendo la barra</em>:</p>
+  <pre><button class="copy">copiar</button><code>.claude-plugin/plugin.json</code></pre>
+  <p>GitHub crea la carpeta sola al detectar la barra. Pega el contenido del fichero y
+  pulsa <strong>Commit changes</strong>. Repite con
+  <code>.claude-plugin/marketplace.json</code>.</p>
+</div>
+
+<div class="step">
+  <h3><span class="n">4</span> Comprueba que el repo tiene lo mínimo</h3>
+  <p>Antes de instalar, mira la portada del repositorio en GitHub. Debes ver:</p>
+  <ul>
+    <li>La carpeta <code>.claude-plugin</code> — con <code>plugin.json</code> y
+      <code>marketplace.json</code> dentro. <strong>Si no aparece, la instalación fallará.</strong></li>
+    <li>La carpeta <code>skills</code>.</li>
+  </ul>
+  <p>GitHub sí muestra las carpetas que empiezan por punto; si no la ves, es que no se subió.</p>
+</div>
+
+<div class="step">
+  <h3><span class="n">5</span> Instálalo desde el marketplace</h3>
+  <p>En Claude Code, tres líneas:</p>
+  <pre><button class="copy">copiar</button><code>/plugin marketplace add https://github.com/novanoticia/claude-skills-exporter
+/plugin install claude-skills-exporter@pablo-skills-tools
+/reload-plugins</code></pre>
+  <table>
+    <tr><th>Línea</th><th>Qué hace</th></tr>
+    <tr><td><code>marketplace add</code></td><td>Registra tu repositorio como fuente de plugins. Se hace una sola vez</td></tr>
+    <tr><td><code>install …@pablo-skills-tools</code></td><td>Instala el plugin. Lo de después de la arroba es el <strong>nombre del marketplace</strong> (campo <code>name</code> de <code>marketplace.json</code>), no tu usuario de GitHub</td></tr>
+    <tr><td><code>reload-plugins</code></td><td>Lo activa en la sesión actual sin reiniciar</td></tr>
+  </table>
+  <p>Comprueba con <code>/plugin</code>: debe aparecer <em>Claude Skills Exporter</em> en la lista.</p>
+  <p>Desde la aplicación de escritorio es lo mismo por interfaz:
+  <strong>Ajustes → Plugins → Añadir → marketplace</strong>, pegas la URL y
+  <strong>Sincronizar</strong>.</p>
+</div>
+
+<div class="note">
+  <strong>Este plugin no fija versión, y es deliberado</strong>
+  Sus manifiestos <em>no</em> llevan campo <code>version</code>. Claude Code usa entonces
+  el hash del commit como identificador, de modo que cada <code>git push</code> cuenta
+  automáticamente como versión nueva. Combinado con «Sincronizar automáticamente», no
+  hay que hacer nada más al publicar un cambio.
+</div>
+
+
+<h2 id="actualizar">2 · Publicar un cambio después</h2>
+
+<p>Cada vez que cambies algo —una skill, el conversor, esta misma guía— publicar es
+un solo <code>push</code>. Este plugin está configurado para que sea así.</p>
+
+<div class="note">
+  <strong>Por qué no hay que tocar ningún número de versión</strong>
+  Los manifiestos de este plugin <strong>no llevan campo <code>version</code></strong>.
+  Cuando falta, Claude Code usa el hash del commit como identificador, así que cada
+  <code>git push</code> es automáticamente una versión nueva. Es lo coherente con tener
+  «Sincronizar automáticamente» activado en el marketplace.
+</div>
+
+<div class="step">
+  <h3><span class="n">1</span> Sube los cambios a GitHub</h3>
+  <p><strong>Con Terminal</strong> (el repositorio ya está enlazado, así que basta con):</p>
+  <pre><button class="copy">copiar</button><code>cd ~/Desktop/claude-skills-exporter
+git add -A
+git commit -m "descripción corta del cambio"
+git push</code></pre>
+  <p><strong>Sin Terminal</strong>, para un fichero suelto: ábrelo en GitHub, pulsa el
+  <strong>lápiz</strong>, edita y <strong>Commit changes</strong>. Para varios ficheros,
+  pulsa la tecla <kbd>.</kbd> estando en el repositorio: se abre el editor
+  <strong>github.dev</strong> en el navegador, y desde ahí editas todo y haces
+  <em>Commit &amp; Push</em> de una vez.</p>
+  <div class="warn">
+    <strong>Si la carpeta local ya no existe</strong>
+    Clónala otra vez con
+    <code>git clone https://github.com/novanoticia/claude-skills-exporter.git</code>,
+    trabaja ahí y haz <code>git push</code>. No vuelvas a crear el repo ni a subir
+    ficheros arrastrando sobre uno que ya tiene contenido: te arriesgas a duplicar o
+    pisar cosas.
+  </div>
+</div>
+
+<div class="step">
+  <h3><span class="n">2</span> Refresca en Claude Code</h3>
+  <p>Con «Sincronizar automáticamente» activado, <strong>no hace falta hacer nada</strong>:
+  el cambio llega solo. Si lo tienes desactivado, o quieres forzarlo ya:</p>
+  <pre><button class="copy">copiar</button><code>/plugin marketplace update pablo-skills-tools
+/plugin update claude-skills-exporter
+/reload-plugins</code></pre>
+  <table>
+    <tr><th>Comando</th><th>Qué hace</th></tr>
+    <tr><td><code>marketplace update</code></td><td>Baja el catálogo actualizado de tu repositorio</td></tr>
+    <tr><td><code>plugin update</code></td><td>Reinstala el plugin si el commit cambió</td></tr>
+    <tr><td><code>reload-plugins</code></td><td>Lo activa en la sesión actual, sin reiniciar</td></tr>
+  </table>
+</div>
+
+<div class="warn">
+  <strong>El precio de no fijar versión</strong>
+  Cada commit llega a quien tenga el plugin instalado, incluidos los que dejaste a medias.
+  Irrelevante si eres el único usuario; molesto si lo comparte un equipo. Si llega ese
+  momento, añade <code>"version": "1.2.0"</code> a <code>plugin.json</code> y a la entrada
+  de <code>marketplace.json</code>, y a partir de ahí publica subiendo ese número — con la
+  contrapartida de tener que acordarte de hacerlo en cada release.
+</div>
+
+
+<h2 id="patch">3 · Aplicar un <code>.patch</code> o un cambio propuesto</h2>
+
+<p>Un <code>.patch</code> (o <code>.diff</code>) es un fichero de texto que describe
+qué líneas quitar y cuáles poner. Tiene esta pinta:</p>
+
+<pre><code>--- a/skills/mi-skill/SKILL.md
++++ b/skills/mi-skill/SKILL.md
+@@ -3,7 +3,7 @@
+-description: Esta skill genera informes.
++description: Cárgala cuando el usuario pida un informe mensual o un cierre.</code></pre>
+
+<p>Las líneas con <code>-</code> se van, las de <code>+</code> entran. El resto es
+contexto para localizar el sitio.</p>
+
+<div class="warn">
+  <strong>La web de GitHub no aplica ficheros <code>.patch</code></strong>
+  No hay ningún botón de «subir parche». Tienes tres caminos reales, de más fácil a más
+  técnico.
+</div>
+
+<div class="step">
+  <h3><span class="n">A</span> A mano, en el editor web · <em>recomendado si el parche es pequeño</em></h3>
+  <ol>
+    <li>Abre en GitHub el fichero que menciona la línea <code>+++ b/…</code>.</li>
+    <li>Pulsa el icono del <strong>lápiz</strong> (arriba a la derecha del contenido).</li>
+    <li>Localiza las líneas <code>-</code> y bórralas; escribe en su lugar las <code>+</code>
+        <em>sin el signo</em> de delante.</li>
+    <li><strong>Commit changes</strong>.</li>
+  </ol>
+  <p>Para dos o tres líneas es lo más rápido y no te puedes equivocar mucho.</p>
+</div>
+
+<div class="step">
+  <h3><span class="n">B</span> Con el editor completo del navegador · <em>varios ficheros</em></h3>
+  <ol>
+    <li>Estando en tu repositorio en GitHub, pulsa la tecla <kbd>.</kbd> (el punto).</li>
+    <li>Se abre <strong>github.dev</strong>, un Visual Studio Code dentro del navegador,
+        con todos tus ficheros. Aquí <em>sí</em> se ven las carpetas ocultas.</li>
+    <li>Edita lo que necesites en el árbol de la izquierda.</li>
+    <li>Ve al icono de <strong>Source Control</strong> (las tres ramas), escribe un
+        mensaje y pulsa <strong>Commit &amp; Push</strong>.</li>
+  </ol>
+</div>
+
+<div class="step">
+  <h3><span class="n">C</span> Con la terminal · <em>el parche entero de una vez</em></h3>
+  <pre><button class="copy">copiar</button><code>cd ~/Descargas/claude-skills-exporter
+git apply --check ~/Descargas/cambio.patch   # 1. ensayo: no toca nada
+git apply ~/Descargas/cambio.patch           # 2. aplicar de verdad
+git add -A
+git commit -m "Aplicar parche"
+git push</code></pre>
+  <p>El primer comando es un ensayo en seco: si no dice nada, el parche encaja. Si
+  protesta, el parche está hecho contra otra versión del fichero — no lo fuerces, vuelve
+  a la opción A.</p>
+</div>
+
+<h3>Ver un cambio de otra persona como parche</h3>
+<p>Si alguien te manda un <em>pull request</em>, puedes ver el parche crudo añadiendo
+<code>.patch</code> al final de su URL:</p>
+<pre><code>https://github.com/usuario/repo/pull/42.patch</code></pre>
+<p>Y para aceptarlo no hace falta nada de esto: en la página del pull request, botón
+verde <strong>Merge pull request</strong> → <strong>Confirm merge</strong>.</p>
+
+
+<h2 id="problemas-m">4 · Si algo falla al publicar</h2>
+
+<table>
+  <tr><th>Síntoma</th><th>Causa habitual</th><th>Qué hacer</th></tr>
+  <tr>
+    <td><code>marketplace add</code> falla o no encuentra nada</td>
+    <td>Falta <code>.claude-plugin/marketplace.json</code>, o el repositorio es privado</td>
+    <td>Mira la portada del repo en GitHub: ¿está la carpeta <code>.claude-plugin</code>? Si no, créala desde la web con la barra en el nombre (paso 1.3). Si el repo es privado, hazlo público</td>
+  </tr>
+  <tr>
+    <td>Subes cambios a GitHub y no llegan</td>
+    <td>El marketplace no se ha resincronizado</td>
+    <td>Este plugin no fija <code>version</code>: cada commit es una versión nueva. Fuerza la actualización con <code>/plugin marketplace update</code> y <code>/plugin update</code></td>
+  </tr>
+  <tr>
+    <td><code>/plugin update</code> dice «already at the latest version»</td>
+    <td>No corriste <code>marketplace update</code> antes</td>
+    <td>Los dos comandos, en este orden: <code>/plugin marketplace update pablo-skills-tools</code> y luego <code>/plugin update claude-skills-exporter</code></td>
+  </tr>
+  <tr>
+    <td><code>git push</code> pide contraseña y la rechaza</td>
+    <td>GitHub ya no acepta la contraseña de la cuenta para git</td>
+    <td>Crea un <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">token personal</a> y úsalo como contraseña, o deja que se autentique por el navegador si te lo ofrece</td>
+  </tr>
+  <tr>
+    <td>Todo devuelve 404 a quien no ha iniciado sesión, pero tú lo ves bien</td>
+    <td>La cuenta está marcada por el sistema antiabuso de GitHub</td>
+    <td>Compruébalo en una ventana de incógnito y, si se confirma, pide revisión en <a href="https://support.github.com/contact" target="_blank" rel="noopener">support.github.com/contact</a>. No hay ningún ajuste que lo resuelva</td>
+  </tr>
+  <tr>
+    <td>Otro marketplace tuyo deja de funcionar</td>
+    <td>Dos marketplaces con el mismo <code>name</code></td>
+    <td>Cada usuario sólo puede tener uno registrado por nombre: el segundo reemplaza al primero. Si vas a publicar más plugins, mételos todos en este mismo <code>marketplace.json</code></td>
+  </tr>
+</table>
+
+<footer>
+  <p><strong>Nota ética.</strong> Esta guía y la herramienta que documenta se han
+  elaborado con asistencia de IA. Requieren revisión humana antes de usarse en
+  producción, y las rutas de interfaz de Perplexity y Mistral pueden cambiar sin previo
+  aviso: si no encuentras un botón donde dice aquí, consulta la documentación oficial
+  de cada plataforma.</p>
+  <p>Claude Skills Exporter — © 2026 Pablo Rodríguez López. Publicado bajo licencia
+  <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT</a>:
+  puedes usarlo, modificarlo y redistribuirlo, incluso comercialmente, conservando el
+  aviso de copyright y la licencia.</p>
+</footer>
+
+</div>
+<script>
+document.querySelectorAll('.copy').forEach(function(b){
+  b.addEventListener('click', function(){
+    var code = b.parentElement.querySelector('code').innerText;
+    navigator.clipboard.writeText(code).then(function(){
+      var t = b.textContent; b.textContent = 'copiado ✓';
+      setTimeout(function(){ b.textContent = t; }, 1400);
+    });
+  });
+});
+</script>
+</body>
+</html>

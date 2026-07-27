@@ -3,6 +3,11 @@
 convert.py — Extrae las skills de un repositorio con un plugin de Claude y las
 empaqueta en formato Agent Skills portable (Perplexity Computer / Mistral Vibe).
 
+Parte de Claude Skills Exporter.
+Copyright (c) 2026 Pablo Rodríguez López — https://github.com/novanoticia
+Licencia MIT. Se permite usar, copiar, modificar y redistribuir este fichero,
+incluso comercialmente, conservando este aviso de copyright y la licencia.
+
 Sólo biblioteca estándar. Python 3.8+.
 
 Uso:
@@ -507,10 +512,11 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
             "ningún destino. El recorte automático mantiene frases completas, pero no puede "
             "reescribir: revisa el resultado y, si ha perdido matiz, redáctala a mano en un "
             "solo párrafo que diga primero cuándo activarse y luego para qué sirve."))
-    elif len(res.description) > SOFT_DESCRIPTION_CHARS:
+    elif origen_bytes > BUDGET_MISTRAL:
         res.findings.append(Finding("baja", "description-densa",
-            f"Descripción de {len(res.description)} caracteres. Perplexity paga este coste "
-            f"en cada sesión; por debajo de ~{SOFT_DESCRIPTION_CHARS} funciona mejor."))
+            f"Descripción de {origen_bytes} bytes: cabe en el zip de Perplexity pero no en la "
+            f"carpeta de Mistral ({BUDGET_MISTRAL} B), donde va recortada. El índice del "
+            "destino paga este coste en cada sesión, así que cuanto más breve, mejor."))
 
     # Claves no portables
     dropped = [k for k in fm if k in CLAUDE_ONLY_KEYS]
