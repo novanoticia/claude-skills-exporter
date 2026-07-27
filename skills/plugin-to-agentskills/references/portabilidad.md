@@ -106,6 +106,40 @@ descripción**, y la paga en tokens en cada sesión. Por eso:
 | "Ayuda con reuniones." | "Cárgala cuando el usuario pegue notas o una transcripción de reunión y pida un resumen o los acuerdos." |
 | "Herramienta de análisis." | (No dice nada. Reescríbela entera.) |
 
+### El orden: primero cuándo, después qué
+
+No basta con que la descripción mencione los disparadores en alguna parte. Tienen que ir
+**delante**, por dos razones distintas:
+
+1. Si hay que recortar, lo que se pierde es la cola. Una descripción que empieza contando
+   qué hace la skill y termina diciendo cuándo activarla queda inservible en cuanto pasa
+   del límite: sobrevive lo decorativo.
+2. Aunque quepa entera, el destino decide con lo primero que lee.
+
+El conversor lo hace automáticamente: trocea la descripción en frases —respetando comillas
+y paréntesis, porque los disparadores suelen ir entrecomillados— y adelanta las que
+contienen marcas de activación (`Cárgala cuando`, `Actívalo cuando`, `cuando el usuario`,
+`se activa con`, `Use when`, `when the user`…). Lo hace **antes** de recortar.
+
+Ejemplo real, `email-triage`. Antes:
+
+> Triaje inteligente de correo electrónico: analiza bandejas… *(4 frases describiendo el
+> funcionamiento)* … Actívalo cuando el usuario diga "filtra mi correo", "revisa mi
+> bandeja"…
+
+Recortado sin reordenar, se perdía entera la última frase — la única que importa. Después
+de reordenar, el recorte se lleva `Incluye calibración estadística…` y la lista de
+disparadores queda intacta.
+
+**Lo que el conversor no puede hacer:** inventar disparadores que no están. Si la
+descripción no dice en ningún momento cuándo cargar la skill, sale el aviso
+`description-sin-activacion` con riesgo **alto** y hay que reescribirla a mano. Rellenar
+ese hueco automáticamente sería fabricar criterios de activación que el autor nunca
+escribió, y una skill que se carga cuando no debe es peor que una que no se carga.
+
+Con `--keep-description-order` se desactiva el reordenado, por si en algún caso rompe el
+hilo del texto.
+
 Reglas prácticas:
 
 - Empieza por *"Cárgala cuando…"* / *"Use when…"*.

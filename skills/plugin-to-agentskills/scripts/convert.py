@@ -168,6 +168,94 @@ def unquote(v: str) -> str:
     return v
 
 
+# Frases que marcan CUÁNDO cargar la skill. Es lo que el destino lee para decidir
+# si la activa, así que va delante de todo lo demás.
+ACTIVATION_RX = re.compile(
+    r"c[áa]rgal[ao]s?\s+cuando|act[íi]val[ao]s?\s+cuando|[úu]sal[ao]s?\s+cuando|"
+    r"inv[óo]cal[ao]s?\s+cuando|utiliza(?:l[ao]s?)?\s+cuando|empl[ée]al[ao]s?\s+cuando|"
+    r"se\s+activa\s+(?:con|cuando|ante)|se\s+dispara\s+(?:con|cuando)|"
+    r"cuando\s+el\s+usuario|si\s+el\s+usuario\s+(?:pide|dice|pregunta)|"
+    r"trigger\w*\s+(?:on|when|obligatorio)|"
+    r"use\s+(?:this\s+skill\s+)?when|used?\s+when|load\s+(?:this\s+)?when|"
+    r"this\s+skill\s+should\s+be\s+used\s+when|apply\s+when|invoke\s+when|"
+    r"when\s+the\s+user",
+    re.I)
+
+# Abreviaturas tras las que un punto NO cierra frase.
+ABBREV = {"etc", "ej", "p", "vs", "aprox", "sr", "sra", "srta", "dr", "dra", "prof",
+          "ee", "uu", "cf", "vgr", "i.e", "e.g", "núm", "num", "pág", "pag", "fig"}
+
+
+def split_sentences(text: str) -> list:
+    """Parte en frases sin romper dentro de comillas ni de paréntesis.
+
+    Necesario porque estas descripciones están llenas de disparadores entrecomillados
+    del tipo "¿es importante?", cuyo signo no cierra la frase.
+    """
+    out, buf, paren, quote = [], [], 0, False
+    n, i = len(text), 0
+    while i < n:
+        ch = text[i]
+        buf.append(ch)
+        i += 1
+        if ch == '"':
+            quote = not quote
+            continue
+        if ch in "“«":
+            quote = True
+            continue
+        if ch in "”»":
+            quote = False
+            continue
+        if ch in "([":
+            paren += 1
+            continue
+        if ch in ")]":
+            paren = max(0, paren - 1)
+            continue
+        if ch not in ".!?…" or quote or paren:
+            continue
+        # ¿Punto de abreviatura o de inicial?
+        prev = "".join(buf[:-1]).split()
+        word = prev[-1].lower().strip("(«“\"") if prev else ""
+        if ch == "." and (word in ABBREV or len(word) == 1):
+            continue
+        # Arrastra los cierres pegados al signo: ...decisión."»)
+        while i < n and text[i] in "\"”»)]":
+            buf.append(text[i])
+            i += 1
+        # Cierra frase sólo si lo siguiente empieza algo nuevo.
+        k = i
+        while k < n and text[k].isspace():
+            k += 1
+        if k >= n or text[k].isupper() or text[k] in "¿¡«“":
+            out.append("".join(buf).strip())
+            buf = []
+    tail = "".join(buf).strip()
+    if tail:
+        out.append(tail)
+    return [s for s in out if s]
+
+
+def reorder_description(desc: str):
+    """Pone delante las frases que dicen CUÁNDO cargar la skill.
+
+    Devuelve (texto, se_movio). No inventa nada: si no hay ninguna frase de
+    activación reconocible, deja la descripción intacta y el aviso lo dirá.
+    """
+    sents = split_sentences(desc)
+    if len(sents) < 2:
+        return desc, False
+    act_idx = [i for i, s in enumerate(sents) if ACTIVATION_RX.search(s)]
+    if not act_idx:
+        return desc, False
+    if act_idx == list(range(len(act_idx))):
+        return desc, False  # ya están agrupadas al principio
+    act = [sents[i] for i in act_idx]
+    rest = [s for i, s in enumerate(sents) if i not in set(act_idx)]
+    return " ".join(act + rest), True
+
+
 def clamp_description(desc: str, limit: int = SAFE_DESCRIPTION) -> str:
     """Recorta la descripción por debajo de `limit` en caracteres Y en bytes UTF-8.
 
@@ -254,7 +342,7 @@ def sanitize_name(raw: str) -> str:
 # Auditoría y adaptación
 # --------------------------------------------------------------------------
 
-def audit_and_adapt(skill_md: Path, out_dir: Path) -> SkillResult:
+def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> SkillResult:
     src_dir = skill_md.parent
     text = skill_md.read_text(encoding="utf-8", errors="replace")
     fm, _raw_fm, body = split_frontmatter(text)
@@ -279,6 +367,24 @@ def audit_and_adapt(skill_md: Path, out_dir: Path) -> SkillResult:
         res.findings.append(Finding("media", "nombre-vs-carpeta",
             f"El nombre del frontmatter ('{name}') no coincidía con la carpeta "
             f"('{src_dir.name}'). Se exporta la carpeta con el nombre del frontmatter."))
+
+    # Orden de la descripción: primero CUÁNDO cargarla, después qué hace.
+    # Va ANTES del recorte a propósito: si hay que cortar, se pierde lo prescindible.
+    if reorder:
+        reordered, moved = reorder_description(res.description)
+        if moved:
+            res.description = reordered
+            res.adaptations.append(
+                "Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han "
+                "puesto delante de las que describen qué hace. Es lo único que el destino lee "
+                "para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.")
+    if not ACTIVATION_RX.search(res.description):
+        res.findings.append(Finding("alta", "description-sin-activacion",
+            "La descripción no dice en ningún momento CUÁNDO cargar la skill: no hay ni un "
+            "'Cárgala cuando…', ni un 'cuando el usuario…', ni ejemplos de frases reales. "
+            "Describe el contenido, no el disparador. El destino casi nunca la activará. "
+            "Esto no se puede arreglar automáticamente sin inventar: reescríbela empezando "
+            "por los disparadores."))
 
     # Longitud de la descripción
     clamped = clamp_description(res.description)
@@ -480,6 +586,8 @@ def main() -> int:
     ap.add_argument("--only", nargs="*", default=None, help="exportar sólo estas skills")
     ap.add_argument("--zip-only", action="store_true",
                     help="dejar sólo los .zip y borrar las carpetas descomprimidas")
+    ap.add_argument("--keep-description-order", action="store_true",
+                    help="no reordenar la descripción (por defecto la activación va primero)")
     args = ap.parse_args()
 
     out = Path(args.out).expanduser().resolve()
@@ -503,7 +611,7 @@ def main() -> int:
             nm = sanitize_name(sf.parent.name)
             if args.only and nm not in {sanitize_name(x) for x in args.only}:
                 continue
-            r = audit_and_adapt(sf, out)
+            r = audit_and_adapt(sf, out, reorder=not args.keep_description_order)
             results.append(r)
             print(f"  · {r.name:<40} riesgo={r.worst}")
 

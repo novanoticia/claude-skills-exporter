@@ -91,6 +91,11 @@ puede hacer por ninguna vía.
 - Normaliza el nombre a minúsculas-con-guiones y lo alinea con la carpeta.
 - Retira del frontmatter las claves que sólo existen en Claude (`allowed-tools`,
   `model`, `argument-hint`…) y deja el par mínimo `name` + `description`.
+- **Reordena la descripción: primero CUÁNDO cargar la skill, después qué hace.** Trocea
+  en frases (sin romper dentro de comillas ni paréntesis), detecta las que marcan
+  activación —`Cárgala cuando`, `Actívalo cuando`, `cuando el usuario`, `Use when`…— y
+  las pone delante. Va antes del recorte a propósito: si hay que cortar, se pierde lo
+  prescindible. Con `--keep-description-order` se desactiva.
 - Reescribe `${CLAUDE_PLUGIN_ROOT}/...` como rutas relativas a la skill.
 - Audita el cuerpo y **escribe los avisos dentro del propio `SKILL.md`**, para que el
   agente de destino sepa que hay instrucciones que no podrá cumplir y lo diga en vez
@@ -113,10 +118,11 @@ puede hacer por ninguna vía.
 - **Mistral conserva el árbol completo.** Comprobado: mantiene `references/` y
   `scripts/` como carpetas reales y admite `.py` y `.yaml`, no sólo markdown. Así que
   sube la carpeta entera; no hay que extraer el `SKILL.md` ni aplanar nada.
-- **La descripción es el 80% del resultado.** Si una skill trae una descripción del tipo
-  "esta skill hace X", el destino casi nunca la cargará. La descripción debe decir
-  *cuándo* activarse. Ofrécete a reescribir las peores; el informe las marca como
-  `description-densa` o `sin-description`.
+- **La descripción es el 80% del resultado, y el orden importa tanto como el contenido.**
+  El conversor ya adelanta las frases de activación, pero **no puede inventar las que no
+  existen**. Si una descripción sólo dice "esta skill hace X", sale el aviso
+  `description-sin-activacion` en riesgo alto: ahí hay que reescribir a mano, empezando
+  por los disparadores con las palabras que usaría el usuario. Ofrécete a hacerlo.
 - **El límite de 1024 de la descripción se mide en bytes, no en caracteres.** Comprobado:
   Perplexity rechaza el zip entero con *"exceeds maximum length of 1024 characters"* ante
   una descripción de 1063 caracteres pero 1085 bytes — en español las tildes cuentan

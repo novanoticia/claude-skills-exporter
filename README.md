@@ -85,6 +85,7 @@ Sólo necesita Python 3.8+ y `git`. Sin dependencias externas.
 | `--out DIR` | Directorio de salida (por defecto `./dist-agentskills`) |
 | `--only a b c` | Exporta sólo esas skills |
 | `--zip-only` | Deja sólo los `.zip` y borra las carpetas descomprimidas |
+| `--keep-description-order` | No reordena la descripción (por defecto, la activación va primero) |
 
 ## Qué genera
 
@@ -122,7 +123,10 @@ sale es exactamente lo que hay que subir. No hay ninguna conversión adicional.
 
 - Frontmatter ausente, incompleto o con claves que sólo existen en Claude.
 - Descripciones que describen *qué hace* la skill en vez de *cuándo* activarla — la
-  causa nº 1 de que una skill importada no se cargue nunca.
+  causa nº 1 de que una skill importada no se cargue nunca. Aquí no se limita a avisar:
+  **reordena la descripción para que los disparadores vayan delante**, porque es lo que
+  el destino lee para decidir y lo primero que debe sobrevivir a un recorte. Si no hay
+  ningún disparador que adelantar, lo marca en riesgo alto en vez de inventarse uno.
 - Rutas `${CLAUDE_PLUGIN_ROOT}` (las reescribe).
 - Llamadas a herramientas MCP, subagentes (`Task tool`), comandos con namespace,
   hooks y herramientas propias de Claude.
