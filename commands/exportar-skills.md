@@ -17,6 +17,7 @@ Después:
    reescribir a mano antes de subirlas.
 4. Recuerda al usuario que los `commands/`, `agents/`, `hooks/` y servidores MCP del
    plugin original **no** se exportan.
-5. Dile qué sube dónde: el `<skill>.zip` **tal cual** a Perplexity Computer; para
-   Mistral Vibe Work, ese mismo zip **descomprimido** — la carpeta `<skill>/` que el
-   conversor ya deja al lado. No son dos formatos: es el mismo, abierto o cerrado.
+5. Dile qué sube dónde: el `<skill>.zip` **tal cual** a Perplexity Computer; la **carpeta**
+   `<skill>/` a Mistral Vibe Work. Advierte de que **no son intercambiables**: llevan los
+   mismos ficheros, pero la descripción se ajusta al presupuesto de cada destino (850 bytes
+   en el zip, 490 en la carpeta), así que descomprimir el zip no sirve para Mistral.

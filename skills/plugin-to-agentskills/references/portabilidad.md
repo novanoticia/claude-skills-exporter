@@ -8,17 +8,18 @@ un aviso del informe importa.
 | | Perplexity Computer | Mistral Vibe Work | Claude Code |
 |---|---|---|---|
 | Ruta de instalación | `perplexity.ai/computer/skills` → Create skill → Upload a skill | `chat.mistral.ai/work` → Context → Skills → New Skill | `/plugin install` o carpeta `skills/` |
-| Formato | **`.zip`** con la carpeta de la skill en su raíz | **la carpeta descomprimida**, con `SKILL.md` dentro | Carpeta con `SKILL.md` |
+| Formato | **`.zip`** con la carpeta de la skill en su raíz | **la carpeta**, con `SKILL.md` dentro | Carpeta con `SKILL.md` |
+| Presupuesto de `description` | 850 bytes | 490 bytes | sin límite práctico |
 | Varias skills a la vez | No — **una por zip** | No — una por vez | Sí |
 | Ficheros auxiliares | Sí, dentro del zip | Sí — conserva subcarpetas y cualquier extensión (`.md`, `.py`, `.yaml`) | Sí |
 | Ejecuta `scripts/` | Sí — y llega al Mac vía `osascript` | **No** — hay shell, pero sin Python | Sí |
 | Límite de tiempo por llamada | ~90 s (comprobado) | — (no ejecuta) | Sin límite práctico |
 | Frontmatter mínimo | `name`, `description` | `name`, `description` | `name`, `description` |
 
-**Sólo existe un artefacto: el `.zip`.** Es válido tal cual para Perplexity. Para
-Mistral, el único paso es descomprimirlo y subir la carpeta resultante. No hay ninguna
-conversión intermedia, ni un «formato Mistral» distinto que haya que generar aparte:
-el conversor deja las dos formas juntas por comodidad, nada más.
+**El `.zip` y la carpeta no son intercambiables.** Llevan exactamente los mismos ficheros,
+pero la `description` del frontmatter se compacta al presupuesto de cada destino: 850
+bytes en el zip, 490 en la carpeta. Descomprimir el zip **no** produce la carpeta de
+Mistral — la descripción que sale es la larga.
 
 ### Lo comprobado en Perplexity Computer
 
@@ -175,6 +176,8 @@ Reglas prácticas:
   índice, y ese coste lo pagan todos los usuarios en todas las sesiones.
 - Incluye dos o tres ejemplos de frases reales.
 - Máximo duro: 1024. **Y se mide en bytes UTF-8, no en caracteres.**
+- Presupuesto que aplica el conversor, por debajo del máximo y por destino: **490 bytes**
+  en la carpeta de Mistral, **850** en el zip de Perplexity.
 
 ### El límite de 1024 se mide en bytes
 
@@ -277,7 +280,8 @@ mi-skill/
 - [ ] Si la skill guarda estado, comprueba que existe antes de usarlo y no lo reconstruye de memoria.
 - [ ] El zip tiene la carpeta de la skill en la raíz (no un nivel extra de por medio),
       y contiene **una sola** skill.
-- [ ] A Mistral le subes la carpeta, no el zip.
+- [ ] A Mistral le subes la carpeta, no el zip descomprimido: **no son lo mismo**.
+- [ ] La descripción es un solo párrafo, sin listas ni saltos de línea.
 - [ ] Se ha leído el `INFORME-PORTABILIDAD.md`.
 
 ## 8. Fuentes

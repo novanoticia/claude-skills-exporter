@@ -89,13 +89,13 @@ Sólo necesita Python 3.8+ y `git`. Sin dependencias externas.
 
 ## Qué genera
 
-**Hay un único artefacto por skill: el `.zip`.** La carpeta del mismo nombre es ese zip
-ya descomprimido — el conversor te la da hecha para ahorrarte el paso.
+Dos artefactos por skill, con los mismos ficheros pero **distinta descripción**: cada
+destino tiene su presupuesto y la `description` se compacta para caber en él.
 
 ```
 dist-agentskills/
-├── mi-skill.zip               ← el artefacto
-├── mi-skill/                  ← el mismo zip, descomprimido
+├── mi-skill.zip               → Perplexity   (description ≤ 850 bytes)
+├── mi-skill/                  → Mistral      (description ≤ 490 bytes)
 │   ├── SKILL.md
 │   └── references/ scripts/ ...
 ├── otra-skill.zip
@@ -106,14 +106,15 @@ dist-agentskills/
 
 ## Dónde se sube cada cosa
 
-| Destino | Qué subir | Ruta |
-|---|---|---|
-| **Perplexity Computer** | `mi-skill.zip` — **tal cual**, sin tocar | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
-| **Mistral Vibe Work** | `mi-skill/` — el zip **descomprimido**, nada más | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
-| **Claude Code** | `mi-skill/` | Copiar a `~/.claude/skills/` |
+| Destino | Qué subir | `description` | Ruta |
+|---|---|---|---|
+| **Perplexity Computer** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 850 B | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
+| **Mistral Vibe Work** | `mi-skill/` — la **carpeta** | ≤ 490 B | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
+| **Claude Code** | `mi-skill/` | — | Copiar a `~/.claude/skills/` |
 
-Si sólo tienes el `.zip` a mano, para Mistral basta con descomprimirlo: la carpeta que
-sale es exactamente lo que hay que subir. No hay ninguna conversión adicional.
+> **No son intercambiables.** Descomprimir el `.zip` **no** da la carpeta de Mistral: la
+> descripción que sale es la larga. Si sólo conservas el zip y luego quieres subirlo a
+> Mistral, vuelve a exportar.
 
 > **Una skill por zip.** Perplexity espera encontrar la carpeta de *una sola* skill en
 > la raíz del zip; un zip con varias falla o sólo reconoce una. Por eso no se genera

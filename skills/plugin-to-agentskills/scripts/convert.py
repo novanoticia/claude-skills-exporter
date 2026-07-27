@@ -9,13 +9,16 @@ Uso:
     python3 convert.py <repo-url-o-ruta> [--out DIR] [--only NOMBRE ...]
 
 Salidas en <out>/:
-    <skill>.zip                el artefacto: se sube tal cual a Perplexity Computer
-    <skill>/                   ese mismo zip descomprimido: se sube a Mistral Vibe Work
+    <skill>.zip                se sube tal cual a Perplexity Computer
+    <skill>/                   se sube a Mistral Vibe Work
     INFORME-PORTABILIDAD.md    qué se adaptó y qué se romperá fuera de Claude
     resumen.json               lo mismo, en formato máquina
 
-Hay un solo artefacto por skill: el zip. La carpeta es el zip descomprimido, ni más
-ni menos. Una skill por zip — nunca un zip con varias dentro.
+Los dos llevan los mismos ficheros, PERO NO SON EL MISMO ARTEFACTO: la descripción
+del frontmatter se ajusta al presupuesto de cada destino (850 B en el zip, 490 B en
+la carpeta). Descomprimir el zip no produce la carpeta de Mistral.
+
+Una skill por zip — nunca un zip con varias dentro.
 """
 
 from __future__ import annotations
@@ -37,11 +40,12 @@ from pathlib import Path
 # --------------------------------------------------------------------------
 
 MAX_DESCRIPTION_CHARS = 1024      # límite duro habitual del campo description
-# Perplexity rechaza el zip entero si se pasa, y lo mide en BYTES UTF-8: 1024
-# caracteres en español son ~1045 bytes. Recortamos con margen para que ni el
-# destino más estricto se queje.
-SAFE_DESCRIPTION = 980
-SOFT_DESCRIPTION_CHARS = 350      # ~100 tokens: presupuesto del índice de Perplexity
+
+# Presupuestos POR DESTINO, en BYTES UTF-8 (no en caracteres: en español un acento
+# ocupa dos y una raya tres, así que contar letras engaña por un 2-3%).
+BUDGET_MISTRAL = 490              # carpeta descomprimida
+BUDGET_PERPLEXITY = 850           # dentro del .zip
+BUDGET_DEFAULT = BUDGET_PERPLEXITY
 SOFT_BODY_TOKENS = 5000           # cuerpo recomendado del SKILL.md
 CHARS_PER_TOKEN = 4               # estimación grosera
 
@@ -272,69 +276,89 @@ def reorder_description(desc: str):
 QUOTED_RX = re.compile(r'[“"«][^”"»\n]{2,60}[”"»]')
 
 
-def trim_quoted_examples(sentence: str, target: int) -> str:
-    """Deja los primeros disparadores entrecomillados y resume el resto con '…'.
+def nbytes(s: str) -> int:
+    return len(s.encode("utf-8"))
+
+
+MAX_TRIGGER_EXAMPLES = 4   # más ejemplos no discriminan mejor; sólo alargan la lista
+
+
+def trim_quoted_examples(sentence: str, budget: int,
+                         max_keep: int = MAX_TRIGGER_EXAMPLES, floor_keep: int = 2) -> str:
+    """Deja unos pocos disparadores entrecomillados y resume el resto con '…'.
 
     Una frase de activación suele ser larga por acumulación de ejemplos, no por
-    complejidad. Con tres o cuatro basta para que el destino reconozca la intención.
+    complejidad: con dos o cuatro el destino ya reconoce la intención, y lo que se
+    libera se invierte en decir para qué sirve la skill. Así el resultado se lee como
+    un párrafo y no como una enumeración.
     """
     quotes = list(QUOTED_RX.finditer(sentence))
-    if len(quotes) < 4:
+    if len(quotes) <= floor_keep:
+        return sentence
+    if len(quotes) <= max_keep and nbytes(sentence) <= budget:
         return sentence
     tail = sentence[quotes[-1].end():].lstrip(" ,;")
-    for keep in range(len(quotes) - 1, 2, -1):
+    best = sentence
+    for keep in range(min(len(quotes) - 1, max_keep), floor_keep - 1, -1):
         cand = sentence[:quotes[keep - 1].end()] + "… " + tail
-        if len(cand) <= target:
+        best = cand
+        if nbytes(cand) <= budget:
             return cand
-    return sentence[:quotes[2].end()] + "… " + tail
+    return best
 
 
-def compact_description(desc: str, target: int = SOFT_DESCRIPTION_CHARS) -> str:
-    """Reduce la descripción al presupuesto blando sin perder el criterio de activación.
+def compact_description(desc: str, budget: int = BUDGET_DEFAULT) -> str:
+    """Reduce la descripción a `budget` bytes UTF-8 conservando el criterio de activación.
 
-    Prioridad: la frase que dice cuándo cargar la skill se conserva siempre; los
-    ejemplos repetidos se resumen; las frases que sólo cuentan qué hace la skill se
-    van cayendo por el final hasta que cabe.
+    Devuelve **un solo párrafo**: primero cuándo cargar la skill, después una mención
+    breve de para qué sirve. Los ejemplos entrecomillados se podan antes que las frases,
+    porque una enumeración larga de disparadores casi sinónimos no discrimina mejor que
+    dos o tres y se come el presupuesto que necesita el propósito.
     """
-    desc = " ".join(desc.split())
-    if len(desc) <= target:
+    desc = " ".join(desc.split())          # un párrafo: sin saltos ni viñetas
+    if nbytes(desc) <= budget:
         return desc
     sents = split_sentences(desc)
     act = [s for s in sents if ACTIVATION_RX.search(s)]
     if not act:
-        return desc  # sin activación no hay nada que priorizar; el aviso ya lo marca
+        return desc                        # sin activación no hay nada que priorizar
     rest = [s for s in sents if not ACTIVATION_RX.search(s)]
-    head = act[0]
-    # Se resumen los ejemplos también cuando la frase cabe pero está saturada de ellos:
-    # doce disparadores casi sinónimos no discriminan mejor que cuatro, y dejan sitio
-    # para una frase que diga qué hace la skill.
-    if len(head) > target or len(QUOTED_RX.findall(head)) >= 5:
-        head = trim_quoted_examples(head, min(target, int(target * 0.62)))
-    # El presupuesto blando es orientativo: nunca se sacrifica un disparador por
-    # respetarlo. Las frases de activación tienen margen; las descriptivas, no.
-    act_budget = int(target * 1.3)
+
+    # Se reserva un tercio del presupuesto para el propósito; la activación se poda
+    # hasta caber en el resto.
+    head = trim_quoted_examples(act[0], int(budget * 0.62))
     out = head
-    for s in act[1:]:  # sin break: si una frase larga no cabe, se prueba la siguiente
-        if len(out) + 1 + len(s) <= act_budget:
+    for s in act[1:]:
+        if nbytes(out) + 1 + nbytes(s) <= int(budget * 0.75):
             out += " " + s
+
+    # Mención corta del propósito: se prueba la frase descriptiva más breve primero,
+    # para maximizar la probabilidad de que quepa alguna.
+    for s in sorted(rest, key=nbytes):
+        if nbytes(out) + 1 + nbytes(s) <= budget:
+            out += " " + s
+            break
     for s in rest:
-        if len(out) + 1 + len(s) <= target:
+        if s in out:
+            continue
+        if nbytes(out) + 1 + nbytes(s) <= budget:
             out += " " + s
     return out
 
 
-def clamp_description(desc: str, limit: int = SAFE_DESCRIPTION) -> str:
-    """Recorta la descripción por debajo de `limit` en caracteres Y en bytes UTF-8.
+def clamp_description(desc: str, budget: int = BUDGET_DEFAULT) -> str:
+    """Garantía dura: deja la descripción por debajo de `budget` bytes UTF-8.
 
-    Corta en el último final de frase que quepa; si no hay ninguno razonable, en
-    el último espacio. Nunca a mitad de palabra: la descripción es el criterio de
+    Corta en el último final de frase que quepa; si no hay ninguno razonable, en el
+    último espacio. Nunca a mitad de palabra: la descripción es el criterio de
     activación, y una frase partida no lo es.
     """
-    if len(desc) <= limit and len(desc.encode("utf-8")) <= limit:
+    if nbytes(desc) <= budget:
         return desc
-    # Recorte por bytes (descartando un carácter partido) y luego por caracteres.
-    cut = desc.encode("utf-8")[:limit - 4].decode("utf-8", errors="ignore")[:limit - 4]
-    floor = int(limit * 0.6)  # no dejar un muñón: mejor cortar por palabra que devolver 3 frases
+    cut = desc.encode("utf-8")[:budget - 4].decode("utf-8", errors="ignore")
+    while nbytes(cut) > budget - 4:
+        cut = cut[:-1]
+    floor = int(len(cut) * 0.6)   # no dejar un muñón de una frase suelta
     ends = list(re.finditer(r"[.!?](?=\s|$)", cut))
     if ends and ends[-1].end() >= floor:
         return cut[:ends[-1].end()]
@@ -371,6 +395,11 @@ class SkillResult:
     findings: list = field(default_factory=list)
     adaptations: list = field(default_factory=list)
     extra_files: list = field(default_factory=list)
+    # Las dos variantes de la descripción: cada destino tiene su presupuesto.
+    desc_folder: str = ""     # carpeta descomprimida → Mistral
+    desc_zip: str = ""        # contenido del .zip → Perplexity
+    body: str = ""
+    fm_extra: dict = field(default_factory=dict)
 
     @property
     def worst(self) -> str:
@@ -445,16 +474,6 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
                 "Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han "
                 "puesto delante de las que describen qué hace. Es lo único que el destino lee "
                 "para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.")
-        # Compactar al presupuesto blando: el índice del destino paga esta descripción
-        # en cada sesión, y una lista de doce disparantes no discrimina mejor que cuatro.
-        compacted = compact_description(res.description)
-        if compacted != res.description:
-            antes = len(res.description)
-            res.description = compacted
-            res.adaptations.append(
-                f"Descripción compactada de {antes} a {len(compacted)} caracteres: se resumen "
-                "los ejemplos de disparadores repetidos y se descartan las frases que sólo "
-                "cuentan qué hace la skill. El criterio de activación se conserva entero.")
     if not ACTIVATION_RX.search(res.description):
         res.findings.append(Finding("alta", "description-sin-activacion",
             "La descripción no dice en ningún momento CUÁNDO cargar la skill: no hay ni un "
@@ -463,17 +482,31 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
             "Esto no se puede arreglar automáticamente sin inventar: reescríbela empezando "
             "por los disparadores."))
 
-    # Longitud de la descripción
-    clamped = clamp_description(res.description)
-    if clamped != res.description:
-        orig_chars, orig_bytes = len(res.description), len(res.description.encode("utf-8"))
-        res.description = clamped
+    # Una descripción por destino: no comparten presupuesto, así que no comparten texto.
+    origen_bytes = nbytes(res.description)
+    if reorder:
+        res.desc_folder = clamp_description(
+            compact_description(res.description, BUDGET_MISTRAL), BUDGET_MISTRAL)
+        res.desc_zip = clamp_description(
+            compact_description(res.description, BUDGET_PERPLEXITY), BUDGET_PERPLEXITY)
+    else:
+        res.desc_folder = clamp_description(res.description, BUDGET_MISTRAL)
+        res.desc_zip = clamp_description(res.description, BUDGET_PERPLEXITY)
+    res.description = res.desc_zip   # la que se muestra en el informe
+
+    if origen_bytes > BUDGET_MISTRAL:
+        res.adaptations.append(
+            f"Descripción ajustada a cada destino: {origen_bytes} bytes de origen → "
+            f"{nbytes(res.desc_zip)} B en el `.zip` (Perplexity, tope {BUDGET_PERPLEXITY}) y "
+            f"{nbytes(res.desc_folder)} B en la carpeta (Mistral, tope {BUDGET_MISTRAL}). "
+            "Se podan primero los ejemplos entrecomillados y después las frases que sólo "
+            "cuentan qué hace la skill; el criterio de activación se conserva.")
+    if origen_bytes > BUDGET_PERPLEXITY:
         res.findings.append(Finding("media", "description-larga",
-            f"La descripción medía {orig_chars} caracteres ({orig_bytes} bytes) y se ha "
-            f"recortado a {len(clamped)} ({len(clamped.encode('utf-8'))} bytes), cortando por "
-            "frase. Perplexity rechaza el zip entero si se pasa del límite, y lo mide en "
-            "bytes UTF-8, no en caracteres: en español un acento cuenta doble. Reescríbela a "
-            "mano — debe decir CUÁNDO cargar la skill, no qué hace."))
+            f"La descripción de origen medía {origen_bytes} bytes UTF-8 y no cabe entera en "
+            "ningún destino. El recorte automático mantiene frases completas, pero no puede "
+            "reescribir: revisa el resultado y, si ha perdido matiz, redáctala a mano en un "
+            "solo párrafo que diga primero cuándo activarse y luego para qué sirve."))
     elif len(res.description) > SOFT_DESCRIPTION_CHARS:
         res.findings.append(Finding("baja", "description-densa",
             f"Descripción de {len(res.description)} caracteres. Perplexity paga este coste "
@@ -528,22 +561,22 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
             "no se ejecutan. Si la lógica vive en el script, el SKILL.md debe traer un "
             "procedimiento manual equivalente al que caer."))
 
-    fm_out = {"name": name, "description": res.description}
-    for k in PORTABLE_KEYS:
-        if k in ("name", "description"):
-            continue
-        if k in fm and isinstance(fm[k], str) and fm[k]:
-            fm_out[k] = fm[k]
-
-    lines = ["---"]
-    for k, v in fm_out.items():
-        lines.append(f"{k}: {yaml_escape(v)}")
-    lines.append("---")
-    header = "\n".join(lines) + "\n"
-
-    notes = render_notes(res)
-    (dest / "SKILL.md").write_text(header + body.rstrip() + notes, encoding="utf-8")
+    res.body = body
+    res.fm_extra = {k: fm[k] for k in PORTABLE_KEYS
+                    if k not in ("name", "description")
+                    and isinstance(fm.get(k), str) and fm.get(k)}
+    # La carpeta en disco es la variante de Mistral; el zip se reescribe al empaquetar.
+    write_skill_md(res, dest, res.desc_folder)
     return res
+
+
+def write_skill_md(res: SkillResult, dest: Path, description: str) -> None:
+    """Escribe el SKILL.md con la descripción que corresponda al destino."""
+    fm_out = {"name": res.name, "description": description}
+    fm_out.update(res.fm_extra)
+    lines = ["---"] + [f"{k}: {yaml_escape(v)}" for k, v in fm_out.items()] + ["---"]
+    (dest / "SKILL.md").write_text(
+        "\n".join(lines) + "\n" + res.body.rstrip() + render_notes(res), encoding="utf-8")
 
 
 def render_notes(res: SkillResult) -> str:
@@ -597,14 +630,16 @@ def write_report(results: list, out: Path, source: str) -> None:
         "",
         "## Dónde sube cada cosa",
         "",
-        "Hay **un solo artefacto por skill**: el `.zip`. La carpeta del mismo nombre es",
-        "ese zip ya descomprimido — no es un formato distinto.",
+        "**El `.zip` y la carpeta no son intercambiables.** Llevan los mismos ficheros, pero",
+        f"la descripción se ajusta al presupuesto de cada destino: {BUDGET_PERPLEXITY} bytes",
+        f"en el zip y {BUDGET_MISTRAL} en la carpeta. Descomprimir el zip **no** produce la",
+        "carpeta de Mistral: su descripción sería demasiado larga.",
         "",
         "| Destino | Qué subir | Dónde |",
         "|---|---|---|",
         "| Perplexity Computer | `<skill>.zip` — tal cual, sin tocar | "
         "perplexity.ai/computer/skills → Create skill → Upload a skill |",
-        "| Mistral Vibe Work | `<skill>/` — el zip descomprimido, nada más | "
+        "| Mistral Vibe Work | `<skill>/` — la carpeta, no el zip | "
         "chat.mistral.ai/work → Context → Skills → New Skill |",
         "",
         "## Resumen",
@@ -656,13 +691,14 @@ def resolve_source(src: str, workdir: Path) -> Path:
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Plugin de Claude → Agent Skills portable",
-        epilog="Salida: <skill>.zip (se sube tal cual a Perplexity) y <skill>/ "
-               "(ese mismo zip descomprimido, que es lo que se sube a Mistral).")
+        epilog="Salida: <skill>.zip para Perplexity y <skill>/ para Mistral. Mismos "
+               "ficheros, pero la descripción se ajusta al presupuesto de cada destino: "
+               "descomprimir el zip NO produce la carpeta de Mistral.")
     ap.add_argument("source", help="URL del repositorio o ruta local")
     ap.add_argument("--out", default="./dist-agentskills", help="directorio de salida")
     ap.add_argument("--only", nargs="*", default=None, help="exportar sólo estas skills")
     ap.add_argument("--zip-only", action="store_true",
-                    help="dejar sólo los .zip y borrar las carpetas descomprimidas")
+                    help="dejar sólo los .zip (pierdes la variante de Mistral)")
     ap.add_argument("--keep-description-order", action="store_true",
                     help="no reordenar la descripción (por defecto la activación va primero)")
     args = ap.parse_args()
@@ -670,8 +706,8 @@ def main() -> int:
     out = Path(args.out).expanduser().resolve()
     if out.exists():
         shutil.rmtree(out)
-    # Las carpetas de skill cuelgan directamente de <out>: son el contenido del zip
-    # ya descomprimido, no un formato aparte.
+    # Las carpetas de skill cuelgan directamente de <out>, al lado de su zip: mismos
+    # ficheros, distinta descripción.
     out.mkdir(parents=True)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -698,7 +734,9 @@ def main() -> int:
         # Un zip por skill, con la carpeta de la skill en la raíz del zip:
         # es la única estructura que Perplexity acepta.
         for r in results:
+            write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
             zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
+            write_skill_md(r, out / r.name, r.desc_folder)   # en disco: Mistral
 
         if args.zip_only:
             for r in results:
@@ -711,11 +749,13 @@ def main() -> int:
             encoding="utf-8")
 
     print(f"\n[ok] Salida en: {out}")
-    print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill: se sube tal cual)")
+    print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill; "
+          f"descripción ≤{BUDGET_PERPLEXITY} B)")
     if not args.zip_only:
-        print(f"     Mistral    → <skill>/      (ese mismo zip descomprimido)")
+        print(f"     Mistral    → <skill>/      (descripción ≤{BUDGET_MISTRAL} B — NO es el "
+              f"zip descomprimido)")
     else:
-        print(f"     Mistral    → descomprime el .zip y sube la carpeta resultante")
+        print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de {BUDGET_MISTRAL} B")
     print(f"     Informe    → INFORME-PORTABILIDAD.md")
     riesgo = [r.name for r in results if r.worst == "alta"]
     if riesgo:

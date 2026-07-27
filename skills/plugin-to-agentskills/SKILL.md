@@ -25,17 +25,17 @@ una viaja:
 Si el usuario dice "convierte mi plugin", **dilo explícitamente**: se exportan las
 skills, el resto se queda. No lo dejes implícito.
 
-**Hay un solo artefacto por skill: el `.zip`.** Ese zip es válido tal cual para
-Perplexity. Para Mistral, lo único que hace falta es descomprimirlo y subir la carpeta
-resultante — ninguna conversión más.
+**El `.zip` y la carpeta no son intercambiables.** Llevan los mismos ficheros, pero la
+descripción del frontmatter se ajusta al presupuesto de cada destino. Descomprimir el zip
+**no** produce la carpeta de Mistral: su descripción sería demasiado larga.
 
-| Destino | Qué subir | Dónde |
-|---|---|---|
-| **Perplexity Computer** | el `.zip` **tal cual** — una skill por zip, con la carpeta de la skill en la raíz | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
-| **Mistral Vibe Work** | ese mismo zip **descomprimido**, con `SKILL.md` dentro | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
+| Destino | Qué subir | Presupuesto de `description` | Dónde |
+|---|---|---|---|
+| **Perplexity Computer** | el `.zip` **tal cual** — una skill por zip, con la carpeta de la skill en la raíz | ≤ 850 bytes | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
+| **Mistral Vibe Work** | la **carpeta** `<skill>/` | ≤ 490 bytes | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
 
-El conversor deja las dos cosas juntas para ahorrar el paso, pero no son dos formatos:
-la carpeta *es* el zip abierto.
+Si el usuario sólo tiene el `.zip` y quiere subirlo a Mistral, dile que vuelva a exportar:
+descomprimirlo le dará una descripción de hasta 850 bytes.
 
 ## Paso 0: localiza el conversor antes de nada
 
@@ -76,9 +76,10 @@ puede hacer por ninguna vía.
    python3 "$CONV" <url-o-ruta> --out ./dist-agentskills
    ```
 
-   Deja en `dist-agentskills/` un `<skill>.zip` por skill y, al lado, ese mismo zip ya
-   descomprimido en `<skill>/`. Añade `--only nombre1 nombre2` para exportar sólo
-   algunas skills, o `--zip-only` si el usuario sólo quiere los zips.
+   Deja en `dist-agentskills/` un `<skill>.zip` (Perplexity) y una carpeta `<skill>/`
+   (Mistral) por cada skill. Añade `--only nombre1 nombre2` para exportar sólo algunas.
+   `--zip-only` borra las carpetas y **con ellas la variante de Mistral**: úsalo sólo si
+   el usuario dice que va a Perplexity y a ningún otro sitio.
 
 3. **Lee `INFORME-PORTABILIDAD.md`** y resume al usuario: cuántas skills salieron,
    cuáles tienen riesgo alto y por qué. No te limites a decir "listo".
@@ -100,17 +101,23 @@ puede hacer por ninguna vía.
 - Audita el cuerpo y **escribe los avisos dentro del propio `SKILL.md`**, para que el
   agente de destino sepa que hay instrucciones que no podrá cumplir y lo diga en vez
   de inventarse el resultado.
-- Empaqueta cada skill en un `<skill>.zip` (con la carpeta de la skill en su raíz) y
-  deja al lado esa misma carpeta ya descomprimida, más el informe.
+- **Compacta la descripción al presupuesto de cada destino**, en bytes UTF-8: 490 para la
+  carpeta de Mistral, 850 para el zip de Perplexity. Poda primero los ejemplos
+  entrecomillados —deja como mucho cuatro— y después las frases que sólo cuentan qué hace
+  la skill, hasta que cabe. El resultado es siempre un párrafo: primero cuándo activarse,
+  después para qué sirve. Nunca corta a mitad de frase.
+- Empaqueta cada skill en un `<skill>.zip` (con la carpeta de la skill en su raíz) y deja
+  al lado la carpeta con la variante corta, más el informe.
 
 ## Gotchas
 
 - **Nunca un zip con todas las skills dentro.** Perplexity espera la carpeta de *una*
   skill en la raíz del zip. Un zip global falla o sólo reconoce una. El conversor ya
   genera uno por skill; no los agrupes tú después.
-- **Mistral quiere el zip abierto, no el zip.** Si el usuario sólo tiene el `.zip`, no
-  hay que regenerar nada: se descomprime y se sube la carpeta que sale. Y a la inversa,
-  no le digas que necesita un formato distinto — no lo necesita.
+- **Mistral quiere la carpeta, no el zip — y no vale descomprimirlo.** Las dos variantes
+  llevan los mismos ficheros pero distinta `description`: 490 bytes en la carpeta, 850 en
+  el zip. Descomprimir el zip da la descripción larga. Es la trampa más fácil de esta
+  herramienta, precisamente porque antes sí eran idénticos.
 - **Mistral valida que el markdown *sea* un `SKILL.md`, no que hable de uno.** Si le
   subes un documento con los campos troceados para copiar y pegar, responde *"sube un
   archivo Markdown válido de skill"*. Nunca fabriques ese intermediario: lo que quiere

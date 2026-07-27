@@ -155,16 +155,17 @@ cd claude-skills-exporter</code></pre>
 <h3>Qué aparece en la carpeta <code>salida/</code></h3>
 
 <div class="note">
-  <strong>Hay un solo archivo que importa por cada skill: su <code>.zip</code></strong>
-  Ese zip vale <em>tal cual</em> para Perplexity. Para Mistral lo único que hace falta es
-  descomprimirlo. La carpeta que verás al lado del zip es exactamente eso: el zip ya
-  descomprimido, para que no tengas ni que abrirlo.
+  <strong>Cada skill sale en dos formas, y no son intercambiables.</strong>
+  El <code>.zip</code> es para Perplexity y la carpeta para Mistral. Llevan los mismos
+  ficheros, pero la descripción se ajusta al espacio que admite cada plataforma: hasta
+  850 bytes en el zip, hasta 490 en la carpeta. Por eso <em>descomprimir el zip no vale</em>
+  para Mistral: la descripción que sale es la larga.
 </div>
 
 <table>
   <tr><th>Carpeta o fichero</th><th>Para qué sirve</th></tr>
-  <tr><td><code>mi-skill.zip</code></td><td><strong>El archivo.</strong> Se sube a Perplexity sin tocarlo</td></tr>
-  <tr><td><code>mi-skill/</code></td><td>Ese mismo zip descomprimido. Es lo que se sube a Mistral</td></tr>
+  <tr><td><code>mi-skill.zip</code></td><td><strong>Para Perplexity.</strong> Se sube sin tocarlo</td></tr>
+  <tr><td><code>mi-skill/</code></td><td><strong>Para Mistral.</strong> La carpeta, no el zip abierto</td></tr>
   <tr><td><code>INFORME-PORTABILIDAD.md</code></td><td><strong>Léelo.</strong> Dice qué se rompió y qué se arregló</td></tr>
   <tr><td><code>resumen.json</code></td><td>Lo mismo que el informe, para procesarlo con otro programa</td></tr>
 </table>
@@ -222,9 +223,11 @@ quiere la <strong>carpeta</strong>, no el zip.</p>
   <h3><span class="n">2</span> Localiza la carpeta de la skill</h3>
   <p>En <code>salida/</code>, junto a cada <code>.zip</code>, hay una carpeta con el
   mismo nombre y sin la extensión: <code>mi-skill.zip</code> → <code>mi-skill/</code>.
-  Esa carpeta es el zip ya descomprimido, con su <code>SKILL.md</code> dentro.</p>
-  <p>Si sólo conservaste el <code>.zip</code>, haz doble clic sobre él para
-  descomprimirlo. Eso es todo: no hay ninguna conversión adicional.</p>
+  Sube <strong>esa carpeta</strong>.</p>
+  <p><strong>No descomprimas el zip para esto.</strong> La carpeta y el zip no son
+  iguales: llevan los mismos ficheros, pero la descripción de la carpeta está recortada
+  a 490 bytes, que es lo que admite Mistral. Si sólo conservaste el <code>.zip</code>,
+  vuelve a ejecutar el conversor en vez de abrirlo.</p>
 </div>
 <div class="step">
   <h3><span class="n">3</span> Súbela</h3>
