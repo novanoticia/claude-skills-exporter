@@ -23,6 +23,17 @@ jobs:
       - name: Validar manifiestos, skills y comandos
         run: python3 .github/validate_plugin.py .
 
+      - name: Pruebas unitarias
+        run: python3 -m unittest discover -s tests -t tests -v
+
+      - name: El conversor arranca desde una copia aislada
+        run: |
+          cp -R . /tmp/cse-aislado
+          python3 /tmp/cse-aislado/skills/plugin-to-agentskills/scripts/convert.py \
+            /tmp/cse-aislado --out /tmp/salida-aislada
+          test -f /tmp/salida-aislada/INFORME-PORTABILIDAD.md
+          echo "Arranca sin instalacion desde una ruta ajena al repositorio."
+
       - name: Prueba de humo del conversor
         run: |
           python3 skills/plugin-to-agentskills/scripts/convert.py --help
