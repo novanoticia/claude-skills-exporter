@@ -400,7 +400,6 @@ Borrar de `convert.py` todo lo movido y añadir el import:
 
 ```python
 from exporter.descripcion import (
-    ACTIVATION_RX,
     clamp_description,
     compact_description,
     nbytes,
@@ -408,6 +407,10 @@ from exporter.descripcion import (
     tiene_activacion,
 )
 ```
+
+`ACTIVATION_RX` **no** se importa: su único uso en `convert.py` es justamente el que
+`tiene_activacion()` sustituye. Vale aquí la misma regla de la tarea 1 — importar sólo lo
+que este fichero llama.
 
 En `audit_and_adapt`, sustituir las dos apariciones de `if not ACTIVATION_RX.search(res.description):` por `if not tiene_activacion(res.description):`. Las llamadas a `compact_description` y `clamp_description` ya pasan el presupuesto explícito, así que no cambian.
 

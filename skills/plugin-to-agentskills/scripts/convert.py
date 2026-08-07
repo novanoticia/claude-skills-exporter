@@ -42,7 +42,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from exporter.descripcion import (
-    ACTIVATION_RX,
     clamp_description,
     compact_description,
     nbytes,
