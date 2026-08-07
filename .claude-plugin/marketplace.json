@@ -10,10 +10,17 @@
     {
       "name": "claude-skills-exporter",
       "source": "./",
-      "description": "Extrae las skills de un repositorio con un plugin de Claude, audita su portabilidad y las empaqueta para Perplexity Computer y Mistral Vibe Work.",
+      "description": "Extrae las skills de un repositorio con un plugin de Claude, audita su portabilidad y las empaqueta para ChatGPT, Perplexity Computer y Mistral Vibe Work. Conforme a Agent Plugins 1.0.0.",
       "homepage": "https://github.com/novanoticia/claude-skills-exporter",
       "category": "productivity",
-      "tags": ["agent-skills", "perplexity", "mistral", "exportar"]
+      "tags": [
+        "agent-skills",
+        "agent-plugins",
+        "chatgpt",
+        "perplexity",
+        "mistral",
+        "exportar"
+      ]
     }
   ]
 }
