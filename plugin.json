@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "claude-skills-exporter",
+  "description": "Extrae las skills de un repositorio con un plugin de Claude, audita su portabilidad y las empaqueta para Perplexity Computer y Mistral Vibe Work.",
+  "author": {
+    "name": "Pablo Rodríguez López",
+    "email": "novanoticia@icloud.com"
+  },
+  "homepage": "https://github.com/novanoticia/claude-skills-exporter",
+  "repository": "https://github.com/novanoticia/claude-skills-exporter",
+  "license": "MIT",
+  "keywords": [
+    "agent-skills",
+    "perplexity",
+    "mistral",
+    "portabilidad",
+    "exportar",
+    "skills"
+  ]
+}

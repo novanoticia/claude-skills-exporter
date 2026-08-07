@@ -60,8 +60,21 @@ CLAUDE_ONLY_KEYS = {
     "model", "argument-hint", "user-invocable", "context",
 }
 
-# Claves que se conservan tal cual.
-PORTABLE_KEYS = ["name", "description", "license", "version", "depends", "metadata"]
+# Claves escalares del estándar Agent Skills que se conservan tal cual.
+# El conjunto del estándar es CERRADO: name, description, license,
+# compatibility, metadata y allowed-tools. Cualquier otra clave al nivel
+# superior hace que el destino rechace la skill con ERROR DURO —claude.ai y la
+# Skills API responden "Unexpected key(s) in SKILL.md frontmatter"— en vez de
+# ignorarla. `allowed-tools` es del estándar pero se retira igualmente porque su
+# semántica es de Claude y no significa nada fuera (ver CLAUDE_ONLY_KEYS).
+PORTABLE_KEYS = ["name", "description", "license", "compatibility"]
+
+# Claves que NO son del estándar pero cuyo valor merece conservarse: se anidan
+# bajo `metadata`, el cajón que la spec reserva para datos propios del autor.
+# `version` vivía en PORTABLE_KEYS y se emitía al nivel superior, así que TODA
+# skill exportada fallaba al subirse. `metadata` también estaba en la lista pero
+# nunca sobrevivía: el filtro exigía valores str y un mapa no lo es.
+KEYS_A_METADATA = ["version", "depends"]
 
 # Herramientas propias del entorno Claude que, si la skill las invoca por nombre,
 # probablemente no existan en Perplexity/Mistral con la misma semántica.
@@ -145,8 +158,23 @@ def parse_simple_yaml(raw: str) -> dict:
             return
         if mode == "block":
             data[key] = "\n".join(buf).strip()
-        elif mode == "list":
-            data[key] = [x for x in buf if x]
+        elif mode == "nested":
+            # Una clave sin valor puede abrir una lista (`- item`) o un mapa
+            # (`clave: valor`). Se decide aquí, con las líneas ya recogidas:
+            # antes se asumía lista siempre y un `metadata:` con claves dentro
+            # se perdía entero, que es justo donde la spec manda guardar los
+            # datos propios del autor.
+            items = [x for x in buf if x]
+            pares = [re.match(r"^([A-Za-z0-9_\-.]+)\s*:\s*(.+)$", x)
+                     for x in items if not x.startswith("- ")]
+            if items and all(x.startswith("- ") for x in items):
+                data[key] = [unquote(x[2:].strip()) for x in items]
+            elif items and all(pares):
+                data[key] = {m.group(1): unquote(m.group(2).strip())
+                             for m in pares}
+            else:
+                data[key] = [unquote(x[2:].strip()) for x in items
+                             if x.startswith("- ")]
         key, buf, mode = None, [], None
 
     for line in raw.splitlines():
@@ -157,14 +185,13 @@ def parse_simple_yaml(raw: str) -> dict:
         stripped = line.strip()
         cur_indent = len(line) - len(line.lstrip())
 
-        if mode in ("block", "list") and cur_indent > indent:
-            if mode == "list" and stripped.startswith("- "):
-                buf.append(unquote(stripped[2:].strip()))
-            elif mode == "block":
-                buf.append(stripped)
+        if mode in ("block", "nested") and cur_indent > indent:
+            # En modo `nested` se guarda la línea CRUDA: aún no se sabe si el
+            # bloque es una lista o un mapa, y flush() necesita el prefijo.
+            buf.append(stripped)
             continue
-        if mode == "list" and stripped.startswith("- ") and cur_indent >= indent:
-            buf.append(unquote(stripped[2:].strip()))
+        if mode == "nested" and stripped.startswith("- ") and cur_indent >= indent:
+            buf.append(stripped)
             continue
         flush()
 
@@ -176,7 +203,7 @@ def parse_simple_yaml(raw: str) -> dict:
         if v in ("|", "|-", ">", ">-", "|+", ">+"):
             key, mode, buf = k, "block", []
         elif v == "":
-            key, mode, buf = k, "list", []
+            key, mode, buf = k, "nested", []
         else:
             data[k] = unquote(v)
     flush()
@@ -405,6 +432,7 @@ class SkillResult:
     desc_zip: str = ""        # contenido del .zip → Perplexity
     body: str = ""
     fm_extra: dict = field(default_factory=dict)
+    fm_meta: dict = field(default_factory=dict)
 
     @property
     def worst(self) -> str:
@@ -571,6 +599,26 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
     res.fm_extra = {k: fm[k] for k in PORTABLE_KEYS
                     if k not in ("name", "description")
                     and isinstance(fm.get(k), str) and fm.get(k)}
+
+    # Lo que no es del estándar pero vale la pena conservar baja a `metadata`,
+    # fusionado con el `metadata` de origen si lo hubiera. Sin esto, `version`
+    # salía al nivel superior y el destino rechazaba la skill entera.
+    meta = {}
+    if isinstance(fm.get("metadata"), dict):
+        meta.update({str(k): str(v) for k, v in fm["metadata"].items()})
+    bajadas = []
+    for k in KEYS_A_METADATA:
+        v = fm.get(k)
+        if isinstance(v, str) and v:
+            meta.setdefault(k, v)
+            bajadas.append(k)
+    if meta:
+        res.fm_meta = meta
+    if bajadas:
+        res.adaptations.append(
+            "Claves movidas a `metadata` (el frontmatter del estándar es un "
+            "conjunto cerrado y al nivel superior el destino las rechaza): "
+            + ", ".join(bajadas) + ".")
     # La carpeta en disco es la variante de Mistral; el zip se reescribe al empaquetar.
     write_skill_md(res, dest, res.desc_folder)
     return res
@@ -580,7 +628,12 @@ def write_skill_md(res: SkillResult, dest: Path, description: str) -> None:
     """Escribe el SKILL.md con la descripción que corresponda al destino."""
     fm_out = {"name": res.name, "description": description}
     fm_out.update(res.fm_extra)
-    lines = ["---"] + [f"{k}: {yaml_escape(v)}" for k, v in fm_out.items()] + ["---"]
+    lines = ["---"] + [f"{k}: {yaml_escape(v)}" for k, v in fm_out.items()]
+    # `metadata` es un mapa, no un escalar: va como bloque anidado.
+    if res.fm_meta:
+        lines.append("metadata:")
+        lines += [f"  {k}: {yaml_escape(v)}" for k, v in res.fm_meta.items()]
+    lines.append("---")
     (dest / "SKILL.md").write_text(
         "\n".join(lines) + "\n" + res.body.rstrip() + render_notes(res), encoding="utf-8")
 
