@@ -21,6 +21,7 @@
 - **Vocabularios cerrados.** Capacidad: `si`, `si_con_confirmacion`, `parcial`, `no`, `desconocido`. Confianza: `oficial`, `oficial-incompleto`, `observado`, `comunidad`, `no-verificado`. Severidad: `alta`, `media`, `baja`. Estado: `compatible`, `compatible_con_adaptacion`, `degradado`, `no_compatible`, `no_verificable`.
 - **`bloqueo_seguridad` siempre `null`.** Existe en el modelo y el schema; ninguna regla lo emite en esta rebanada.
 - Rama de trabajo: `auditor-portabilidad`. No hacer push salvo petición explícita de Pablo.
+- **Los números de línea de este plan se refieren a `convert.py` tal como estaba antes de la tarea 1** (832 líneas). Cada extracción los desplaza. Trátalos como una pista de dónde mirar, no como una dirección: **localiza los bloques por contenido**. Si lo que encuentras no coincide con lo que dice el plan, informa de la discrepancia en tu informe en lugar de forzar el encaje.
 
 ---
 
@@ -2601,6 +2602,56 @@ from exporter.informes import informe_markdown, resumen_json
 from exporter.modelo import SkillPortatil, capacidades_de
 from exporter.perfiles import cargar_perfiles
 ```
+
+- [ ] **Step 6b: Los presupuestos salen del perfil, no de constantes**
+
+Es el paso que cierra el objetivo de la rebanada: mientras `BUDGET_MISTRAL` y
+`BUDGET_PERPLEXITY` sigan escritos en `convert.py`, añadir un destino seguirá exigiendo
+editar Python. Hay unos trece usos repartidos entre `audit_and_adapt`, el informe y los
+mensajes finales de `main`.
+
+Añadir a `exporter/perfiles.py`:
+
+```python
+def presupuesto_por_modo(perfiles: dict, modo: str) -> int:
+    """El presupuesto mas restrictivo entre los destinos que aceptan ese modo.
+
+    El artefacto es uno solo por modo —una carpeta, un zip— y tiene que valer
+    para todos los destinos que lo admitan, asi que manda el mas estrecho.
+    """
+    presupuestos = [p.presupuesto() for p in perfiles.values() if modo in p.modos()]
+    if not presupuestos:
+        raise PerfilInvalido(
+            "ningun perfil declara el modo de instalacion '{}'".format(modo))
+    return min(presupuestos)
+```
+
+En `convert.py`: borrar `BUDGET_MISTRAL`, `BUDGET_PERPLEXITY` y `BUDGET_DEFAULT`, cargar
+los perfiles una sola vez al principio de `main` y pasar los dos presupuestos a
+`audit_and_adapt(skill_md, out_dir, presupuesto_carpeta, presupuesto_zip, reorder=True)`.
+Sustituir cada uso de la constante por el parámetro correspondiente, incluidos los textos
+de los avisos y los mensajes finales.
+
+```python
+    presupuesto_carpeta = presupuesto_por_modo(perfiles, "carpeta")   # Mistral: 490
+    presupuesto_zip = presupuesto_por_modo(perfiles, "zip")           # el resto: 850
+```
+
+Los valores resultantes son idénticos a los de hoy, así que **la salida no debe cambiar**.
+Ésa es justo la comprobación: si cambia, la derivación está mal.
+
+```bash
+cd "/Users/pablorodriguezlopez/Desktop/claude-skills-exporter" && python3 -c "
+import sys; sys.path.insert(0,'skills/plugin-to-agentskills/scripts')
+from exporter.perfiles import cargar_perfiles, presupuesto_por_modo
+p = cargar_perfiles()
+assert presupuesto_por_modo(p,'carpeta') == 490, presupuesto_por_modo(p,'carpeta')
+assert presupuesto_por_modo(p,'zip') == 850, presupuesto_por_modo(p,'zip')
+print('presupuestos derivados del perfil: 490 carpeta / 850 zip — OK')
+" && grep -c "BUDGET_" skills/plugin-to-agentskills/scripts/convert.py
+```
+
+Esperado: el mensaje de OK y `0` usos de `BUDGET_`.
 
 - [ ] **Step 7: Comprobar la matriz de punta a punta**
 
