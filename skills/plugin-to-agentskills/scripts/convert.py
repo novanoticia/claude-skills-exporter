@@ -48,6 +48,7 @@ from exporter.descripcion import (
     reorder_description,
     tiene_activacion,
 )
+from exporter.deteccion import CLAUDE_TOOL_NAMES, EXPLICACIONES, detectar_en_arbol
 from exporter.frontmatter import split_frontmatter, yaml_escape
 
 # --------------------------------------------------------------------------
@@ -90,56 +91,6 @@ PORTABLE_KEYS = ["name", "description", "license", "compatibility"]
 # skill exportada fallaba al subirse. `metadata` también estaba en la lista pero
 # nunca sobrevivía: el filtro exigía valores str y un mapa no lo es.
 KEYS_A_METADATA = ["version", "depends"]
-
-# Herramientas propias del entorno Claude que, si la skill las invoca por nombre,
-# probablemente no existan en Perplexity/Mistral con la misma semántica.
-CLAUDE_TOOL_NAMES = [
-    "TodoWrite", "AskUserQuestion", "NotebookEdit", "SlashCommand",
-    "ExitPlanMode", "WebFetch", "TaskCreate", "TaskUpdate", "ToolSearch",
-]
-
-PATTERNS = [
-    # (id, regex, severidad, explicación)
-    ("plugin-root", re.compile(r"\$\{?CLAUDE_PLUGIN_ROOT\}?"), "alta",
-     "Ruta ${CLAUDE_PLUGIN_ROOT}: sólo existe dentro de un plugin de Claude Code."),
-    ("mcp-tool", re.compile(r"\bmcp__[a-zA-Z0-9_\-]+"), "alta",
-     "Invoca herramientas MCP por nombre; esos servidores no estarán conectados."),
-    ("skill-tool", re.compile(r"\bSkill\s*\(\s*[\"'`]|\bSkill tool\b|\bherramienta Skill\b"), "alta",
-     "Invoca otras skills mediante la herramienta Skill de Claude."),
-    ("subagent", re.compile(r"\bTask tool\b|\bsubagent_type\b|\bAgent tool\b|\bsubagente\b", re.I), "alta",
-     "Delega en subagentes vía la herramienta Task, que no existe fuera de Claude Code."),
-    # Comando con namespace de plugin: /plugin:comando. Excluye namespaces XML tipo /w:p.
-    ("slash-plugin", re.compile(
-        r"(?:^|[\s(`])/[a-z][a-z0-9]{2,}(?:-[a-z0-9]+)*:[a-z][a-z0-9]{2,}(?:-[a-z0-9]+)*\b", re.M), "media",
-     "Referencia a comandos con namespace de plugin (/plugin:comando)."),
-    ("hooks", re.compile(r"\bhooks?\.json\b|\bPreToolUse\b|\bPostToolUse\b"), "media",
-     "Depende de hooks del plugin, que no se exportan."),
-    ("applescript", re.compile(r"\bosascript\b|\btell\s+application\b", re.I), "media",
-     "Usa AppleScript para llegar a aplicaciones del Mac. Perplexity Computer sí lo "
-     "ejecuta (comprobado), pero corta cada llamada en torno a 90 segundos: un lote largo "
-     "se queda a medias y deja el trabajo inconsistente. Trocea los lotes y verifica el "
-     "resultado después de cada trozo. Mistral no lo ejecuta en absoluto."),
-    ("lote-destructivo", re.compile(
-        r"\b(?:move|delete|borra|elimina|mueve|archiva)\b[^.\n]{0,60}\b(?:whose|todos|all|"
-        r"cada|every|lote|batch|masiv)", re.I), "alta",
-     "Modifica o mueve elementos en bloque a partir de un filtro. Si el entorno de destino "
-     "corta la llamada a mitad —Perplexity Computer lo hace— el lote queda parcialmente "
-     "aplicado y sin registro fiable de qué se tocó. Antes de exportar: procesa en trozos "
-     "pequeños, verifica releyendo el estado después de cada uno, y no confíes en que el "
-     "filtro se haya aplicado como esperabas: compruébalo sobre los elementos afectados."),
-    ("home-tilde", re.compile(r"(?<![\w/])(?:~/|\$HOME/)[\w.\-]"), "media",
-     "Lee o escribe en rutas con ~ o $HOME. Comprobado en Mistral Vibe Work: $HOME vale "
-     "'/', así que '~/.mi-skill/' termina creando '//.mi-skill/'. Usa rutas relativas a "
-     "la carpeta de la skill, o pide al usuario una ruta absoluta explícita."),
-    ("estado-persistente", re.compile(r">>\s*[\"']?[~$./][^\s\"'|;)]*"), "media",
-     "Acumula estado con anexado (>>). Comprobado en Mistral Vibe Work: la escritura "
-     "puede reportar éxito y el fichero no existir después. Reléelo para confirmarlo, o "
-     "reescribe el fichero entero de una vez en lugar de ir anexando."),
-    ("claude-md", re.compile(r"\bCLAUDE\.md\b"), "baja",
-     "Referencia a CLAUDE.md, convención específica de Claude Code."),
-    ("claude-brand", re.compile(r"\bClaude Code\b|\bCowork\b"), "baja",
-     "Menciona el producto Claude por su nombre; conviene neutralizarlo."),
-]
 
 
 # --------------------------------------------------------------------------
@@ -294,12 +245,12 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
         res.adaptations.append("Rutas ${CLAUDE_PLUGIN_ROOT}/... convertidas en rutas relativas a la skill.")
         body = new_body
 
-    # Patrones problemáticos en el cuerpo
-    for code, rx, sev, expl in PATTERNS:
-        hits = rx.findall(body)
-        if hits:
-            sample = sorted({h if isinstance(h, str) else h[0] for h in hits})[:4]
-            res.findings.append(Finding(sev, code, f"{expl} Ejemplos: {', '.join(sample)}"))
+    # Patrones problemáticos en todo el árbol de la skill (SKILL.md, references/,
+    # scripts/, y cualquier otro fichero de texto), no sólo en el cuerpo.
+    for s in detectar_en_arbol(src_dir):
+        res.findings.append(Finding(s.severidad_base, s.id,
+                                    "{} Visto en {}: {}".format(
+                                        EXPLICACIONES[s.id], s.ubicacion, s.muestra)))
 
     tools_used = sorted({t for t in CLAUDE_TOOL_NAMES if re.search(rf"\b{t}\b", body)})
     if tools_used:
