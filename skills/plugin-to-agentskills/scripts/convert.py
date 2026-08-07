@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 convert.py — Extrae las skills de un repositorio con un plugin de Claude y las
-empaqueta en formato Agent Skills portable (Perplexity Computer / Mistral Vibe).
+empaqueta en formato Agent Skills portable (ChatGPT / Perplexity Computer /
+Mistral Vibe Work / claude.ai).
 
 Parte de Claude Skills Exporter.
 Copyright (c) 2026 Pablo Rodríguez López — https://github.com/novanoticia
@@ -14,7 +15,7 @@ Uso:
     python3 convert.py <repo-url-o-ruta> [--out DIR] [--only NOMBRE ...]
 
 Salidas en <out>/:
-    <skill>.zip                se sube tal cual a Perplexity Computer
+    <skill>.zip                se sube tal cual a ChatGPT, claude.ai y Perplexity
     <skill>/                   se sube a Mistral Vibe Work
     INFORME-PORTABILIDAD.md    qué se adaptó y qué se romperá fuera de Claude
     resumen.json               lo mismo, en formato máquina
@@ -44,13 +45,18 @@ from pathlib import Path
 # Límites y constantes del estándar Agent Skills
 # --------------------------------------------------------------------------
 
-MAX_DESCRIPTION_CHARS = 1024      # límite duro habitual del campo description
+# Tope del estándar Agent Skills, en CARACTERES. Es también el que aplican
+# ChatGPT (Skills), claude.ai y la Skills API, y lo aplican como error duro.
+MAX_DESCRIPTION_CHARS = 1024
 
 # Presupuestos POR DESTINO, en BYTES UTF-8 (no en caracteres: en español un acento
 # ocupa dos y una raya tres, así que contar letras engaña por un 2-3%).
 BUDGET_MISTRAL = 490              # carpeta descomprimida
 BUDGET_PERPLEXITY = 850           # dentro del .zip
 BUDGET_DEFAULT = BUDGET_PERPLEXITY
+# ChatGPT y claude.ai no necesitan presupuesto propio: su tope es el del estándar
+# (1024 caracteres) y el zip ya viaja con la descripción de 850 bytes, que cabe de
+# sobra. Por eso el mismo .zip de Perplexity sirve para los tres sin reexportar.
 SOFT_BODY_TOKENS = 5000           # cuerpo recomendado del SKILL.md
 CHARS_PER_TOKEN = 4               # estimación grosera
 

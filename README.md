@@ -2,7 +2,15 @@
 
 Coge un repositorio con un plugin (o unas skills) de Claude, extrae las skills,
 **audita qué se romperá fuera de Claude** y las empaqueta para instalarlas en
-**Perplexity Computer** y **Mistral Vibe Work**.
+**ChatGPT**, **Perplexity Computer** y **Mistral Vibe Work**.
+
+> **Compatible con [Agent Plugins 1.0.0](https://agent-plugins.org/specification)** —
+> el formato portátil de empaquetado de la Agentic AI Foundation (OpenAI, Amazon,
+> Microsoft, Cursor y Vercel, con Google como *core maintainer*). Este repositorio
+> es a la vez un plugin conforme a esa especificación y la herramienta que lleva
+> otros plugins hacia ella. Las skills que produce validan contra el conjunto
+> cerrado de frontmatter de [Agent Skills](https://agentskills.io/specification),
+> que es lo que ChatGPT, claude.ai y la Skills API exigen para aceptar una subida.
 
 👉 **Si no manejas GitHub, empieza por la [guía de uso](docs/guia.html)** — descárgala y
 ábrela con doble clic en el navegador. Cubre instalar la herramienta, exportar un
@@ -40,13 +48,31 @@ cumplir, para que lo declare en vez de simular el resultado.
 Lo que va después de la arroba, `pablo-skills-tools`, es el nombre del **marketplace**
 (campo `name` de `.claude-plugin/marketplace.json`), no un usuario de GitHub.
 
-Después:
+### Cómo se invoca con `/`
+
+Una vez instalado, el plugin aporta un comando y una skill. Los comandos de plugin van
+**namespaced**, con el nombre del plugin delante y dos puntos:
+
+| Qué escribes | Qué hace |
+|---|---|
+| `/claude-skills-exporter:exportar-skills <url-o-ruta>` | Exporta las skills del repositorio indicado. Es la forma canónica. |
+| `/exportar-skills <url-o-ruta>` | Atajo. Funciona igual, salvo que otro plugin instalado use ya ese nombre. |
+| `/claude-skills-exporter:plugin-to-agentskills` | Carga la skill directamente, sin pasar por el comando. Útil para preguntar por portabilidad sin exportar nada. |
+
+Ejemplos:
 
 ```
 /claude-skills-exporter:exportar-skills https://github.com/usuario/repo
+/exportar-skills ~/proyectos/mi-plugin
+/exportar-skills .
 ```
 
-O pídeselo en lenguaje natural: *"exporta las skills de este repo para Perplexity"*.
+Escribe `/` y empieza a teclear `expor` para que el autocompletado lo ofrezca. Si no
+aparece, ejecuta `/reload-plugins`.
+
+También funciona en lenguaje natural, sin barra: *«exporta las skills de este repo para
+ChatGPT»* o *«¿es portable esta skill?»*. La skill se activa sola porque su
+`description` lleva esos disparadores.
 
 ### Actualizar
 
@@ -89,7 +115,7 @@ destino tiene su presupuesto y la `description` se compacta para caber en él.
 
 ```
 dist-agentskills/
-├── mi-skill.zip               → Perplexity   (description ≤ 850 bytes)
+├── mi-skill.zip               → ChatGPT, claude.ai y Perplexity (description ≤ 850 bytes)
 ├── mi-skill/                  → Mistral      (description ≤ 490 bytes)
 │   ├── SKILL.md
 │   └── references/ scripts/ ...
@@ -103,9 +129,21 @@ dist-agentskills/
 
 | Destino | Qué subir | `description` | Ruta |
 |---|---|---|---|
+| **ChatGPT** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 1024 caracteres | *Plugins* → *Skills* → *Create* → *Upload from your computer* |
 | **Perplexity Computer** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 850 B | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
 | **Mistral Vibe Work** | `mi-skill/` — la **carpeta** | ≤ 490 B | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
 | **Claude Code** | `mi-skill/` | — | Copiar a `~/.claude/skills/` |
+| **claude.ai** | `mi-skill.zip` | ≤ 1024 caracteres | *Ajustes* → *Capacidades* → *Skills* → *Subir skill* |
+
+> **Para ChatGPT sirve el mismo `.zip` de Perplexity**, sin volver a exportar: su tope
+> es de 1024 caracteres y el zip trae la descripción de 850 bytes, así que cabe de
+> sobra. ChatGPT además exige que el zip contenga **una única carpeta en la raíz** y
+> **un solo `SKILL.md`** — que es exactamente lo que genera esta herramienta.
+> Sus otros límites (50 MB de zip, 500 ficheros, 25 MB por fichero descomprimido)
+> quedan muy lejos para una skill normal.
+>
+> Las *Skills* de ChatGPT requieren un plan **Business, Enterprise, Healthcare o Edu**;
+> en las cuentas personales todavía no están disponibles.
 
 > **No son intercambiables.** Descomprimir el `.zip` **no** da la carpeta de Mistral: la
 > descripción que sale es la larga. Si sólo conservas el zip y luego quieres subirlo a
