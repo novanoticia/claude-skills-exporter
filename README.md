@@ -129,7 +129,7 @@ dist-agentskills/
 
 | Destino | Qué subir | `description` | Ruta |
 |---|---|---|---|
-| **ChatGPT** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 1024 caracteres | *Plugins* → *Skills* → *Create* → *Upload from your computer* |
+| **ChatGPT** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 1024 caracteres | Con `Work` activado, en **Complementos** (ver la nota) |
 | **Perplexity Computer** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 850 B | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
 | **Mistral Vibe Work** | `mi-skill/` — la **carpeta** | ≤ 490 B | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
 | **Claude Code** | `mi-skill/` | — | Copiar a `~/.claude/skills/` |
@@ -137,13 +137,18 @@ dist-agentskills/
 
 > **Para ChatGPT sirve el mismo `.zip` de Perplexity**, sin volver a exportar: su tope
 > es de 1024 caracteres y el zip trae la descripción de 850 bytes, así que cabe de
-> sobra. ChatGPT además exige que el zip contenga **una única carpeta en la raíz** y
-> **un solo `SKILL.md`** — que es exactamente lo que genera esta herramienta.
-> Sus otros límites (50 MB de zip, 500 ficheros, 25 MB por fichero descomprimido)
-> quedan muy lejos para una skill normal.
+> sobra. Exige además que el zip contenga **una única carpeta en la raíz** y **un solo
+> `SKILL.md`** — que es exactamente lo que genera esta herramienta. Sus otros límites
+> (50 MB de zip, 500 ficheros, 25 MB por fichero descomprimido) quedan muy lejos para
+> una skill normal. Está en el **plan gratuito**, con límites de uso.
 >
-> Las *Skills* de ChatGPT requieren un plan **Business, Enterprise, Healthcare o Edu**;
-> en las cuentas personales todavía no están disponibles.
+> **Sobre la ruta exacta en ChatGPT, honestamente: no la hemos verificado para un zip
+> suelto.** Lo que sí está comprobado a mano es instalar un *repositorio* como
+> complemento —activar `Work` en el selector, ir a **Complementos** y añadirlo por
+> nombre o por URL—. Para un `.zip` de una skill aislada, que es lo que produce esta
+> herramienta, mira la gestión de complementos con `Work` activado y consulta la
+> documentación de ChatGPT si la interfaz ha cambiado. Preferimos decir esto a repetir
+> unos pasos concretos que ya nos salieron mal una vez.
 
 > **No son intercambiables.** Descomprimir el `.zip` **no** da la carpeta de Mistral: la
 > descripción que sale es la larga. Si sólo conservas el zip y luego quieres subirlo a
