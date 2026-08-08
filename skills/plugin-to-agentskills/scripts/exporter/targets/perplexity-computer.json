@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "id": "perplexity-computer",
+  "label": "Perplexity Computer",
+  "instalacion": {
+    "modos": ["zip"],
+    "ruta_ui": "perplexity.ai/computer/skills → Create skill → Upload a skill",
+    "una_skill_por_subida": true
+  },
+  "formato": {
+    "acepta": ["agent-skills"],
+    "frontmatter_cerrado": true,
+    "presupuesto_description_bytes": 850,
+    "tope_duro_description": { "valor": 1024, "unidad": "bytes" },
+    "conserva_arbol": true
+  },
+  "limites_paquete": {
+    "zip_max_bytes": null,
+    "ficheros_max": null,
+    "fichero_max_bytes": null
+  },
+  "capacidades": {
+    "scripts.ejecutar": "si",
+    "shell.ejecutar": "si",
+    "filesystem.leer": "si",
+    "filesystem.escribir": "si",
+    "red.fetch": "si",
+    "mcp.cliente": "no",
+    "applescript": "si",
+    "subagentes": "no",
+    "hooks": "no",
+    "comandos.namespace": "no",
+    "skills.anidadas": "no",
+    "home.resolver": "desconocido"
+  },
+  "peligros": [
+    {
+      "id": "perplexity-corte-90s",
+      "dispara_con": ["applescript", "lote-destructivo"],
+      "severidad": "alta",
+      "titulo": "Cada llamada se corta en torno a los 90 segundos",
+      "detalle": "Observado sobre un buzón de 358 correos: cada movimiento sincroniza contra iCloud y el lote no termina. Un lote cortado a mitad deja el trabajo inconsistente — el archivado se llevó unos 64 correos que no estaban en el lote evaluado, y un filtro que debía cortar en junio movió también correos de julio.",
+      "mitigacion": "Procesar en trozos pequeños dimensionados para terminar dentro del límite, verificar releyendo el estado real después de cada trozo, y comprobar qué elementos se han tocado en vez de confiar en el filtro.",
+      "evidencia": { "confianza": "observado", "verificado_el": "2026-07-27" }
+    },
+    {
+      "id": "perplexity-descripcion-rechaza-zip",
+      "dispara_con": [],
+      "severidad": "media",
+      "titulo": "Una descripción por encima del tope rechaza el zip entero",
+      "detalle": "El tope de 1024 se mide en bytes UTF-8 aunque el mensaje de error diga «characters». Una descripción de 1063 caracteres pero 1085 bytes fue rechazada. En español cada tilde ocupa dos bytes y cada raya tres.",
+      "mitigacion": "El conversor recorta a 850 bytes, con margen de sobra.",
+      "evidencia": { "confianza": "observado", "verificado_el": "2026-07-27" }
+    }
+  ],
+  "evidencia": {
+    "verificado_el": "2026-07-27",
+    "revisar_tras": "2026-10-27",
+    "confianza": "observado",
+    "fuentes": [
+      {
+        "titulo": "Perplexity — How to use Computer Skills",
+        "url": "https://www.perplexity.ai/help-center/en/articles/13914413-how-to-use-computer-skills"
+      },
+      {
+        "titulo": "Perplexity Research — Designing, Refining, and Maintaining Agent Skills",
+        "url": "https://research.perplexity.ai/articles/designing-refining-and-maintaining-agent-skills-at-perplexity"
+      }
+    ]
+  }
+}
