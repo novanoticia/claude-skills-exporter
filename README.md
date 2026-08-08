@@ -1,8 +1,9 @@
 # Claude Skills Exporter
 
 Coge un repositorio con un plugin (o unas skills) de Claude, extrae las skills,
-**audita qué se romperá fuera de Claude** y las empaqueta para instalarlas en
-**ChatGPT**, **Perplexity Computer** y **Mistral Vibe Work**.
+**audita, destino por destino, qué se romperá fuera de Claude** y las empaqueta para
+instalarlas en **ChatGPT**, **claude.ai**, **Claude Code**, **Mistral Vibe Work** y
+**Perplexity Computer**.
 
 > **Compatible con [Agent Plugins 1.0.0](https://agent-plugins.org/specification)** —
 > el formato portátil de empaquetado de la Agentic AI Foundation (OpenAI, Amazon,
@@ -33,9 +34,10 @@ viaja al estándar abierto Agent Skills:
 | Servidores MCP | ❌ No |
 | `hooks/` | ❌ No |
 
-Esta herramienta no arregla eso: lo **hace visible**. Cada skill exportada lleva
-incrustado un aviso que le dice al agente de destino qué instrucciones no va a poder
-cumplir, para que lo declare en vez de simular el resultado.
+Esta herramienta no arregla eso: lo **hace visible**. Cuando hay algo que declarar, la
+skill exportada lleva incrustado un aviso que le dice al agente de destino qué
+instrucciones no va a poder cumplir, para que lo declare en vez de simular el resultado.
+Si no hubo adaptaciones ni hallazgos, el `SKILL.md` sale limpio, sin nota.
 
 ## Instalación
 
@@ -99,14 +101,17 @@ python3 skills/plugin-to-agentskills/scripts/convert.py https://github.com/usuar
     --out ./dist-agentskills
 ```
 
-Sólo necesita Python 3.8+ y `git`. Sin dependencias externas.
+Sólo necesita Python 3.8+. Sin dependencias externas; `git` sólo hace falta si el origen
+es una URL de repositorio, no si ya tienes la carpeta descargada.
 
 | Opción | Qué hace |
 |---|---|
 | `--out DIR` | Directorio de salida (por defecto `./dist-agentskills`) |
 | `--only a b c` | Exporta sólo esas skills |
-| `--zip-only` | Deja sólo los `.zip` — se pierde la variante para Mistral |
-| `--keep-description-order` | No reordena la descripción (por defecto, la activación va primero) |
+| `--zip-only` | Deja sólo los `.zip` — se pierde la variante para Mistral. Con un destino que sólo instala carpeta (`--target mistral-vibe-work`) es **error** y aborta: no quedaría ningún artefacto de skill |
+| `--target a b` | En `audit`, qué destinos evaluar; en `export`, qué artefactos producir — la auditoría sigue cubriendo los cinco |
+| `--fail-on {ninguno,degradado,no_compatible}` | Devuelve código 2 si algún estado alcanza ese umbral. Útil en CI |
+| `--keep-description-order` | No reordena la descripción — y con ello desactiva también la compactación: sólo queda el recorte duro por el final |
 
 ## Los tres modos
 
@@ -118,6 +123,15 @@ Sólo necesita Python 3.8+ y `git`. Sin dependencias externas.
 
 `convert.py <origen>` sin subcomando sigue exportando, como siempre.
 
+**Usarlo en CI.** `--fail-on degradado` devuelve código 2 si alguna skill queda en
+`degradado`, `no verificable` o `no compatible` en algún destino; `--fail-on no_compatible`
+sólo con el peor estado. Sin la opción, el conversor siempre sale con 0 aunque todo esté
+rojo. Combínalo con `audit`, que no escribe ficheros:
+
+```bash
+python3 convert.py audit . --target perplexity-computer --fail-on no_compatible
+```
+
 ## Qué genera
 
 Dos artefactos por skill, con los mismos ficheros pero **distinta descripción**: cada
@@ -126,7 +140,7 @@ destino tiene su presupuesto y la `description` se compacta para caber en él.
 ```
 dist-agentskills/
 ├── mi-skill.zip               → ChatGPT, claude.ai y Perplexity (description ≤ 850 bytes)
-├── mi-skill/                  → Mistral      (description ≤ 490 bytes)
+├── mi-skill/                  → Mistral, Claude Code (description ≤ 490 bytes)
 │   ├── SKILL.md
 │   └── references/ scripts/ ...
 ├── otra-skill.zip
@@ -135,6 +149,13 @@ dist-agentskills/
 └── resumen.json               lo mismo, en formato máquina
 ```
 
+`resumen.json` es la salida para máquinas y tiene contrato: lleva `report_version` (hoy
+`"2.0"`) y valida contra
+[`exporter/resumen.schema.json`](skills/plugin-to-agentskills/scripts/exporter/resumen.schema.json)
+en cada `push`. Es además el único artefacto que trae los hallazgos completos —severidad,
+código y el `fichero:línea` donde se vio cada señal—: el informe en Markdown se queda en
+la matriz y los motivos.
+
 ## Dónde se sube cada cosa
 
 | Destino | Qué subir | `description` | Ruta |
@@ -142,15 +163,21 @@ dist-agentskills/
 | **ChatGPT** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 1024 caracteres | Con `Work` activado, en **Complementos** (ver la nota) |
 | **Perplexity Computer** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 850 B | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
 | **Mistral Vibe Work** | `mi-skill/` — la **carpeta** | ≤ 490 B | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
-| **Claude Code** | `mi-skill/` | — | Copiar a `~/.claude/skills/` |
+| **Claude Code** | `mi-skill/` — la **carpeta** | ≤ 490 B de hecho | Copiar a `~/.claude/skills/`, o instalar el plugin con `/plugin install` |
 | **claude.ai** | `mi-skill.zip` | ≤ 1024 caracteres | *Ajustes* → *Capacidades* → *Skills* → *Subir skill* |
+
+> **El presupuesto lo escribe el destino más estrecho de cada modo de instalación**, no
+> el de cada plataforma: la carpeta es una sola y la marca Mistral con sus 490 B, aunque
+> Claude Code admita los 1024 caracteres del estándar.
 
 > **Para ChatGPT sirve el mismo `.zip` de Perplexity**, sin volver a exportar: su tope
 > es de 1024 caracteres y el zip trae la descripción de 850 bytes, así que cabe de
 > sobra. Exige además que el zip contenga **una única carpeta en la raíz** y **un solo
 > `SKILL.md`** — que es exactamente lo que genera esta herramienta. Sus otros límites
 > (50 MB de zip, 500 ficheros, 25 MB por fichero descomprimido) quedan muy lejos para
-> una skill normal. Está en el **plan gratuito**, con límites de uso.
+> una skill normal — pero la herramienta los comprueba: si un zip los superara, saldría
+> el hallazgo `limite-de-paquete` en el informe. Está en el **plan gratuito**, con
+> límites de uso.
 >
 > **Sobre la ruta exacta en ChatGPT, honestamente: no la hemos verificado para un zip
 > suelto.** Lo que sí está comprobado a mano es instalar un *repositorio* como
@@ -191,8 +218,13 @@ fecha vence, el estado degrada a `no verificable` en vez de seguir afirmando.
   Mistral Vibe Work esas escrituras pueden reportar éxito y no persistir.
 - Tamaño del cuerpo frente al presupuesto de contexto recomendado.
 
-Cada hallazgo se clasifica en 🔴 alto (no funcionará), 🟡 medio (funcionará degradado)
-o 🔵 bajo (cosmético).
+Cada hallazgo conserva su severidad —alta (no funcionará), media (funcionará degradado),
+baja (cosmético)—, pero el informe ya no los pinta con iconos: los emojis son ahora el
+estado **por destino** de la matriz — 🟢 compatible, 🟡 adaptación, 🟠 degradado,
+🔵 no verificable, 🔴 no compatible. Los hallazgos, con su código y su `fichero:línea`,
+viven en `resumen.json` y en las notas que se incrustan al final del `SKILL.md` exportado,
+agrupados en «Probablemente no funcione en este entorno» y «Funcionará, pero con
+limitaciones».
 
 ## Contribuir
 
@@ -203,7 +235,7 @@ no de la documentación de las plataformas.
 
 Cada `push` y cada pull request sobre `main` ejecuta
 [`.github/workflows/validar.yml`](.github/workflows/validar.yml), que comprueba lo que
-rompe la carga del plugin en silencio:
+rompe la carga del plugin en silencio —y algo más—:
 
 - Los manifiestos parsean como JSON y tienen los campos obligatorios.
 - El nombre del plugin coincide entre `plugin.json` y `marketplace.json`, y el `source`
@@ -215,16 +247,30 @@ rompe la carga del plugin en silencio:
   su carpeta y el informe. Compilar sólo detecta errores de sintaxis: una constante
   renombrada pasa el `py_compile` y revienta en ejecución.
 - Las descripciones generadas respetan el presupuesto de cada destino (490 y 850 bytes).
+- Los perfiles de `targets/*.json` validan contra `_schema.json`, y su etiqueta y su
+  presupuesto aparecen citados en el README o en `portabilidad.md`: cambiar una cifra en
+  el JSON y no en la prosa hace fallar el CI.
+- **El análisis sigue siendo estático**: un `ast` recorre `scripts/` y falla si aparece
+  cualquier proceso externo que no sea el `subprocess.run(git clone)` del origen.
+- `resumen.json` valida contra `resumen.schema.json`.
+- Pasan las pruebas unitarias de `tests/`, incluidos los golden files.
+- El conversor arranca desde una copia del repositorio en otra ruta, sin instalación.
 
 Para lanzarlo en local antes de abrir un pull request:
 
 ```bash
 python3 .github/validate_plugin.py .
+python3 -m pip install --quiet jsonschema && python3 .github/validar_perfiles.py .
 ```
 
 Esta comprobación importa más de lo habitual porque el marketplace se sincroniza solo y
 no hay versión fija: un manifiesto roto llegaría a quien tenga el plugin instalado en el
 mismo `push`.
+
+Si tocas un perfil de `targets/*.json` y regeneras los golden, fija la fecha con
+`CSE_FECHA=AAAA-MM-DD python3 tests/generar_golden.py`: sin ella, en cuanto la fecha real
+supere el `revisar_tras` de un perfil, los veredictos pasan de `compatible` a `no
+verificable` y el CI se pone en rojo sin que nadie haya tocado una línea.
 
 ## Limitaciones conocidas
 
@@ -235,6 +281,13 @@ mismo `push`.
   Trátalos como avisos para revisar, no como veredictos.
 - Repositorios privados: necesitas `git` ya autenticado, o descarga el repo a mano y
   pásale la ruta local.
+- **El origen tiene techo.** Se aborta el análisis si el árbol pasa de **200 MB** o de
+  **20 000 ficheros**, y el `git clone` se cancela a los **300 segundos**. No se sigue
+  ningún enlace simbólico al medir. Si necesitas convertir un monorepo, apunta a la
+  subcarpeta que contenga las skills.
+- **No se pedirán credenciales nunca.** El clon se lanza con `GIT_TERMINAL_PROMPT=0`: un
+  repositorio privado falla de inmediato en vez de dejar el proceso colgado esperando una
+  contraseña. Autentica `git` antes, o descarga el repo a mano y pásale la ruta.
 
 ## Autoría y licencia
 

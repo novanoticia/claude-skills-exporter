@@ -94,7 +94,7 @@ ellas se puede llevar a otra plataforma:</p>
 
 <table>
   <tr><th>Qué hay dentro</th><th>¿Viaja?</th><th>Por qué</th></tr>
-  <tr><td><code>skills/</code></td><td>✅ Sí</td><td>Es el estándar abierto <em>Agent Skills</em>, que Perplexity y Mistral también entienden</td></tr>
+  <tr><td><code>skills/</code></td><td>✅ Sí</td><td>Es el estándar abierto <em>Agent Skills</em>, que ChatGPT, claude.ai, Perplexity y Mistral también entienden — y que Claude Code sigue leyendo</td></tr>
   <tr><td><code>commands/</code></td><td>❌ No</td><td>Los comandos <code>/algo</code> son propios de Claude Code</td></tr>
   <tr><td><code>agents/</code></td><td>❌ No</td><td>No existen los subagentes en el destino</td></tr>
   <tr><td>Servidores MCP</td><td>❌ No</td><td>El destino no tendrá esas conexiones</td></tr>
@@ -104,15 +104,19 @@ ellas se puede llevar a otra plataforma:</p>
 <div class="warn">
   <strong>Expectativa realista</strong>
   Esto no es un botón mágico de «convertir plugin». Extrae las skills, arregla lo que
-  se puede arreglar solo, y <em>te avisa por escrito</em> de lo que no. Una skill que
-  llamaba a una base de datos por MCP seguirá siendo un buen procedimiento escrito,
-  pero no podrá consultar esa base de datos.
+  se puede arreglar solo, y <em>te avisa por escrito</em> de lo que no: el informe abre
+  con una matriz que dice, destino a destino, si la skill queda compatible, compatible
+  con adaptaciones, degradada, no verificable o no compatible. Una skill que llamaba a
+  una base de datos por MCP seguirá siendo un buen procedimiento escrito, pero no podrá
+  consultar esa base de datos.
 </div>
 
 
 <h2 id="instalar">2 · Poner esta herramienta en tu ordenador</h2>
 
-<p>Sólo necesitas <strong>Python 3</strong> (ya viene en macOS y Linux) y <strong>git</strong>.
+<p>Sólo necesitas <strong>Python 3</strong> (versión 3.8 o posterior; ya viene en macOS y
+Linux). <strong>git</strong> hace falta únicamente si vas a convertir desde una URL de
+GitHub: con una carpeta que ya tengas descargada no se usa.
 Comprueba que los tienes abriendo la Terminal y escribiendo:</p>
 
 <pre><button class="copy">copiar</button><code>python3 --version &amp;&amp; git --version</code></pre>
@@ -157,11 +161,17 @@ cd claude-skills-exporter</code></pre>
 
 <pre><button class="copy">copiar</button><code>python3 skills/plugin-to-agentskills/scripts/convert.py ~/Descargas/mi-plugin --out ./salida</code></pre>
 
+<p>Ese comando es la forma corta de <code>export</code>. Hay dos más, que no escriben nada
+en disco: <code>inspect</code> (qué contiene y qué exige cada skill, sin elegir destino) y
+<code>audit</code> (sólo la matriz de compatibilidad, con <code>--target</code> para mirar
+un destino concreto).</p>
+
 <h3>Qué aparece en la carpeta <code>salida/</code></h3>
 
 <div class="note">
   <strong>Cada skill sale en dos formas, y no son intercambiables.</strong>
-  El <code>.zip</code> es para Perplexity y la carpeta para Mistral. Llevan los mismos
+  El <code>.zip</code> sirve para Perplexity, ChatGPT y claude.ai; la carpeta, para
+  Mistral y Claude Code. Llevan los mismos
   ficheros, pero la descripción se ajusta al espacio que admite cada plataforma: hasta
   850 bytes en el zip, hasta 490 en la carpeta. Por eso <em>descomprimir el zip no vale</em>
   para Mistral: la descripción que sale es la larga.
@@ -169,19 +179,32 @@ cd claude-skills-exporter</code></pre>
 
 <table>
   <tr><th>Carpeta o fichero</th><th>Para qué sirve</th></tr>
-  <tr><td><code>mi-skill.zip</code></td><td><strong>Para Perplexity.</strong> Se sube sin tocarlo</td></tr>
-  <tr><td><code>mi-skill/</code></td><td><strong>Para Mistral.</strong> La carpeta, no el zip abierto</td></tr>
-  <tr><td><code>INFORME-PORTABILIDAD.md</code></td><td><strong>Léelo.</strong> Dice qué se rompió y qué se arregló</td></tr>
-  <tr><td><code>resumen.json</code></td><td>Lo mismo que el informe, para procesarlo con otro programa</td></tr>
+  <tr><td><code>mi-skill.zip</code></td><td><strong>Para Perplexity, ChatGPT y claude.ai.</strong> Se sube sin tocarlo</td></tr>
+  <tr><td><code>mi-skill/</code></td><td><strong>Para Mistral y Claude Code.</strong> La carpeta, no el zip abierto</td></tr>
+  <tr><td><code>INFORME-PORTABILIDAD.md</code></td><td><strong>Léelo.</strong> Abre con una matriz que dice, destino a destino, si la skill es compatible, compatible con adaptaciones, degradada, no verificable o no compatible; luego detalla por skill qué se adaptó solo y qué la bloquea en cada plataforma</td></tr>
+  <tr><td><code>resumen.json</code></td><td>El informe en formato máquina y, además, la lista de hallazgos con el fichero y la línea exactos, que el informe en Markdown no incluye</td></tr>
 </table>
 
 <p>Habrá un <code>.zip</code> y una carpeta por cada skill del repositorio original.</p>
 
 <div class="danger">
   <strong>Lee el informe antes de subir nada</strong>
-  Las skills marcadas con 🔴 contienen instrucciones que casi seguro fallarán fuera de
-  Claude. Puedes subirlas igualmente —llevan un aviso incrustado para que el agente lo
-  declare en vez de fingir— pero conviene saberlo de antemano.
+  En la matriz, 🔴 no marca la skill entera: marca <em>una casilla</em>, es decir «no
+  compatible con ese destino concreto». La misma skill puede salir 🔴 en Mistral y 🟢 en
+  Claude Code. Mira la columna del destino al que vayas a subirla. Un 🔴 puede venir de
+  una capacidad que el destino no tiene (MCP, subagentes, ejecutar scripts) o de un
+  peligro de conducta observado, no sólo de una instrucción que vaya a fallar. Puedes
+  subirlas igualmente —llevan un aviso incrustado para que el agente lo declare en vez de
+  fingir— pero conviene saberlo de antemano.
+</div>
+
+<div class="note">
+  <strong>Y un 🟡 casi nunca falta</strong>
+  En cuanto la herramienta toca algo de la skill —reordenar la descripción, retirar una
+  clave de frontmatter que sólo existe en Claude— <em>todas</em> las columnas de esa fila
+  suben a 🟡 «adaptación», incluida la de Claude Code. No es un aviso de que algo vaya
+  mal en el destino: es un aviso de que lo que vas a subir ya no es exactamente el fichero
+  original. 🟢 puro significa que no se tocó nada.
 </div>
 
 
@@ -217,8 +240,9 @@ cd claude-skills-exporter</code></pre>
 
 <h2 id="mistral">5 · Subir a Mistral (Vibe Work)</h2>
 
-<p>Es el mismo material que acabas de subir a Perplexity, sólo que abierto: Mistral
-quiere la <strong>carpeta</strong>, no el zip.</p>
+<p>Son los mismos ficheros que acabas de subir a Perplexity, pero <strong>no el mismo
+artefacto</strong>: Mistral quiere la <strong>carpeta</strong> que dejó la herramienta
+—con la descripción recortada a 490 bytes—, no el zip descomprimido.</p>
 
 <div class="step">
   <h3><span class="n">1</span> Abre el panel de skills</h3>
@@ -239,9 +263,14 @@ quiere la <strong>carpeta</strong>, no el zip.</p>
 <div class="step">
   <h3><span class="n">3</span> Súbela</h3>
   <p>Entrega la carpeta con todo su contenido — <code>SKILL.md</code> y, si los hay, los
-  ficheros de <code>references/</code> y <code>scripts/</code>. Mistral mantiene las
-  subcarpetas tal cual y acepta cualquier extensión, no sólo markdown: los
-  <code>.py</code> y <code>.yaml</code> viajan igual.</p>
+  ficheros de <code>references/</code> y <code>scripts/</code>. Si la skill original tenía
+  enlaces simbólicos no estarán: la herramienta los omite a propósito —copiarlos habría
+  metido en el paquete un fichero de fuera de la skill— y lo avisa en el informe. Mistral
+  mantiene las subcarpetas tal cual y acepta cualquier extensión, no sólo markdown: los
+  <code>.py</code> y <code>.yaml</code> viajan igual. Pero <em>viajar no es ejecutarse</em>:
+  Mistral no tiene Python, así que una skill cuya lógica viva en <code>scripts/</code> sale
+  marcada como no compatible con este destino, y el <code>SKILL.md</code> debe traer un
+  procedimiento manual equivalente.</p>
   <p>El contenido de <code>SKILL.md</code> pasa a ser el panel <strong>Instrucciones</strong>
   de la skill.</p>
 </div>
@@ -300,7 +329,7 @@ quiere la <strong>carpeta</strong>, no el zip.</p>
   <tr>
     <td>El agente dice que ejecutó algo que no existe</td>
     <td>La skill llamaba a una herramienta MCP</td>
-    <td>Busca el aviso 🔴 en el informe y reescribe ese paso como instrucción neutral</td>
+    <td>El informe te dice en qué destinos sale 🔴 y por qué («mcp.cliente: requerida por la skill…»), pero no en qué línea. Para eso mira <code>resumen.json</code> o las «Notas de portabilidad» que la herramienta añade al final del <code>SKILL.md</code> exportado. Reescribe ese paso como instrucción neutral</td>
   </tr>
   <tr>
     <td>En Perplexity, un proceso largo se queda a medias</td>
@@ -344,9 +373,10 @@ descripción, y la paga en tokens en cada sesión.</p>
 <footer>
   <p><strong>Nota ética.</strong> Esta guía y la herramienta que documenta se han
   elaborado con asistencia de IA. Requieren revisión humana antes de usarse en
-  producción, y las rutas de interfaz de Perplexity y Mistral pueden cambiar sin previo
-  aviso: si no encuentras un botón donde dice aquí, consulta la documentación oficial
-  de cada plataforma.</p>
+  producción. Las rutas de interfaz de los cinco destinos (ChatGPT, claude.ai, Claude
+  Code, Mistral Vibe Work y Perplexity Computer) pueden cambiar sin previo aviso: si no
+  encuentras un botón donde dice aquí, consulta la documentación oficial de cada
+  plataforma.</p>
   <p>Claude Skills Exporter — © 2026 Pablo Rodríguez López. Publicado bajo licencia
   <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT</a>:
   puedes usarlo, modificarlo y redistribuirlo, incluso comercialmente, conservando el
