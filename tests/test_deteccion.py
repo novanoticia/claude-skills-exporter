@@ -1,10 +1,13 @@
+import os
+import tempfile
 import unittest
+from pathlib import Path
 
 from ayuda import importar_exporter
 
 importar_exporter()
 
-from exporter.deteccion import detectar  # noqa: E402
+from exporter.deteccion import detectar, detectar_en_arbol  # noqa: E402
 
 
 class Deteccion(unittest.TestCase):
@@ -36,6 +39,67 @@ class Deteccion(unittest.TestCase):
     def test_detecta_el_home_con_tilde(self):
         senales = detectar("Escribe en ~/.mi-skill/estado.jsonl\n", "SKILL.md")
         self.assertEqual([s.id for s in senales], ["home-tilde"])
+
+
+class DeteccionEnArbol(unittest.TestCase):
+    """Cubre la mitad del modulo que toca disco: os.walk, symlinks, filtro
+    por extension y el nuevo parametro `excluir`. Ficheros reales, sin mocks.
+    """
+
+    def test_encuentra_senales_en_fichero_anidado_con_ruta_relativa_a_la_raiz(self):
+        with tempfile.TemporaryDirectory() as raiz:
+            carpeta = Path(raiz) / "references"
+            carpeta.mkdir()
+            fichero = carpeta / "guia.md"
+            fichero.write_text("Primera linea\nUsa mcp__gmail__buscar aqui\n", encoding="utf-8")
+
+            senales = detectar_en_arbol(raiz)
+
+            self.assertEqual(len(senales), 1)
+            self.assertEqual(senales[0].id, "mcp-tool")
+            self.assertEqual(senales[0].ubicacion, "references/guia.md:2")
+
+    def test_ignora_ficheros_con_extension_fuera_de_extensiones_texto(self):
+        with tempfile.TemporaryDirectory() as raiz:
+            fichero = Path(raiz) / "logo.png"
+            fichero.write_bytes(b"mcp__gmail__buscar\n")
+
+            senales = detectar_en_arbol(raiz)
+
+            self.assertEqual(senales, [])
+
+    def test_ignora_symlinks_en_lugar_de_seguirlos(self):
+        with tempfile.TemporaryDirectory() as raiz:
+            objetivo = Path(raiz) / "real.md"
+            objetivo.write_text("Usa mcp__gmail__buscar aqui\n", encoding="utf-8")
+            enlace = Path(raiz) / "enlace.md"
+            os.symlink(objetivo, enlace)
+
+            senales = detectar_en_arbol(raiz)
+
+            # El fichero real SI produce senal; el symlink que apunta a el, no
+            # se sigue, asi que solo se ve una vez (por real.md).
+            self.assertEqual(len(senales), 1)
+            self.assertEqual(senales[0].ubicacion, "real.md:1")
+
+    def test_excluir_se_salta_el_fichero_nombrado(self):
+        with tempfile.TemporaryDirectory() as raiz:
+            (Path(raiz) / "SKILL.md").write_text(
+                "Usa mcp__gmail__buscar aqui\n", encoding="utf-8")
+            (Path(raiz) / "otro.md").write_text(
+                "Tambien mcp__gmail__buscar\n", encoding="utf-8")
+
+            senales = detectar_en_arbol(raiz, excluir={"SKILL.md"})
+
+            self.assertEqual(len(senales), 1)
+            self.assertEqual(senales[0].ubicacion, "otro.md:1")
+
+    def test_arbol_sin_nada_sospechoso_da_lista_vacia(self):
+        with tempfile.TemporaryDirectory() as raiz:
+            (Path(raiz) / "SKILL.md").write_text(
+                "Un procedimiento normal y corriente.\n", encoding="utf-8")
+
+            self.assertEqual(detectar_en_arbol(raiz), [])
 
 
 if __name__ == "__main__":

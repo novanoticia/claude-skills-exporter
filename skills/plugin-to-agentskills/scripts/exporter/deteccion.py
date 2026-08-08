@@ -79,11 +79,18 @@ def detectar(texto: str, ruta: str) -> list:
     return salida
 
 
-def detectar_en_arbol(raiz) -> list:
-    """Recorre los ficheros de texto de una skill y acumula sus senales."""
+def detectar_en_arbol(raiz, excluir=frozenset()) -> list:
+    """Recorre los ficheros de texto de una skill y acumula sus senales.
+
+    `excluir` es un conjunto de nombres de fichero (basename, no ruta) que se
+    saltan. Lo usa quien ya audito ese fichero por otra via -por ejemplo el
+    cuerpo YA ADAPTADO del SKILL.md- y no quiere leerlo dos veces desde disco.
+    """
     salida = []
     for base, _dirs, ficheros in os.walk(str(raiz)):
         for nombre in sorted(ficheros):
+            if nombre in excluir:
+                continue
             ruta = os.path.join(base, nombre)
             if os.path.splitext(nombre)[1].lower() not in EXTENSIONES_TEXTO:
                 continue

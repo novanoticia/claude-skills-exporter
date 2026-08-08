@@ -48,7 +48,7 @@ from exporter.descripcion import (
     reorder_description,
     tiene_activacion,
 )
-from exporter.deteccion import CLAUDE_TOOL_NAMES, EXPLICACIONES, detectar_en_arbol
+from exporter.deteccion import CLAUDE_TOOL_NAMES, EXPLICACIONES, detectar, detectar_en_arbol
 from exporter.frontmatter import split_frontmatter, yaml_escape
 
 # --------------------------------------------------------------------------
@@ -247,7 +247,15 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
 
     # Patrones problemáticos en todo el árbol de la skill (SKILL.md, references/,
     # scripts/, y cualquier otro fichero de texto), no sólo en el cuerpo.
-    for s in detectar_en_arbol(src_dir):
+    #
+    # El SKILL.md se audita sobre el cuerpo YA ADAPTADO, y el resto del arbol
+    # desde disco. La razon esta en el orden que ya seguia este fichero:
+    # adaptar antes de auditar, para no avisar de lo que uno mismo acaba de
+    # arreglar. La reescritura de ${CLAUDE_PLUGIN_ROOT} solo alcanza al cuerpo
+    # del SKILL.md, asi que en references/ y scripts/ ese patron SI es un
+    # riesgo real y debe seguir avisando.
+    senales = detectar(body, "SKILL.md") + detectar_en_arbol(src_dir, excluir={"SKILL.md"})
+    for s in senales:
         res.findings.append(Finding(s.severidad_base, s.id,
                                     "{} Visto en {}: {}".format(
                                         EXPLICACIONES[s.id], s.ubicacion, s.muestra)))
