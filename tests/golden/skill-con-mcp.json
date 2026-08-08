@@ -71,7 +71,7 @@
       "hallazgos": [
         {
           "codigo": "mcp-tool",
-          "mensaje": "Invoca herramientas MCP por nombre; esos servidores no estaran conectados. Visto en SKILL.md:4: mcp__gmail__buscar",
+          "mensaje": "Invoca herramientas MCP por nombre; esos servidores no estaran conectados. Visto en SKILL.md:8: mcp__gmail__buscar",
           "severidad": "alta"
         }
       ],

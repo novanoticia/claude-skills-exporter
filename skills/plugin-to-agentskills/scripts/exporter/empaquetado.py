@@ -28,6 +28,8 @@ def copiar_skill(src: Path, dest: Path, ignorar: set) -> list:
         dirs[:] = [d for d in dirs
                    if d not in ignorar and not os.path.islink(os.path.join(base, d))]
         for d in sorted(os.listdir(base)):
+            if d in ignorar:
+                continue
             ruta = os.path.join(base, d)
             if os.path.isdir(ruta) and os.path.islink(ruta):
                 senales.append(_senal_enlace(ruta, src))

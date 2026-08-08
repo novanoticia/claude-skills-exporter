@@ -40,6 +40,19 @@ class Deteccion(unittest.TestCase):
         senales = detectar("Escribe en ~/.mi-skill/estado.jsonl\n", "SKILL.md")
         self.assertEqual([s.id for s in senales], ["home-tilde"])
 
+    def test_el_offset_desplaza_el_numero_de_linea_reportado(self):
+        # El cuerpo de un SKILL.md ya no empieza en la linea 1 del fichero
+        # real una vez que se le ha quitado el frontmatter: quien llama debe
+        # poder decir cuantas lineas se quedaron fuera para que la ubicacion
+        # que se reporta sea la del fichero, no la del fragmento.
+        texto = "Relleno\nUsa mcp__gmail__buscar aqui\n"
+        senales = detectar(texto, "SKILL.md", offset=9)
+        self.assertEqual(senales[0].ubicacion, "SKILL.md:11")
+
+    def test_offset_por_defecto_es_cero(self):
+        senales = detectar("Usa mcp__gmail__buscar\n", "SKILL.md")
+        self.assertEqual(senales[0].ubicacion, "SKILL.md:1")
+
 
 class DeteccionEnArbol(unittest.TestCase):
     """Cubre la mitad del modulo que toca disco: os.walk, symlinks, filtro
@@ -96,6 +109,20 @@ class DeteccionEnArbol(unittest.TestCase):
 
     def test_arbol_sin_nada_sospechoso_da_lista_vacia(self):
         with tempfile.TemporaryDirectory() as raiz:
+            (Path(raiz) / "SKILL.md").write_text(
+                "Un procedimiento normal y corriente.\n", encoding="utf-8")
+
+            self.assertEqual(detectar_en_arbol(raiz), [])
+
+    def test_no_desciende_en_directorios_ignorados(self):
+        # Sin podar node_modules/, una senal ahi dentro marcaba como
+        # no_compatible un fichero que copiar_skill() jamas incluye en el
+        # paquete exportado: el veredicto hablaba de algo que no viaja.
+        with tempfile.TemporaryDirectory() as raiz:
+            paquete = Path(raiz) / "node_modules" / "algun-paquete"
+            paquete.mkdir(parents=True)
+            (paquete / "README.md").write_text(
+                "Usa mcp__gmail__buscar aqui\n", encoding="utf-8")
             (Path(raiz) / "SKILL.md").write_text(
                 "Un procedimiento normal y corriente.\n", encoding="utf-8")
 

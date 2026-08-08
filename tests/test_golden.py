@@ -155,6 +155,16 @@ class CasosConcretos(unittest.TestCase):
         self.assertIn("depends:", frontmatter)
         self.assertIn("- otra-skill", frontmatter)
 
+    def test_las_senales_de_skill_md_citan_la_linea_real_del_fichero(self):
+        # skill-con-mcp dispara "mcp-tool" en la linea 8 del SKILL.md real
+        # (el patron esta despues del frontmatter, que ocupa 4 lineas). Antes
+        # del offset, detectar() contaba desde el cuerpo ya separado del
+        # frontmatter y reportaba la linea 4: un desplazamiento de 4 lineas
+        # sobre un fichero pequeno, y de 9 sobre uno real mas largo.
+        d = self.leer("skill-con-mcp")
+        hallazgo = next(h for h in d["skills"][0]["hallazgos"] if h["codigo"] == "mcp-tool")
+        self.assertIn("SKILL.md:8", hallazgo["mensaje"])
+
 
 class SkillConEnlace(unittest.TestCase):
     """El octavo caso, con enlace simbolico.

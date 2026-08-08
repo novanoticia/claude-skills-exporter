@@ -21,6 +21,13 @@ from exporter.modelo import Senal
 # Ficheros de texto en los que tiene sentido buscar.
 EXTENSIONES_TEXTO = {".md", ".txt", ".py", ".sh", ".yaml", ".yml", ".json", ".toml"}
 
+# Directorios que ningun artefacto exportado incluye jamas. Es el mismo
+# conjunto que usa discover_skills() para no anidar skills y copiar_skill()
+# para no copiarlos: detectar_en_arbol() lo pruna por la misma razon, para no
+# avisar de senales dentro de ficheros -por ejemplo un README de
+# node_modules/- que nunca llegan a ningun paquete.
+IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+
 CLAUDE_TOOL_NAMES = [
     "TodoWrite", "AskUserQuestion", "NotebookEdit", "SlashCommand",
     "ExitPlanMode", "WebFetch", "TaskCreate", "TaskUpdate", "ToolSearch",
@@ -63,14 +70,20 @@ EXPLICACIONES = {
 }
 
 
-def detectar(texto: str, ruta: str) -> list:
+def detectar(texto: str, ruta: str, offset: int = 0) -> list:
     """Devuelve una Senal por cada par (patron, linea) que coincida.
 
     Una linea con dos llamadas MCP produce UNA senal, no dos: lo que importa
     para el informe es donde mirar, y la linea ya lo dice.
+
+    `offset` desplaza la numeracion: quien llama con un fragmento de texto
+    que empieza mas abajo en el fichero real -el cuerpo de un SKILL.md tras
+    separar el frontmatter, por ejemplo- pasa aqui cuantas lineas se quedaron
+    fuera del fragmento, para que la ubicacion reportada sea la linea real
+    del fichero y no la linea dentro del fragmento.
     """
     salida = []
-    for numero, linea in enumerate(texto.splitlines(), start=1):
+    for numero, linea in enumerate(texto.splitlines(), start=1 + offset):
         for pid, rx, severidad in PATRONES:
             m = rx.search(linea)
             if m:
@@ -85,9 +98,15 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> list:
     `excluir` es un conjunto de nombres de fichero (basename, no ruta) que se
     saltan. Lo usa quien ya audito ese fichero por otra via -por ejemplo el
     cuerpo YA ADAPTADO del SKILL.md- y no quiere leerlo dos veces desde disco.
+
+    Los directorios de `IGNORED_DIRS` se podan de la busqueda: son los mismos
+    que discover_skills() y copiar_skill() ya excluyen en el resto del
+    pipeline, y sin esto una senal dentro de node_modules/ acababa marcando
+    como no_compatible un fichero que el paquete exportado nunca incluye.
     """
     salida = []
-    for base, _dirs, ficheros in os.walk(str(raiz)):
+    for base, dirs, ficheros in os.walk(str(raiz)):
+        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
         for nombre in sorted(ficheros):
             if nombre in excluir:
                 continue

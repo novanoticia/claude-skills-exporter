@@ -52,7 +52,13 @@ from exporter.descripcion import (
     reorder_description,
     tiene_activacion,
 )
-from exporter.deteccion import CLAUDE_TOOL_NAMES, EXPLICACIONES, detectar, detectar_en_arbol
+from exporter.deteccion import (
+    CLAUDE_TOOL_NAMES,
+    EXPLICACIONES,
+    IGNORED_DIRS,
+    detectar,
+    detectar_en_arbol,
+)
 from exporter.empaquetado import comprobar_limites, copiar_skill, zip_dir
 from exporter.frontmatter import split_frontmatter, yaml_escape
 from exporter.informes import informe_markdown, resumen_json
@@ -147,7 +153,9 @@ class SkillResult:
 # Descubrimiento
 # --------------------------------------------------------------------------
 
-IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+# IGNORED_DIRS vive en exporter.deteccion: es el mismo conjunto que
+# detectar_en_arbol() debe podar para no auditar ficheros que este modulo
+# nunca copia al paquete (ver copiar_skill() mas abajo).
 
 
 def discover_skills(root: Path) -> list:
@@ -270,7 +278,16 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     # arreglar. La reescritura de ${CLAUDE_PLUGIN_ROOT} solo alcanza al cuerpo
     # del SKILL.md, asi que en references/ y scripts/ ese patron SI es un
     # riesgo real y debe seguir avisando.
-    senales = detectar(body, "SKILL.md") + detectar_en_arbol(src_dir, excluir={"SKILL.md"})
+    #
+    # `body` ya no empieza en la linea 1 del fichero real: split_frontmatter()
+    # se lo quito. detectar() numera desde 1 salvo que se le diga cuanto se
+    # quito, o cada senal del SKILL.md sale con un numero de linea que no es
+    # el que tiene el fichero de verdad -el offset se mide por diferencia de
+    # lineas totales porque sobrevive a las reescrituras de arriba, que
+    # cambian texto DENTRO de una linea pero nunca el numero de lineas-.
+    offset_skill_md = len(text.splitlines()) - len(body.splitlines())
+    senales = (detectar(body, "SKILL.md", offset=offset_skill_md)
+               + detectar_en_arbol(src_dir, excluir={"SKILL.md"}))
     res.senales = senales
     for s in senales:
         res.findings.append(Finding(s.severidad_base, s.id,
