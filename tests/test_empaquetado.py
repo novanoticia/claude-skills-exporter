@@ -60,6 +60,24 @@ class CopiaSinSeguirEnlaces(unittest.TestCase):
             self.assertFalse((Path(tmp) / "salida" / "__pycache__").exists())
             self.assertFalse((Path(tmp) / "salida" / "SKILL.md").exists())
 
+    def test_conserva_el_permiso_de_ejecucion(self):
+        # read_bytes/write_bytes no arrastran el modo del fichero, a
+        # diferencia de shutil.copy2. Un scripts/*.sh sin +x llega inerte a
+        # Perplexity Computer, que SI ejecuta scripts/.
+        with tempfile.TemporaryDirectory() as tmp:
+            origen = Path(tmp) / "skill"
+            (origen / "scripts").mkdir(parents=True)
+            script = origen / "scripts" / "run.sh"
+            script.write_text("#!/bin/sh\necho hola\n", encoding="utf-8")
+            script.chmod(0o755)
+
+            destino_raiz = Path(tmp) / "salida"
+            copiar_skill(origen, destino_raiz, ignorar=set())
+
+            copia = destino_raiz / "scripts" / "run.sh"
+            self.assertTrue(copia.exists())
+            self.assertEqual(copia.stat().st_mode & 0o777, 0o755)
+
 
 class LimitesDePaquete(unittest.TestCase):
 

@@ -53,6 +53,17 @@ class InformeMarkdown(unittest.TestCase):
         md = informe_markdown(self.res, self.evaluaciones, "./x", self.perfiles)
         self.assertIn("scripts.ejecutar", md)
 
+    def test_un_veredicto_causado_por_capacidad_tambien_cita_evidencia(self):
+        # El veredicto de mistral-vibe-work en self.evaluaciones lo causa el
+        # canal de capacidades (scripts.ejecutar) y no lleva ningun peligro:
+        # es justo el caso que antes se quedaba sin evidencia ni fecha,
+        # incumpliendo el criterio de aceptacion 4 («cada no_compatible o
+        # degradado cita... su evidencia y su fecha de verificacion»).
+        md = informe_markdown(self.res, self.evaluaciones, "./x", self.perfiles)
+        ev_perfil = self.perfiles["mistral-vibe-work"].datos["evidencia"]
+        self.assertIn(ev_perfil["confianza"], md)
+        self.assertIn(ev_perfil["verificado_el"], md)
+
 
 class ResumenJson(unittest.TestCase):
 

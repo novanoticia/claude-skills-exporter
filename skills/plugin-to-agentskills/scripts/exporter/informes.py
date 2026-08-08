@@ -76,6 +76,16 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles) -> str:
                     L.append("- *Mitigación:* {}".format(p["mitigacion"]))
                     L.append("  Evidencia: {} · verificado el {}.".format(
                         p["evidencia"]["confianza"], p["evidencia"]["verificado_el"]))
+                # Las capacidades no tienen evidencia propia -no son un
+                # peligro observado, son una casilla que el perfil declara o
+                # no-, así que la cita es la del perfil entero: es la fuente
+                # real de "cuán fiable es lo que este destino declara saber
+                # hacer". Sin esto, la mayoría de las celdas rojas (las que
+                # vienen del canal de capacidades) no citaban evidencia
+                # ninguna, incumpliendo el criterio de aceptación 4.
+                ev_perfil = perfiles[i].datos["evidencia"]
+                L.append("  Evidencia del perfil: {} · verificado el {}.".format(
+                    ev_perfil["confianza"], ev_perfil["verificado_el"]))
                 L.append("")
     return "\n".join(L) + "\n"
 

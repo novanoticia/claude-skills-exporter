@@ -41,7 +41,13 @@ def copiar_skill(src: Path, dest: Path, ignorar: set) -> list:
             if os.path.islink(origen):
                 senales.append(_senal_enlace(origen, src))
                 continue
-            (destino_base / nombre).write_bytes(Path(origen).read_bytes())
+            destino = destino_base / nombre
+            destino.write_bytes(Path(origen).read_bytes())
+            # read_bytes/write_bytes no conservan el modo del fichero, a
+            # diferencia de shutil.copy2. Sin esto, un scripts/*.sh con +x
+            # llega al paquete sin permiso de ejecucion, y Perplexity
+            # Computer -que SI ejecuta scripts/- no puede lanzarlo.
+            os.chmod(destino, os.stat(origen).st_mode & 0o777)
     return senales
 
 
