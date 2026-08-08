@@ -12,9 +12,12 @@ incluso comercialmente, conservando este aviso de copyright y la licencia.
 Sólo biblioteca estándar. Python 3.8+.
 
 Uso:
-    python3 convert.py <repo-url-o-ruta> [--out DIR] [--only NOMBRE ...]
+    python3 convert.py inspect <repo-url-o-ruta>              # qué exige, sin destino
+    python3 convert.py audit   <repo-url-o-ruta> [--target …] # matriz; no escribe nada
+    python3 convert.py export  <repo-url-o-ruta> [--out DIR] [--only NOMBRE ...]
+    python3 convert.py <repo-url-o-ruta> ...                  # forma corta = export
 
-Salidas en <out>/:
+Salidas de `export` en <out>/:
     <skill>.zip                se sube tal cual a ChatGPT, claude.ai y Perplexity
     <skill>/                   se sube a Mistral Vibe Work
     INFORME-PORTABILIDAD.md    qué se adaptó y qué se romperá fuera de Claude
@@ -50,11 +53,11 @@ from exporter.descripcion import (
     tiene_activacion,
 )
 from exporter.deteccion import CLAUDE_TOOL_NAMES, EXPLICACIONES, detectar, detectar_en_arbol
-from exporter.empaquetado import copiar_skill, zip_dir
+from exporter.empaquetado import comprobar_limites, copiar_skill, zip_dir
 from exporter.frontmatter import split_frontmatter, yaml_escape
 from exporter.informes import informe_markdown, resumen_json
-from exporter.modelo import SkillPortatil, capacidades_de
-from exporter.perfiles import cargar_perfiles, presupuesto_por_modo
+from exporter.modelo import Estado, SkillPortatil, capacidades_de
+from exporter.perfiles import PerfilInvalido, cargar_perfiles, presupuesto_por_modo
 
 # --------------------------------------------------------------------------
 # Límites y constantes del estándar Agent Skills
@@ -412,34 +415,122 @@ def resolve_source(src: str, workdir: Path) -> Path:
     return target
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Plugin de Claude → Agent Skills portable",
-        epilog="Salida: <skill>.zip para Perplexity y <skill>/ para Mistral. Mismos "
-               "ficheros, pero la descripción se ajusta al presupuesto de cada destino: "
-               "descomprimir el zip NO produce la carpeta de Mistral.")
-    ap.add_argument("source", help="URL del repositorio o ruta local")
-    ap.add_argument("--out", default="./dist-agentskills", help="directorio de salida")
-    ap.add_argument("--only", nargs="*", default=None, help="exportar sólo estas skills")
-    ap.add_argument("--zip-only", action="store_true",
-                    help="dejar sólo los .zip (pierdes la variante de Mistral)")
-    ap.add_argument("--keep-description-order", action="store_true",
-                    help="no reordenar la descripción (por defecto la activación va primero)")
-    args = ap.parse_args()
+SUBCOMANDOS = ("inspect", "audit", "export")
 
-    # Los perfiles se cargan una sola vez: de ellos salen los presupuestos de
-    # descripción (el más restrictivo por modo de instalación) y, más abajo,
-    # la evaluación de compatibilidad de cada skill.
-    perfiles = cargar_perfiles()
+
+def normalizar_argv(argv: list) -> list:
+    """Antepone `export` cuando el primer argumento es un origen suelto.
+
+    `convert.py <repo>` funcionaba antes de que existieran los subcomandos, y
+    lo usan el «Paso 0» del SKILL.md, el comando /exportar-skills y el
+    workflow de CI. Romperlo llegaría a todo el que tenga el plugin
+    instalado en el mismo push, porque el marketplace está en autosync.
+    """
+    if not argv or argv[0] in SUBCOMANDOS or argv[0].startswith("-"):
+        return list(argv)
+    return ["export"] + list(argv)
+
+
+def construir_parser():
+    ap = argparse.ArgumentParser(
+        prog="convert.py",
+        description="Audita y exporta skills de un plugin de Claude al estándar "
+                    "abierto Agent Skills.")
+    subs = ap.add_subparsers(dest="comando", required=True)
+
+    def comun(p):
+        p.add_argument("source", help="URL del repositorio o ruta local")
+        p.add_argument("--fail-on", dest="fail_on", default="ninguno",
+                       choices=["ninguno", "degradado", "no_compatible"],
+                       help="devolver código 2 si algún estado alcanza este umbral")
+        return p
+
+    ins = comun(subs.add_parser(
+        "inspect", help="qué contiene y qué exige la skill, sin elegir destino"))
+    ins.add_argument("--keep-description-order", action="store_true",
+                     help="no reordenar la descripción")
+
+    aud = comun(subs.add_parser(
+        "audit", help="matriz de compatibilidad; no escribe paquetes"))
+    aud.add_argument("--target", nargs="*", default=None,
+                     help="destinos a auditar (por defecto, todos)")
+    aud.add_argument("--keep-description-order", action="store_true",
+                     help="no reordenar la descripción")
+
+    exp = comun(subs.add_parser("export", help="auditar y empaquetar"))
+    exp.add_argument("--target", nargs="*", default=None,
+                     help="restringe qué artefactos se producen; la auditoría "
+                          "sigue cubriendo todos los destinos")
+    exp.add_argument("--out", default="./dist-agentskills", help="directorio de salida")
+    exp.add_argument("--only", nargs="*", default=None,
+                     help="exportar sólo estas skills")
+    exp.add_argument("--zip-only", action="store_true",
+                     help="dejar sólo los .zip (pierdes la variante de carpeta)")
+    exp.add_argument("--keep-description-order", action="store_true",
+                     help="no reordenar la descripción")
+    return ap
+
+
+def codigo_por_umbral(evaluaciones, umbral: str) -> int:
+    if umbral == "ninguno":
+        return 0
+    limite = Estado.ORDEN.index(
+        Estado.DEGRADADO if umbral == "degradado" else Estado.NO_COMPATIBLE)
+    for por_destino in evaluaciones.values():
+        for evs in por_destino.values():
+            for ev in evs:
+                if Estado.ORDEN.index(ev.estado) >= limite:
+                    return 2
+    return 0
+
+
+def imprimir_inspect(skill) -> None:
+    """Vuelca el modelo intermedio: lo que la skill es y exige, sin destino."""
+    print("\n## {}".format(skill.nombre))
+    if skill.nombre != skill.nombre_original:
+        print("   nombre original: {}".format(skill.nombre_original))
+    print("   descripción: {} bytes{}".format(
+        skill.descripcion_bytes,
+        "" if skill.tiene_activacion else "  ⚠ SIN criterio de activación"))
+    print("   cuerpo: ~{} tokens".format(skill.cuerpo_tokens))
+    print("   ficheros: {}{}".format(
+        len(skill.ficheros), " (incluye scripts/)" if skill.tiene_scripts else ""))
+
+    if skill.capacidades:
+        print("   capacidades exigidas:")
+        for c in skill.capacidades:
+            print("     · {:<24} {}".format(c.nombre, c.nivel))
+    else:
+        print("   capacidades exigidas: ninguna")
+
+    if skill.senales:
+        print("   señales:")
+        for s in skill.senales:
+            print("     · {:<20} {}  {}".format(s.id, s.ubicacion, s.muestra))
+    else:
+        print("   señales: ninguna")
+
+    ambiguo = [c.nombre for c in skill.capacidades if c.nivel == "requerida"]
+    if ambiguo and not skill.tiene_activacion:
+        print("   ⚠ Exige capacidades y no dice cuándo cargarse: revisa la "
+              "descripción antes de auditar contra ningún destino.")
+
+
+def ejecutar(args, perfiles, elegidos) -> int:
+    # Los perfiles ya están cargados: de ellos salen los presupuestos de
+    # descripción (el más restrictivo por modo de instalación), con
+    # independencia del subcomando y de qué destinos se hayan elegido.
     presupuesto_carpeta = presupuesto_por_modo(perfiles, "carpeta")   # Mistral: 490
     presupuesto_zip = presupuesto_por_modo(perfiles, "zip")           # el resto: 850
 
-    out = Path(args.out).expanduser().resolve()
-    if out.exists():
-        shutil.rmtree(out)
-    # Las carpetas de skill cuelgan directamente de <out>, al lado de su zip: mismos
-    # ficheros, distinta descripción.
-    out.mkdir(parents=True)
+    out = None
+    if args.comando == "export":
+        out = Path(args.out).expanduser().resolve()
+        if out.exists():
+            shutil.rmtree(out)
+        # Las carpetas de skill cuelgan directamente de <out>, al lado de su
+        # zip: mismos ficheros, distinta descripción.
+        out.mkdir(parents=True)
 
     with tempfile.TemporaryDirectory() as tmp:
         root = resolve_source(args.source, Path(tmp))
@@ -450,12 +541,20 @@ def main() -> int:
                      "skills? Un plugin sin carpeta skills/ no tiene nada portable.")
 
         print(f"[info] {len(skill_files)} skill(s) encontradas.")
+
+        # `inspect` y `audit` no escriben ningún fichero de salida: trabajan
+        # sobre una copia efímera que desaparece con este bloque. `export`
+        # usa `out`, que sí sobrevive fuera de él.
+        work_dir = out if out is not None else Path(tmp) / "_trabajo"
+        work_dir.mkdir(parents=True, exist_ok=True)
+
+        solo = getattr(args, "only", None)
         results = []
         for sf in skill_files:
             nm = sanitize_name(sf.parent.name)
-            if args.only and nm not in {sanitize_name(x) for x in args.only}:
+            if solo and nm not in {sanitize_name(x) for x in solo}:
                 continue
-            r = audit_and_adapt(sf, out, presupuesto_carpeta, presupuesto_zip,
+            r = audit_and_adapt(sf, work_dir, presupuesto_carpeta, presupuesto_zip,
                                 reorder=not args.keep_description_order)
             results.append(r)
             print(f"  · {r.name:<40} riesgo={r.worst}")
@@ -463,24 +562,65 @@ def main() -> int:
         if not results:
             sys.exit("[error] --only no coincidió con ninguna skill.")
 
-        # Un zip por skill, con la carpeta de la skill en la raíz del zip:
-        # es la única estructura que Perplexity acepta.
-        for r in results:
-            write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
-            zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
-            write_skill_md(r, out / r.name, r.desc_folder)   # en disco: Mistral
-
-        if args.zip_only:
+        if args.comando == "inspect":
             for r in results:
-                shutil.rmtree(out / r.name)
+                imprimir_inspect(a_skill_portatil(r))
+            return 0
 
         hoy = datetime.date.today()
+
+        # `audit` respeta --target: es él quien decide qué destinos evaluar.
+        # `export` NO: su --target sólo restringe qué artefactos se
+        # escriben, la auditoría sigue cubriendo los cinco destinos.
+        perfiles_informe = perfiles
+        if args.comando == "audit" and elegidos:
+            perfiles_informe = {pid: perfiles[pid] for pid in elegidos}
+
         evaluaciones = {}
         for r in results:
             skill = a_skill_portatil(r)
             evaluaciones[r.name] = {
-                pid: evaluar(skill, perfil, hoy) for pid, perfil in perfiles.items()
+                pid: evaluar(skill, perfil, hoy) for pid, perfil in perfiles_informe.items()
             }
+
+        if args.comando == "audit":
+            print()
+            print(informe_markdown(results, evaluaciones, args.source, perfiles_informe))
+            return codigo_por_umbral(evaluaciones, args.fail_on)
+
+        # -------- export --------
+        # Qué artefactos hacen falta: la unión de los modos de instalación
+        # de los destinos elegidos (todos, si no se restringió con
+        # --target). `carpeta` es el único modo no-zip que este conversor
+        # sabe producir, así que cualquier modo que no sea `zip` ni
+        # `url_repositorio` (que no necesita ningún artefacto propio)
+        # implica querer la carpeta.
+        modos_deseados = set()
+        for pid in (elegidos if elegidos else perfiles):
+            modos_deseados.update(perfiles[pid].modos())
+        quiere_zip = "zip" in modos_deseados
+        quiere_carpeta = bool(modos_deseados - {"zip", "url_repositorio"})
+
+        # Un zip por skill, con la carpeta de la skill en la raíz del zip:
+        # es la única estructura que Perplexity acepta.
+        for r in results:
+            if quiere_zip:
+                write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
+                zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
+                for pid, perfil in perfiles.items():
+                    if "zip" not in perfil.modos():
+                        continue
+                    for aviso in comprobar_limites(out / "{}.zip".format(r.name), perfil):
+                        r.findings.append(Finding("alta", "limite-de-paquete", aviso))
+            if quiere_carpeta:
+                write_skill_md(r, out / r.name, r.desc_folder)   # en disco: Mistral
+            elif (out / r.name).exists():
+                shutil.rmtree(out / r.name)
+
+        if args.zip_only:
+            for r in results:
+                if (out / r.name).exists():
+                    shutil.rmtree(out / r.name)
 
         (out / "INFORME-PORTABILIDAD.md").write_text(
             informe_markdown(results, evaluaciones, args.source, perfiles),
@@ -491,18 +631,43 @@ def main() -> int:
             encoding="utf-8")
 
     print(f"\n[ok] Salida en: {out}")
-    print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill; "
-          f"descripción ≤{presupuesto_zip} B)")
-    if not args.zip_only:
-        print(f"     Mistral    → <skill>/      (descripción ≤{presupuesto_carpeta} B — NO es el "
-              f"zip descomprimido)")
-    else:
-        print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de {presupuesto_carpeta} B")
+    if quiere_zip:
+        print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill; "
+              f"descripción ≤{presupuesto_zip} B)")
+    if quiere_carpeta:
+        if args.zip_only:
+            print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de "
+                  f"{presupuesto_carpeta} B")
+        else:
+            print(f"     Mistral    → <skill>/      (descripción ≤{presupuesto_carpeta} B — NO es el "
+                  f"zip descomprimido)")
     print(f"     Informe    → INFORME-PORTABILIDAD.md")
     riesgo = [r.name for r in results if r.worst == "alta"]
     if riesgo:
         print(f"\n[aviso] Riesgo alto en: {', '.join(riesgo)}. Lee el informe antes de subirlas.")
-    return 0
+
+    return codigo_por_umbral(evaluaciones, args.fail_on)
+
+
+def main(argv=None) -> int:
+    args = construir_parser().parse_args(normalizar_argv(
+        sys.argv[1:] if argv is None else argv))
+
+    try:
+        perfiles = cargar_perfiles()
+    except PerfilInvalido as e:
+        print("[error] perfil de destino inválido: {}".format(e), file=sys.stderr)
+        return 1
+
+    elegidos = getattr(args, "target", None)
+    if elegidos:
+        desconocidos = [t for t in elegidos if t not in perfiles]
+        if desconocidos:
+            print("[error] destino desconocido: {}. Disponibles: {}".format(
+                ", ".join(desconocidos), ", ".join(sorted(perfiles))), file=sys.stderr)
+            return 1
+
+    return ejecutar(args, perfiles, elegidos)
 
 
 if __name__ == "__main__":
