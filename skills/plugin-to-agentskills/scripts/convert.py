@@ -37,7 +37,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -49,6 +48,7 @@ from exporter.descripcion import (
     tiene_activacion,
 )
 from exporter.deteccion import CLAUDE_TOOL_NAMES, EXPLICACIONES, detectar, detectar_en_arbol
+from exporter.empaquetado import copiar_skill, zip_dir
 from exporter.frontmatter import split_frontmatter, yaml_escape
 
 # --------------------------------------------------------------------------
@@ -277,7 +277,12 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
     dest = out_dir / name
     if dest.exists():
         shutil.rmtree(dest)
-    shutil.copytree(src_dir, dest, ignore=shutil.ignore_patterns(*IGNORED_DIRS, "SKILL.md"))
+    enlaces = copiar_skill(src_dir, dest, ignorar=set(IGNORED_DIRS) | {"SKILL.md"})
+    for s in enlaces:
+        res.findings.append(Finding("alta", "enlace-simbolico",
+            "Se omitió un enlace simbólico al empaquetar: {} ({}). Copiar su "
+            "contenido habría metido en el paquete un fichero de fuera de la "
+            "skill.".format(s.ubicacion, s.muestra)))
 
     for p in sorted(dest.rglob("*")):
         if p.is_file():
@@ -358,19 +363,6 @@ def render_notes(res: SkillResult) -> str:
                    "disponible, dilo explícitamente y propón una alternativa. No simules el "
                    "resultado ni lo inventes.\n")
     return "\n".join(out) + "\n"
-
-
-# --------------------------------------------------------------------------
-# Empaquetado
-# --------------------------------------------------------------------------
-
-def zip_dir(src: Path, dest_zip: Path, arc_prefix: str = "") -> None:
-    dest_zip.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(dest_zip, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in sorted(src.rglob("*")):
-            if p.is_file():
-                arc = Path(arc_prefix) / p.relative_to(src) if arc_prefix else p.relative_to(src)
-                z.write(p, arc.as_posix())
 
 
 def write_report(results: list, out: Path, source: str) -> None:
