@@ -892,11 +892,25 @@ Nota sobre `slash-plugin`: al pasar de buscar sobre el texto completo a buscar l
 En `convert.py`, borrar `PATTERNS` (líneas 92-134) y `CLAUDE_TOOL_NAMES` (líneas 87-90), y sustituir el bucle de `audit_and_adapt` (líneas 530-545) por:
 
 ```python
-    for s in detectar_en_arbol(src_dir):
+    # El SKILL.md se audita sobre el cuerpo YA ADAPTADO, y el resto del arbol
+    # desde disco. La razon esta en el orden que ya seguia este fichero:
+    # adaptar antes de auditar, para no avisar de lo que uno mismo acaba de
+    # arreglar. La reescritura de ${CLAUDE_PLUGIN_ROOT} solo alcanza al cuerpo
+    # del SKILL.md, asi que en references/ y scripts/ ese patron SI es un
+    # riesgo real y debe seguir avisando.
+    senales = detectar(body, "SKILL.md") + detectar_en_arbol(src_dir, excluir={"SKILL.md"})
+    for s in senales:
         res.findings.append(Finding(s.severidad_base, s.id,
                                     "{} Visto en {}: {}".format(
                                         EXPLICACIONES[s.id], s.ubicacion, s.muestra)))
 ```
+
+`detectar_en_arbol` gana el parámetro `excluir: set = frozenset()`, que salta los ficheros
+cuyo nombre esté en el conjunto.
+
+Lo que sobrevive a la reescritura sigue avisando, y es correcto que lo haga: un
+`$CLAUDE_PLUGIN_ROOT` sin barra —como el `[ -n "$CLAUDE_PLUGIN_ROOT" ]` de una condición de
+shell— no lo captura ninguno de los dos `re.sub`, y fuera del destino no existe.
 
 Añadir el import correspondiente:
 
@@ -1840,6 +1854,10 @@ CAPACIDAD_SUFICIENTE = {"si", "si_con_confirmacion"}
 # Un peligro disparado contribuye este estado. Un peligro `alta` lleva a
 # no_compatible aunque no falte ninguna capacidad: la skill se instala y se
 # ejecuta, pero su consecuencia la hace inadecuada para ese destino.
+# `baja` mapea a COMPATIBLE a proposito: no cambia el estado, porque
+# Estado.peor() nunca lo elige por encima de nada. Pero el peligro y su motivo
+# SI se registran, para que salgan en el informe como nota informativa. Es lo
+# que pide el diseno: «baja → ninguno: nota informativa en el informe».
 ESTADO_POR_SEVERIDAD = {
     "alta": Estado.NO_COMPATIBLE,
     "media": Estado.DEGRADADO,
@@ -3686,6 +3704,10 @@ Y una sección nueva al final:
    afirmación.
 3. Los peligros de conducta —lo que la plataforma hace mal *teniendo* la
    capacidad— van en `peligros[]`, enlazados por `dispara_con` al id de la señal.
+   **`dispara_con: []` significa «informativo»**: documenta un comportamiento de la
+   plataforma que no depende de ninguna señal detectable, así que `peligros_para()` nunca
+   lo devuelve y no afecta a ningún veredicto. Sirve como referencia para quien lea el
+   perfil. Si esperabas que tu peligro disparase y no lo hace, mira aquí primero.
 4. Poner `evidencia.verificado_el` a hoy y `revisar_tras` a tres meses vista.
 5. Añadir la etiqueta y el presupuesto a la tabla de la sección 1 y al README,
    o el CI fallará.
