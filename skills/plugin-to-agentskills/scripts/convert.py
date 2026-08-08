@@ -400,18 +400,58 @@ def a_skill_portatil(res: SkillResult) -> SkillPortatil:
 # Main
 # --------------------------------------------------------------------------
 
+# Limites defensivos sobre lo que se acepta analizar. No se descomprime nada
+# ni se ejecuta nada, pero un repositorio absurdo puede agotar el disco.
+MAX_BYTES_REPO = 200 * 1024 * 1024
+MAX_FICHEROS_REPO = 20000
+TIMEOUT_CLON = 300
+
+
+def comprobar_tamano(raiz: Path) -> None:
+    """Aborta si el arbol excede los limites. No sigue enlaces."""
+    total, n = 0, 0
+    for base, dirs, ficheros in os.walk(str(raiz)):
+        dirs[:] = [d for d in dirs
+                   if d != ".git" and not os.path.islink(os.path.join(base, d))]
+        for nombre in ficheros:
+            ruta = os.path.join(base, nombre)
+            if os.path.islink(ruta):
+                continue
+            n += 1
+            total += os.path.getsize(ruta)
+            if n > MAX_FICHEROS_REPO:
+                sys.exit("[error] El origen supera los {} ficheros. Se aborta el "
+                         "análisis.".format(MAX_FICHEROS_REPO))
+            if total > MAX_BYTES_REPO:
+                sys.exit("[error] El origen supera los {} MB. Se aborta el "
+                         "análisis.".format(MAX_BYTES_REPO // (1024 * 1024)))
+
+
 def resolve_source(src: str, workdir: Path) -> Path:
     p = Path(src).expanduser()
     if p.exists():
+        comprobar_tamano(p.resolve())
         return p.resolve()
     if not re.match(r"^(https?://|git@)", src):
-        sys.exit(f"[error] '{src}' no existe como ruta ni parece una URL de repositorio.")
+        sys.exit("[error] '{}' no existe como ruta ni parece una URL de "
+                 "repositorio.".format(src))
     target = workdir / "repo"
-    print(f"[info] clonando {src} ...")
-    r = subprocess.run(["git", "clone", "--depth", "1", src, str(target)],
-                       capture_output=True, text=True)
+    print("[info] clonando {} ...".format(src))
+    entorno = dict(os.environ)
+    # Sin esto, un repositorio privado deja el proceso colgado esperando
+    # credenciales que nadie va a teclear.
+    entorno["GIT_TERMINAL_PROMPT"] = "0"
+    try:
+        r = subprocess.run(
+            ["git", "clone", "--depth", "1", "--no-recurse-submodules", src, str(target)],
+            capture_output=True, text=True, env=entorno, timeout=TIMEOUT_CLON)
+    except subprocess.TimeoutExpired:
+        sys.exit("[error] el clon superó los {} s y se ha cancelado.".format(TIMEOUT_CLON))
     if r.returncode != 0:
-        sys.exit(f"[error] git clone falló:\n{r.stderr.strip()}")
+        sys.exit("[error] git clone falló:\n{}\n\nSi el repositorio es privado, "
+                 "necesitas git ya autenticado, o descárgalo a mano y pasa la "
+                 "ruta local.".format(r.stderr.strip()))
+    comprobar_tamano(target)
     return target
 
 
