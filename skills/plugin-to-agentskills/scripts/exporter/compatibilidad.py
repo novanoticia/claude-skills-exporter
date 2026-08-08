@@ -26,6 +26,11 @@ CAPACIDAD_SUFICIENTE = {"si", "si_con_confirmacion"}
 # Un peligro disparado contribuye este estado. Un peligro `alta` lleva a
 # no_compatible aunque no falte ninguna capacidad: la skill se instala y se
 # ejecuta, pero su consecuencia la hace inadecuada para ese destino.
+#
+# `baja` mapea a COMPATIBLE a proposito, y no significa "se ignora":
+# Estado.peor() nunca elige COMPATIBLE por encima de nada, asi que el estado no
+# cambia, pero el peligro y su motivo SI quedan registrados para que salgan en
+# el informe. Es lo que pide el diseno: «baja → nota informativa».
 ESTADO_POR_SEVERIDAD = {
     "alta": Estado.NO_COMPATIBLE,
     "media": Estado.DEGRADADO,
