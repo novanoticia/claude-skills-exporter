@@ -30,6 +30,7 @@ Una skill por zip — nunca un zip con varias dentro.
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -40,6 +41,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from exporter.compatibilidad import evaluar
 from exporter.descripcion import (
     clamp_description,
     compact_description,
@@ -50,6 +52,9 @@ from exporter.descripcion import (
 from exporter.deteccion import CLAUDE_TOOL_NAMES, EXPLICACIONES, detectar, detectar_en_arbol
 from exporter.empaquetado import copiar_skill, zip_dir
 from exporter.frontmatter import split_frontmatter, yaml_escape
+from exporter.informes import informe_markdown, resumen_json
+from exporter.modelo import SkillPortatil, capacidades_de
+from exporter.perfiles import cargar_perfiles, presupuesto_por_modo
 
 # --------------------------------------------------------------------------
 # Límites y constantes del estándar Agent Skills
@@ -59,11 +64,11 @@ from exporter.frontmatter import split_frontmatter, yaml_escape
 # ChatGPT (Skills), claude.ai y la Skills API, y lo aplican como error duro.
 MAX_DESCRIPTION_CHARS = 1024
 
-# Presupuestos POR DESTINO, en BYTES UTF-8 (no en caracteres: en español un acento
-# ocupa dos y una raya tres, así que contar letras engaña por un 2-3%).
-BUDGET_MISTRAL = 490              # carpeta descomprimida
-BUDGET_PERPLEXITY = 850           # dentro del .zip
-BUDGET_DEFAULT = BUDGET_PERPLEXITY
+# Los presupuestos POR DESTINO (en BYTES UTF-8, no en caracteres: en español un
+# acento ocupa dos y una raya tres, así que contar letras engaña por un 2-3%) ya
+# no son constantes de este fichero: se derivan de los perfiles de exporter/targets/
+# con presupuesto_por_modo(), el más restrictivo de los destinos que aceptan ese
+# modo de instalación. Añadir un destino es escribir un JSON, no tocar esta lista.
 # ChatGPT y claude.ai no necesitan presupuesto propio: su tope es el del estándar
 # (1024 caracteres) y el zip ya viaja con la descripción de 850 bytes, que cabe de
 # sobra. Por eso el mismo .zip de Perplexity sirve para los tres sin reexportar.
@@ -119,6 +124,9 @@ class SkillResult:
     body: str = ""
     fm_extra: dict = field(default_factory=dict)
     fm_meta: dict = field(default_factory=dict)
+    # Señales detectadas en toda la skill (SKILL.md adaptado + resto del árbol).
+    # Alimentan a_skill_portatil(), que las pasa al motor de compatibilidad.
+    senales: list = field(default_factory=list)
 
     @property
     def worst(self) -> str:
@@ -157,7 +165,8 @@ def sanitize_name(raw: str) -> str:
 # Auditoría y adaptación
 # --------------------------------------------------------------------------
 
-def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> SkillResult:
+def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
+                    presupuesto_zip: int, reorder: bool = True) -> SkillResult:
     src_dir = skill_md.parent
     text = skill_md.read_text(encoding="utf-8", errors="replace")
     fm, _raw_fm, body = split_frontmatter(text)
@@ -205,31 +214,31 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
     origen_bytes = nbytes(res.description)
     if reorder:
         res.desc_folder = clamp_description(
-            compact_description(res.description, BUDGET_MISTRAL), BUDGET_MISTRAL)
+            compact_description(res.description, presupuesto_carpeta), presupuesto_carpeta)
         res.desc_zip = clamp_description(
-            compact_description(res.description, BUDGET_PERPLEXITY), BUDGET_PERPLEXITY)
+            compact_description(res.description, presupuesto_zip), presupuesto_zip)
     else:
-        res.desc_folder = clamp_description(res.description, BUDGET_MISTRAL)
-        res.desc_zip = clamp_description(res.description, BUDGET_PERPLEXITY)
+        res.desc_folder = clamp_description(res.description, presupuesto_carpeta)
+        res.desc_zip = clamp_description(res.description, presupuesto_zip)
     res.description = res.desc_zip   # la que se muestra en el informe
 
-    if origen_bytes > BUDGET_MISTRAL:
+    if origen_bytes > presupuesto_carpeta:
         res.adaptations.append(
             f"Descripción ajustada a cada destino: {origen_bytes} bytes de origen → "
-            f"{nbytes(res.desc_zip)} B en el `.zip` (Perplexity, tope {BUDGET_PERPLEXITY}) y "
-            f"{nbytes(res.desc_folder)} B en la carpeta (Mistral, tope {BUDGET_MISTRAL}). "
+            f"{nbytes(res.desc_zip)} B en el `.zip` (Perplexity, tope {presupuesto_zip}) y "
+            f"{nbytes(res.desc_folder)} B en la carpeta (Mistral, tope {presupuesto_carpeta}). "
             "Se podan primero los ejemplos entrecomillados y después las frases que sólo "
             "cuentan qué hace la skill; el criterio de activación se conserva.")
-    if origen_bytes > BUDGET_PERPLEXITY:
+    if origen_bytes > presupuesto_zip:
         res.findings.append(Finding("media", "description-larga",
             f"La descripción de origen medía {origen_bytes} bytes UTF-8 y no cabe entera en "
             "ningún destino. El recorte automático mantiene frases completas, pero no puede "
             "reescribir: revisa el resultado y, si ha perdido matiz, redáctala a mano en un "
             "solo párrafo que diga primero cuándo activarse y luego para qué sirve."))
-    elif origen_bytes > BUDGET_MISTRAL:
+    elif origen_bytes > presupuesto_carpeta:
         res.findings.append(Finding("baja", "description-densa",
             f"Descripción de {origen_bytes} bytes: cabe en el zip de Perplexity pero no en la "
-            f"carpeta de Mistral ({BUDGET_MISTRAL} B), donde va recortada. El índice del "
+            f"carpeta de Mistral ({presupuesto_carpeta} B), donde va recortada. El índice del "
             "destino paga este coste en cada sesión, así que cuanto más breve, mejor."))
 
     # Claves no portables
@@ -255,6 +264,7 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
     # del SKILL.md, asi que en references/ y scripts/ ese patron SI es un
     # riesgo real y debe seguir avisando.
     senales = detectar(body, "SKILL.md") + detectar_en_arbol(src_dir, excluir={"SKILL.md"})
+    res.senales = senales
     for s in senales:
         res.findings.append(Finding(s.severidad_base, s.id,
                                     "{} Visto en {}: {}".format(
@@ -365,53 +375,22 @@ def render_notes(res: SkillResult) -> str:
     return "\n".join(out) + "\n"
 
 
-def write_report(results: list, out: Path, source: str) -> None:
-    sev_icon = {"alta": "🔴", "media": "🟡", "baja": "🔵", "ninguna": "🟢"}
-    L = [
-        "# Informe de portabilidad",
-        "",
-        f"- **Origen:** `{source}`",
-        f"- **Skills exportadas:** {len(results)}",
-        "",
-        "## Dónde sube cada cosa",
-        "",
-        "**El `.zip` y la carpeta no son intercambiables.** Llevan los mismos ficheros, pero",
-        f"la descripción se ajusta al presupuesto de cada destino: {BUDGET_PERPLEXITY} bytes",
-        f"en el zip y {BUDGET_MISTRAL} en la carpeta. Descomprimir el zip **no** produce la",
-        "carpeta de Mistral: su descripción sería demasiado larga.",
-        "",
-        "| Destino | Qué subir | Dónde |",
-        "|---|---|---|",
-        "| Perplexity Computer | `<skill>.zip` — tal cual, sin tocar | "
-        "perplexity.ai/computer/skills → Create skill → Upload a skill |",
-        "| Mistral Vibe Work | `<skill>/` — la carpeta, no el zip | "
-        "chat.mistral.ai/work → Context → Skills → New Skill |",
-        "",
-        "## Resumen",
-        "",
-        "| Skill | Riesgo | Avisos | Adaptaciones | Ficheros extra |",
-        "|---|---|---|---|---|",
-    ]
-    for r in results:
-        L.append(f"| `{r.name}` | {sev_icon[r.worst]} {r.worst} | {len(r.findings)} | "
-                 f"{len(r.adaptations)} | {len(r.extra_files)} |")
-    L += ["", "**Riesgo alto** = la skill contiene instrucciones que casi seguro fallarán "
-          "fuera de Claude. **Medio** = funcionará, pero degradada. **Bajo** = cosmético.", ""]
+def a_skill_portatil(res: SkillResult) -> SkillPortatil:
+    """Convierte el SkillResult del conversor en el modelo intermedio.
 
-    for r in results:
-        L += [f"## `{r.name}`", "",
-              f"- Origen: `{r.src_dir}`",
-              f"- Descripción ({len(r.description)} car.): {r.description[:300]}", ""]
-        if r.adaptations:
-            L += ["**Adaptado automáticamente:**", ""] + [f"- {a}" for a in r.adaptations] + [""]
-        if r.findings:
-            L += ["**Avisos:**", ""]
-            for f in r.findings:
-                L.append(f"- {sev_icon[f.severity]} *{f.code}* — {f.message}")
-            L.append("")
-        else:
-            L += ["Sin avisos: esta skill es portable tal cual.", ""]
-    (out / "INFORME-PORTABILIDAD.md").write_text("\n".join(L), encoding="utf-8")
+    Puente temporal: SkillResult existe desde antes del modelo y sigue siendo
+    lo que manejan audit_and_adapt y el empaquetado.
+    """
+    skill = SkillPortatil(
+        nombre=res.name, nombre_original=res.orig_name, carpeta=str(res.src_dir),
+        descripcion=res.description, descripcion_bytes=nbytes(res.description),
+        tiene_activacion=tiene_activacion(res.description),
+        cuerpo_tokens=len(res.body) // CHARS_PER_TOKEN,
+        ficheros=list(res.extra_files),
+        tiene_scripts=any(f.startswith("scripts/") for f in res.extra_files),
+        senales=list(res.senales), adaptaciones=list(res.adaptations))
+    skill.capacidades = capacidades_de(skill.senales, skill.tiene_scripts)
+    return skill
 
 
 # --------------------------------------------------------------------------
@@ -448,6 +427,13 @@ def main() -> int:
                     help="no reordenar la descripción (por defecto la activación va primero)")
     args = ap.parse_args()
 
+    # Los perfiles se cargan una sola vez: de ellos salen los presupuestos de
+    # descripción (el más restrictivo por modo de instalación) y, más abajo,
+    # la evaluación de compatibilidad de cada skill.
+    perfiles = cargar_perfiles()
+    presupuesto_carpeta = presupuesto_por_modo(perfiles, "carpeta")   # Mistral: 490
+    presupuesto_zip = presupuesto_por_modo(perfiles, "zip")           # el resto: 850
+
     out = Path(args.out).expanduser().resolve()
     if out.exists():
         shutil.rmtree(out)
@@ -469,7 +455,8 @@ def main() -> int:
             nm = sanitize_name(sf.parent.name)
             if args.only and nm not in {sanitize_name(x) for x in args.only}:
                 continue
-            r = audit_and_adapt(sf, out, reorder=not args.keep_description_order)
+            r = audit_and_adapt(sf, out, presupuesto_carpeta, presupuesto_zip,
+                                reorder=not args.keep_description_order)
             results.append(r)
             print(f"  · {r.name:<40} riesgo={r.worst}")
 
@@ -487,20 +474,30 @@ def main() -> int:
             for r in results:
                 shutil.rmtree(out / r.name)
 
-        write_report(results, out, args.source)
-        (out / "resumen.json").write_text(json.dumps(
-            [{"name": r.name, "risk": r.worst, "findings": [f.__dict__ for f in r.findings],
-              "adaptations": r.adaptations} for r in results], ensure_ascii=False, indent=2),
+        hoy = datetime.date.today()
+        evaluaciones = {}
+        for r in results:
+            skill = a_skill_portatil(r)
+            evaluaciones[r.name] = {
+                pid: evaluar(skill, perfil, hoy) for pid, perfil in perfiles.items()
+            }
+
+        (out / "INFORME-PORTABILIDAD.md").write_text(
+            informe_markdown(results, evaluaciones, args.source, perfiles),
+            encoding="utf-8")
+        (out / "resumen.json").write_text(
+            json.dumps(resumen_json(results, evaluaciones, args.source),
+                       ensure_ascii=False, indent=2),
             encoding="utf-8")
 
     print(f"\n[ok] Salida en: {out}")
     print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill; "
-          f"descripción ≤{BUDGET_PERPLEXITY} B)")
+          f"descripción ≤{presupuesto_zip} B)")
     if not args.zip_only:
-        print(f"     Mistral    → <skill>/      (descripción ≤{BUDGET_MISTRAL} B — NO es el "
+        print(f"     Mistral    → <skill>/      (descripción ≤{presupuesto_carpeta} B — NO es el "
               f"zip descomprimido)")
     else:
-        print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de {BUDGET_MISTRAL} B")
+        print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de {presupuesto_carpeta} B")
     print(f"     Informe    → INFORME-PORTABILIDAD.md")
     riesgo = [r.name for r in results if r.worst == "alta"]
     if riesgo:

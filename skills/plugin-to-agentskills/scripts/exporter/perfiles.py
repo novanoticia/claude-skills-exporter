@@ -86,3 +86,16 @@ def cargar_perfiles(directorio=None) -> dict:
                     ruta.name, perfil.id))
         perfiles[perfil.id] = perfil
     return perfiles
+
+
+def presupuesto_por_modo(perfiles: dict, modo: str) -> int:
+    """El presupuesto mas restrictivo entre los destinos que aceptan ese modo.
+
+    El artefacto es uno solo por modo —una carpeta, un zip— y tiene que valer
+    para todos los destinos que lo admitan, asi que manda el mas estrecho.
+    """
+    presupuestos = [p.presupuesto() for p in perfiles.values() if modo in p.modos()]
+    if not presupuestos:
+        raise PerfilInvalido(
+            "ningun perfil declara el modo de instalacion '{}'".format(modo))
+    return min(presupuestos)
