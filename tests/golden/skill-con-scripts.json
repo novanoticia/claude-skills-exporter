@@ -1,0 +1,77 @@
+{
+  "origen": "<origen>",
+  "report_version": "2.0",
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "no_verificable",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [
+              "scripts.ejecutar: el perfil no declara esta capacidad, asi que no se puede afirmar nada."
+            ],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "no_verificable",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "scripts.ejecutar: el perfil no declara esta capacidad, asi que no se puede afirmar nada."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "no_compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [
+              "scripts.ejecutar: requerida por la skill y el destino la declara «no»."
+            ],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [
+        {
+          "codigo": "scripts",
+          "mensaje": "Incluye scripts/. Perplexity Computer puede ejecutarlos en su sandbox; Mistral Vibe Work los guarda pero NO tiene Python (comprobado), así que allí no se ejecutan. Si la lógica vive en el script, el SKILL.md debe traer un procedimiento manual equivalente al que caer.",
+          "severidad": "media"
+        }
+      ],
+      "name": "con-scripts"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "origen": "<origen>",
+  "report_version": "2.0",
+  "skills": [
+    {
+      "adaptaciones": [
+        "Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
+        "Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+      ],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [
+              "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+            ],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "directorio_local",
+            "motivos": [
+              "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+            ],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "carpeta",
+            "motivos": [
+              "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+            ],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+            ],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [],
+      "name": "frontmatter-exotico"
+    }
+  ]
+}
