@@ -1,5 +1,5 @@
 ---
-description: Exporta las skills de un repositorio de Claude a paquetes para Perplexity y Mistral
+description: Audita la portabilidad de las skills de un repositorio de Claude hacia cinco destinos (ChatGPT, claude.ai, Claude Code, Mistral Vibe Work y Perplexity Computer) y las empaqueta
 argument-hint: <url-del-repo-o-ruta-local>
 ---
 
@@ -13,13 +13,21 @@ Después:
 
 1. Ejecuta el conversor: `python3 "$CONV" $1 --out ./dist-agentskills`
 2. Lee `dist-agentskills/INFORME-PORTABILIDAD.md`.
-3. Resume: cuántas skills salieron, cuáles tienen riesgo alto y qué habría que
+3. Resume, leyendo la matriz de compatibilidad: cuántas skills salieron y, para cada una,
+   en qué destinos queda `compatible`, en cuáles sólo `compatible con adaptación`, en
+   cuáles `degradado` o `no verificable`, y en cuáles `no compatible`; y qué habría que
    reescribir a mano antes de subirlas.
 4. Recuerda al usuario que los `commands/`, `agents/`, `hooks/` y servidores MCP del
-   plugin original **no** se exportan.
-5. Dile qué sube dónde: el `<skill>.zip` **tal cual** a Perplexity Computer; la **carpeta**
-   `<skill>/` a Mistral Vibe Work. Advierte de que **no son intercambiables**: llevan los
-   mismos ficheros, pero la descripción se ajusta al presupuesto de cada destino (850 bytes
-   en el zip, 490 en la carpeta), así que descomprimir el zip no sirve para Mistral.
-6. Si el usuario sólo quiere saber dónde puede subir la skill, sin paquetes,
-   usa `audit` en vez de `export`: no escribe ningún fichero.
+   plugin original **no** se exportan, y que los enlaces simbólicos que haya dentro de una
+   skill se omiten al empaquetar —con aviso en el informe—: copiar su contenido metería en
+   el paquete ficheros de fuera de la skill.
+5. Dile qué sube dónde: el `<skill>.zip` **tal cual** a los destinos que instalan por zip
+   —Perplexity Computer, claude.ai y ChatGPT—; la **carpeta** `<skill>/` a los que instalan
+   por directorio —Mistral Vibe Work y Claude Code—. Advierte de que **no son
+   intercambiables**: llevan los mismos ficheros, pero la descripción se recorta al
+   presupuesto más estrecho de cada modo de instalación (850 bytes en el zip, 490 en la
+   carpeta), así que descomprimir el zip no sirve para Mistral.
+6. Si el usuario sólo quiere saber dónde puede subir la skill, sin paquetes, usa el
+   subcomando `audit`: `python3 "$CONV" audit $1` —opcionalmente con `--target <destino> …`—.
+   Imprime la matriz por pantalla y no escribe ningún fichero. Hay también un `inspect`,
+   que dice qué contiene y qué exige cada skill sin elegir destino.

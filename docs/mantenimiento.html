@@ -188,6 +188,11 @@ git push -u origin main</code></pre>
     <li>La carpeta <code>.claude-plugin</code> — con <code>plugin.json</code> y
       <code>marketplace.json</code> dentro. <strong>Si no aparece, la instalación fallará.</strong></li>
     <li>La carpeta <code>skills</code>.</li>
+    <li>La carpeta <code>commands</code> — es la que lleva <code>/exportar-skills</code>;
+      sin ella el plugin carga, pero el comando no aparece.</li>
+    <li>El fichero <code>plugin.json</code> <em>de la raíz</em> — no es el mismo que el de
+      <code>.claude-plugin/</code>. Es el manifiesto Agent Plugins 1.0.0, y es lo que lee
+      ChatGPT cuando instalas el plugin dándole la URL del repositorio.</li>
   </ul>
   <p>GitHub sí muestra las carpetas que empiezan por punto; si no la ves, es que no se subió.</p>
 </div>
@@ -273,9 +278,10 @@ git push</code></pre>
   <strong>El precio de no fijar versión</strong>
   Cada commit llega a quien tenga el plugin instalado, incluidos los que dejaste a medias.
   Irrelevante si eres el único usuario; molesto si lo comparte un equipo. Si llega ese
-  momento, añade <code>"version": "1.2.0"</code> a <code>plugin.json</code> y a la entrada
-  de <code>marketplace.json</code>, y a partir de ahí publica subiendo ese número — con la
-  contrapartida de tener que acordarte de hacerlo en cada release.
+  momento, añade <code>"version": "1.2.0"</code> a <code>.claude-plugin/plugin.json</code>
+  —ojo, ése, no el <code>plugin.json</code> de la raíz, que es el manifiesto Agent
+  Plugins— y a la entrada de <code>marketplace.json</code>, y a partir de ahí publica
+  subiendo ese número — con la contrapartida de tener que acordarte en cada release.
 </div>
 
 
@@ -325,7 +331,7 @@ contexto para localizar el sitio.</p>
 
 <div class="step">
   <h3><span class="n">C</span> Con la terminal · <em>el parche entero de una vez</em></h3>
-  <pre><button class="copy">copiar</button><code>cd ~/Descargas/claude-skills-exporter
+  <pre><button class="copy">copiar</button><code>cd ~/Desktop/claude-skills-exporter
 git apply --check ~/Descargas/cambio.patch   # 1. ensayo: no toca nada
 git apply ~/Descargas/cambio.patch           # 2. aplicar de verdad
 git add -A
@@ -376,16 +382,19 @@ verde <strong>Merge pull request</strong> → <strong>Confirm merge</strong>.</p
   <tr>
     <td>Otro marketplace tuyo deja de funcionar</td>
     <td>Dos marketplaces con el mismo <code>name</code></td>
-    <td>Cada usuario sólo puede tener uno registrado por nombre: el segundo reemplaza al primero. Si vas a publicar más plugins, mételos todos en este mismo <code>marketplace.json</code></td>
+    <td>Si vas a publicar más plugins, lo seguro es meterlos todos en este mismo <code>marketplace.json</code> en vez de registrar un segundo marketplace: dos marketplaces con el mismo campo <code>name</code> compiten por el mismo identificador y el comportamiento depende de la versión de Claude Code</td>
   </tr>
 </table>
 
 <footer>
   <p><strong>Nota ética.</strong> Esta guía y la herramienta que documenta se han
   elaborado con asistencia de IA. Requieren revisión humana antes de usarse en
-  producción, y las rutas de interfaz de Perplexity y Mistral pueden cambiar sin previo
-  aviso: si no encuentras un botón donde dice aquí, consulta la documentación oficial
-  de cada plataforma.</p>
+  producción. Las rutas de interfaz de los cinco destinos (ChatGPT, claude.ai, Claude
+  Code, Mistral Vibe Work y Perplexity Computer) pueden cambiar sin previo aviso: si no
+  encuentras un botón donde dice aquí, consulta la documentación oficial de cada
+  plataforma. La herramienta lleva esa información como dato fechado, con fecha de
+  caducidad, en <code>scripts/exporter/targets/*.json</code>; cuando una caduca, el
+  informe deja de afirmar y pasa a <em>no verificable</em>.</p>
   <p>Claude Skills Exporter — © 2026 Pablo Rodríguez López. Publicado bajo licencia
   <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT</a>:
   puedes usarlo, modificarlo y redistribuirlo, incluso comercialmente, conservando el

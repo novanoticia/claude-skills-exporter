@@ -5,21 +5,31 @@ un aviso del informe importa.
 
 ## 1. Qué acepta cada destino
 
-> Los datos de esta tabla son ahora la copia legible de
-> `scripts/exporter/targets/*.json`, que es la fuente de verdad. El CI comprueba
-> que concuerdan. Lo que sigue viviendo sólo aquí es la evidencia narrativa: qué
-> se observó, en qué ejecución y por qué importa.
+> Los datos de esta tabla son la copia legible de `scripts/exporter/targets/*.json`, que
+> es la fuente de verdad. El CI sólo comprueba, por contención, que la **etiqueta** y el
+> **presupuesto de `description`** de cada perfil aparezcan escritos en algún sitio del
+> README o de este fichero: no verifica la ruta de instalación, ni las capacidades, ni que
+> las celdas digan lo mismo que el JSON. La tabla recoge sólo tres de los cinco destinos;
+> ChatGPT y claude.ai tienen perfil propio (`chatgpt.json`, `claude-ai.json`) y comparten
+> el zip de 850 bytes. Lo que sigue viviendo sólo aquí es la evidencia narrativa: qué se
+> observó, en qué ejecución y por qué importa.
 
 | | Perplexity Computer | Mistral Vibe Work | Claude Code |
 |---|---|---|---|
-| Ruta de instalación | `perplexity.ai/computer/skills` → Create skill → Upload a skill | `chat.mistral.ai/work` → Context → Skills → New Skill | `/plugin install` o carpeta `skills/` |
+| Ruta de instalación | `perplexity.ai/computer/skills` → Create skill → Upload a skill | `chat.mistral.ai/work` → Context → Skills → New Skill | Copiar la carpeta a `~/.claude/skills/`, o instalar el plugin con `/plugin install` |
 | Formato | **`.zip`** con la carpeta de la skill en su raíz | **la carpeta**, con `SKILL.md` dentro | Carpeta con `SKILL.md` |
-| Presupuesto de `description` | 850 bytes | 490 bytes | sin límite práctico |
+| Presupuesto de `description` | 850 bytes | 490 bytes | 1024 bytes |
 | Varias skills a la vez | No — **una por zip** | No — una por vez | Sí |
 | Ficheros auxiliares | Sí, dentro del zip | Sí — conserva subcarpetas y cualquier extensión (`.md`, `.py`, `.yaml`) | Sí |
 | Ejecuta `scripts/` | Sí — y llega al Mac vía `osascript` | **No** — hay shell, pero sin Python | Sí |
 | Límite de tiempo por llamada | ~90 s (comprobado) | — (no ejecuta) | Sin límite práctico |
 | Frontmatter mínimo | `name`, `description` | `name`, `description` | `name`, `description` |
+| Frontmatter cerrado | Sí — cualquier clave fuera de `name`, `description`, `license`, `compatibility` y `metadata` es error duro | Sí | No — admite claves propias de Claude |
+
+Claude Code instala en modo `directorio_local` y el conversor no fabrica un artefacto
+propio para él: se lleva la misma carpeta que Mistral, con la descripción de 490 bytes.
+El presupuesto de un artefacto lo escribe el destino más estrecho de los que comparten ese
+modo de instalación, no el más generoso.
 
 **El `.zip` y la carpeta no son intercambiables.** Llevan exactamente los mismos ficheros,
 pero la `description` del frontmatter se compacta al presupuesto de cada destino: 850
@@ -49,8 +59,11 @@ sobrevivir aquí, tres propiedades que en Claude podía permitirse no tener:
 3. **No dar por bueno el filtro.** Comprobar qué elementos se han tocado, no cuántos se
    pretendía tocar.
 
-El conversor marca `applescript` en riesgo medio y `lote-destructivo` en riesgo **alto**
-justo por esto.
+La severidad ya no es una propiedad del patrón: la declara el perfil del destino. En
+Perplexity Computer, `applescript` y `lote-destructivo` disparan los dos el peligro
+`perplexity-corte-90s`, de severidad **alta**, así que una skill que los contenga sale
+**no compatible** con este destino. La severidad «media» que muestra `inspect` es sólo la
+reserva que se usa mientras no se ha elegido destino.
 
 ### Lo comprobado en Mistral Vibe Work
 
@@ -101,12 +114,19 @@ justo por esto.
 Esa última línea es la que más importa: si el estado se perdió, la respuesta correcta es
 *"no encuentro el registro, no puedo deshacer"*, no un registro plausible inventado.
 
-El conversor marca automáticamente estos patrones (`scripts`, `home-tilde`,
-`estado-persistente`) como riesgo medio, e incrusta el aviso en el `SKILL.md` exportado.
+El conversor detecta estos patrones (`scripts`, `home-tilde`, `estado-persistente`) e
+incrusta el aviso en el `SKILL.md` exportado, pero la gravedad la pone el destino, no el
+patrón: en Mistral Vibe Work `home-tilde` dispara `mistral-home-es-raiz` y
+`estado-persistente` dispara `mistral-estado-no-persiste`, ambos de severidad **alta**, y
+`scripts/` choca además con `scripts.ejecutar: no`. El veredicto para Mistral es **no
+compatible**, no «riesgo medio».
 
 ## 2. Frontmatter
 
-Sólo `name` y `description` son universales.
+Sólo `name` y `description` son obligatorios. Y el frontmatter del estándar es un conjunto
+**cerrado**: `name`, `description`, `license`, `compatibility` y `metadata`. Cualquier otra
+clave al nivel superior no se ignora — el destino rechaza la skill entera («Unexpected
+key(s) in SKILL.md frontmatter»).
 
 ```yaml
 ---
@@ -115,18 +135,29 @@ description: Cárgala cuando...   # condición de activación, no descripción d
 ---
 ```
 
-Se retiran al exportar porque no existen fuera de Claude:
+El conversor no va retirando claves una a una: conserva sólo las del conjunto cerrado y
+descarta el resto. Estas son las que más suelen aparecer, y por qué se caen:
 
 | Clave | Por qué se cae |
 |---|---|
-| `allowed-tools` / `allowed_tools` | La lista de herramientas permitidas es un concepto de Claude Code |
+| `allowed-tools` / `allowed_tools` | Está en el estándar, pero su semántica es de Claude Code y fuera no significa nada: se retira igualmente |
 | `model` | El destino elige su propio modelo |
 | `argument-hint` | Pertenece a los slash commands, no a las skills |
 | `disable-model-invocation` | Control de invocación propio de Claude |
 | `user-invocable`, `context` | Idem |
 
-`license`, `version`, `depends` y `metadata` se conservan: forman parte del estándar
-abierto o son inocuos.
+`license`, `compatibility` y `metadata` se conservan al nivel superior: son del conjunto
+cerrado del estándar. `version` y `depends` **no** — se bajan dentro de `metadata`,
+fusionadas con el `metadata` de origen si lo hubiera, porque emitidas arriba hacen que el
+destino rechace la skill entera:
+
+```yaml
+metadata:
+  autor: Pablo
+  version: 4.1
+  depends:
+    - otra-skill
+```
 
 ## 3. La descripción: el campo que decide todo
 
@@ -171,7 +202,12 @@ ese hueco automáticamente sería fabricar criterios de activación que el autor
 escribió, y una skill que se carga cuando no debe es peor que una que no se carga.
 
 Con `--keep-description-order` se desactiva el reordenado, por si en algún caso rompe el
-hilo del texto.
+hilo del texto. Pero desactiva algo más: sin él no hay compactación —ni poda de ejemplos
+entrecomillados, ni priorización de la frase de activación—, sólo un recorte duro por el
+final. Con la descripción de `email-triage` eso es exactamente el escenario del ejemplo de
+arriba: la carpeta de Mistral se queda con las cuatro frases descriptivas y **pierde
+entera** la frase «Actívalo cuando el usuario diga…». Úsalo sólo si vas a revisar a mano
+lo que sale.
 
 Reglas prácticas:
 
@@ -180,7 +216,10 @@ Reglas prácticas:
 - Por debajo de ~350 caracteres. Perplexity presupuesta ~100 tokens por skill en su
   índice, y ese coste lo pagan todos los usuarios en todas las sesiones.
 - Incluye dos o tres ejemplos de frases reales.
-- Máximo duro: 1024. **Y se mide en bytes UTF-8, no en caracteres.**
+- Máximo duro: 1024, y **la unidad depende del destino**: Perplexity Computer lo mide en
+  bytes UTF-8 (`tope_duro_description.unidad: bytes`); el estándar, ChatGPT, claude.ai,
+  Mistral y Claude Code lo declaran en caracteres. Escribe pensando en bytes: es el
+  criterio más estrecho y el único que se ha visto rechazar una subida.
 - Presupuesto que aplica el conversor, por debajo del máximo y por destino: **490 bytes**
   en la carpeta de Mistral, **850** en el zip de Perplexity.
 
@@ -196,7 +235,10 @@ description exceeds maximum length of 1024 characters
 Aunque el mensaje diga *characters*, la cuenta es en bytes. Esa descripción tenía
 1063 caracteres — pero **1085 bytes**, porque cada tilde, cada `ñ` y cada `¿` ocupan
 dos, y cada `—` ocupa tres. Un texto en español se pasa del límite unos 20-30 bytes
-antes de lo que sugiere contar letras. El conversor recorta a 980 para dejar margen.
+antes de lo que sugiere contar letras. El conversor ya no recorta a un número fijo: toma
+el presupuesto de los perfiles de destino, el más estrecho de los que aceptan cada modo de
+instalación — 850 bytes para el zip (Perplexity, ChatGPT, claude.ai) y 490 para la carpeta
+(Mistral). Los dos quedan muy por debajo del tope duro.
 
 **Y los dos destinos fallan distinto:**
 
@@ -208,18 +250,22 @@ antes de lo que sugiere contar letras. El conversor recorta a 980 para dejar mar
 Es decir: en Mistral es un inconveniente, en Perplexity es un bloqueo. Si sólo pruebas
 en Mistral, no te enteras de que tu skill no es instalable en el otro.
 
-**Cuidado con lo que se pierde al recortar.** El conversor corta por el último final de
-frase que quepa, nunca a mitad de palabra. Pero eso conserva el principio de la
-descripción — que suele decir *qué hace* la skill — y tira el final, que suele ser donde
-está el *"Actívalo cuando el usuario diga…"*. Justo lo que decide si la skill se carga.
-Si ves el aviso `description-larga`, reescribe la descripción a mano: no te fíes del
-recorte automático, que sólo garantiza que el fichero sea válido.
+**Cuidado con lo que se pierde al recortar.** El conversor compacta primero —adelanta las
+frases de activación, poda los ejemplos entrecomillados sobrantes (deja unos cuatro y
+resume el resto con «…») y descarta después las frases que sólo cuentan qué hace la
+skill—, y sólo si aun así no cabe aplica el corte duro: por el último final de frase que
+quepa, o por el último espacio con «…» si no hay ninguno razonable. Como el reordenado va
+antes que el recorte, lo que sobrevive es el criterio de activación y lo que se pierde es
+la parte descriptiva. Aun así, si ves el aviso `description-larga`, reescríbela a mano: el
+recorte sólo garantiza que el fichero sea válido.
 
 ## 4. Patrones que hay que reescribir a mano
 
 ### `${CLAUDE_PLUGIN_ROOT}`
-Se reescribe automáticamente como ruta relativa. Si queda alguno suelto, sustitúyelo
-por la ruta relativa a la carpeta de la skill.
+Se reescribe automáticamente como ruta relativa, pero **sólo en el cuerpo del `SKILL.md`**.
+Las apariciones dentro de `references/`, `scripts/` o cualquier otro fichero del árbol no
+se tocan: se reportan como señal `plugin-root` con su `fichero:línea` y hay que sustituirlas
+a mano por la ruta relativa a la carpeta de la skill.
 
 ```diff
 - python3 ${CLAUDE_PLUGIN_ROOT}/skills/mi-skill/scripts/run.py
@@ -260,7 +306,7 @@ validación tiene que pasar al cuerpo de la skill como instrucción explícita.
 |---|---|---|
 | Índice (`name` + `description`) | ~100 tokens | Siempre, en cada sesión |
 | Cuerpo del `SKILL.md` | <5.000 tokens | Al cargarse la skill |
-| `references/`, `scripts/`, `assets/` | Sin límite práctico | Sólo si el agente los abre |
+| `references/`, `scripts/`, `assets/` | Sin límite práctico, salvo donde el destino publique uno: ChatGPT declara 50 MB de zip, 500 ficheros y 25 MB por fichero, y el conversor los comprueba al empaquetar (aviso `limite-de-paquete`) | Sólo si el agente los abre |
 
 Si el cuerpo se pasa, mueve lo condicional a `references/` y deja en el `SKILL.md` una
 línea del tipo *"si la API devuelve un error, lee `references/errores.md`"*.
@@ -274,6 +320,10 @@ mi-skill/
 ├── scripts/          # código determinista que el agente ejecuta
 └── assets/           # plantillas, esquemas, ejemplos de salida
 ```
+
+El conversor conserva el modo de los ficheros al copiar (`os.chmod`), así que un
+`scripts/*.sh` con `+x` llega al paquete ejecutable — que es lo que necesita Perplexity
+Computer, el único destino que ejecuta `scripts/`.
 
 ## 7. Comprobación antes de subir
 
@@ -303,8 +353,9 @@ mi-skill/
    `id` debe coincidir con el nombre del fichero.
 2. Declarar cada capacidad. **Lo que no se haya comprobado va a `desconocido`,
    nunca a `no`.** Callar no es negar: `desconocido` produce `no verificable`,
-   que es la respuesta honesta; `no` produce `no compatible`, que es una
-   afirmación.
+   que es la respuesta honesta. `no` —y también `parcial`— produce `no compatible`
+   si la skill declara esa capacidad como **requerida**, y `degradado` si sólo la
+   marca como opcional; en los dos casos es una afirmación.
 3. Los peligros de conducta —lo que la plataforma hace mal *teniendo* la
    capacidad— van en `peligros[]`, enlazados por `dispara_con` al id de la señal.
    **`dispara_con: []` significa «informativo»**: documenta un comportamiento de la
@@ -312,8 +363,16 @@ mi-skill/
    lo devuelve y no afecta a ningún veredicto. Sirve como referencia para quien lea el
    perfil. Si esperabas que tu peligro disparase y no lo hace, mira aquí primero.
 4. Poner `evidencia.verificado_el` a hoy y `revisar_tras` a tres meses vista.
-5. Añadir la etiqueta y el presupuesto a la tabla de la sección 1 y al README,
-   o el CI fallará.
-6. Regenerar los golden: `python3 tests/generar_golden.py`, y revisar el diff.
+5. Escribir la etiqueta y el presupuesto en la prosa. El CI (`.github/validar_perfiles.py`)
+   los busca por contención en el README **o** en este fichero —basta con que aparezcan en
+   uno de los dos, en cualquier sitio del texto— y falla si no los encuentra. Que la tabla
+   de la sección 1 quede correcta es responsabilidad tuya: eso el CI no lo comprueba.
+6. Regenerar los golden: `python3 tests/generar_golden.py`, y revisar el diff. Las pruebas
+   fijan la fecha con `CSE_FECHA=AAAA-MM-DD`; si tu perfil nace con un `revisar_tras`
+   anterior a esa fecha, saldrá `no verificable` en los golden.
 
-No hay que tocar Python.
+No hay que tocar Python mientras el destino encaje en lo que ya existe: un modo de
+instalación de los cuatro del schema (`zip`, `carpeta`, `directorio_local`,
+`url_repositorio`) y capacidades del vocabulario ya definido. `export` sólo sabe fabricar
+dos artefactos —el zip y la carpeta—, así que un modo nuevo, o una capacidad que ninguna
+señal sepa exigir todavía, sí exige código.

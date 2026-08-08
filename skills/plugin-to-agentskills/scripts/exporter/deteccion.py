@@ -5,10 +5,12 @@ cada senal lleva su ubicacion exacta y una muestra del texto, para que quien
 lea el informe pueda ir a mirarlo.
 
 La severidad NO vive aqui. Vive en el perfil del destino, porque depende de
-el: `applescript` es media en Perplexity Computer, que lo ejecuta con un
-corte a los ~90 s, y alta en Mistral Vibe Work, que no lo ejecuta y deja la
-skill inerte. La severidad de este modulo es solo la reserva que usa
-`inspect`, que corre sin destino elegido.
+el: `applescript` es alta en Perplexity Computer, que si lo ejecuta pero
+corta la llamada a los ~90 s (peligro `perplexity-corte-90s`), y en Mistral
+Vibe Work ni siquiera llega a disparar un peligro: la capacidad se declara
+`no` y el destino sale no compatible por el canal de capacidades. La
+severidad de este modulo es solo la reserva que usa `inspect`, que corre sin
+destino elegido.
 """
 
 from __future__ import annotations
