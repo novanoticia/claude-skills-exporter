@@ -5,7 +5,7 @@
     {
       "adaptaciones": [
         "Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
-        "Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+        "Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version, depends."
       ],
       "compatibilidad": {
         "chatgpt": [
@@ -15,7 +15,7 @@
             "modo_instalacion": "url_repositorio",
             "motivos": [
               "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
-              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version, depends."
             ],
             "peligros": []
           },
@@ -25,7 +25,7 @@
             "modo_instalacion": "zip",
             "motivos": [
               "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
-              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version, depends."
             ],
             "peligros": []
           }
@@ -37,7 +37,7 @@
             "modo_instalacion": "zip",
             "motivos": [
               "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
-              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version, depends."
             ],
             "peligros": []
           }
@@ -49,7 +49,7 @@
             "modo_instalacion": "directorio_local",
             "motivos": [
               "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
-              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version, depends."
             ],
             "peligros": []
           }
@@ -61,7 +61,7 @@
             "modo_instalacion": "carpeta",
             "motivos": [
               "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
-              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version, depends."
             ],
             "peligros": []
           }
@@ -73,7 +73,7 @@
             "modo_instalacion": "zip",
             "motivos": [
               "Adaptación aplicada: Claves de frontmatter retiradas (no existen fuera de Claude): allowed-tools, model.",
-              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version."
+              "Adaptación aplicada: Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): version, depends."
             ],
             "peligros": []
           }

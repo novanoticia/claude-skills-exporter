@@ -1,10 +1,14 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from ayuda import importar_exporter
 
 importar_exporter()
 
 import convert  # noqa: E402
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 class CompatibilidadHaciaAtras(unittest.TestCase):
@@ -60,6 +64,35 @@ class DestinoDesconocido(unittest.TestCase):
     def test_lista_los_ids_disponibles(self):
         codigo = convert.main(["audit", ".", "--target", "no-existe"])
         self.assertEqual(codigo, 1)
+
+
+class ZipOnlyConDestinoSinModoZip(unittest.TestCase):
+
+    def test_zip_only_con_target_solo_carpeta_es_error(self):
+        # mistral-vibe-work solo instala en modo 'carpeta'. Con --zip-only,
+        # el codigo de export borraba esa carpeta al final asumiendo que
+        # existia un zip que la sustituyera, y aqui no lo hay: el resultado
+        # era un directorio de salida sin ningun artefacto de skill.
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "salida"
+            codigo = convert.main([
+                "export", str(FIXTURES / "skill-minima"),
+                "--target", "mistral-vibe-work", "--zip-only",
+                "--out", str(destino),
+            ])
+            self.assertEqual(codigo, 1)
+            self.assertFalse(destino.exists())
+
+    def test_zip_only_con_un_destino_que_si_admite_zip_no_es_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "salida"
+            codigo = convert.main([
+                "export", str(FIXTURES / "skill-minima"),
+                "--target", "perplexity-computer", "--zip-only",
+                "--out", str(destino),
+            ])
+            self.assertEqual(codigo, 0)
+            self.assertTrue(list(destino.glob("*.zip")))
 
 
 if __name__ == "__main__":

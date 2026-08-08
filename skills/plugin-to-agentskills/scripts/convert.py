@@ -98,6 +98,10 @@ PORTABLE_KEYS = ["name", "description", "license", "compatibility"]
 # `version` vivía en PORTABLE_KEYS y se emitía al nivel superior, así que TODA
 # skill exportada fallaba al subirse. `metadata` también estaba en la lista pero
 # nunca sobrevivía: el filtro exigía valores str y un mapa no lo es.
+# `depends` es una lista YAML (`depends: [- una, - otra]`), no un str: el mismo
+# filtro la dejaba fuera en silencio pese a que references/portabilidad.md
+# prometía que se conservaba. write_skill_md() sabe emitir listas anidadas
+# bajo metadata, así que aquí basta con no descartarlas.
 KEYS_A_METADATA = ["version", "depends"]
 
 
@@ -324,6 +328,9 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         if isinstance(v, str) and v:
             meta.setdefault(k, v)
             bajadas.append(k)
+        elif isinstance(v, list) and v:
+            meta.setdefault(k, list(v))
+            bajadas.append(k)
     if meta:
         res.fm_meta = meta
     if bajadas:
@@ -341,10 +348,17 @@ def write_skill_md(res: SkillResult, dest: Path, description: str) -> None:
     fm_out = {"name": res.name, "description": description}
     fm_out.update(res.fm_extra)
     lines = ["---"] + [f"{k}: {yaml_escape(v)}" for k, v in fm_out.items()]
-    # `metadata` es un mapa, no un escalar: va como bloque anidado.
+    # `metadata` es un mapa, no un escalar: va como bloque anidado. Un valor
+    # que sea lista (p. ej. `depends`) se anida a su vez como lista YAML: no
+    # se aplana a texto porque `parse_simple_yaml` sabe leer justo esa forma.
     if res.fm_meta:
         lines.append("metadata:")
-        lines += [f"  {k}: {yaml_escape(v)}" for k, v in res.fm_meta.items()]
+        for k, v in res.fm_meta.items():
+            if isinstance(v, list):
+                lines.append(f"  {k}:")
+                lines += [f"    - {yaml_escape(item)}" for item in v]
+            else:
+                lines.append(f"  {k}: {yaml_escape(v)}")
     lines.append("---")
     (dest / "SKILL.md").write_text(
         "\n".join(lines) + "\n" + res.body.rstrip() + render_notes(res), encoding="utf-8")
@@ -731,6 +745,25 @@ def main(argv=None) -> int:
         if desconocidos:
             print("[error] destino desconocido: {}. Disponibles: {}".format(
                 ", ".join(desconocidos), ", ".join(sorted(perfiles))), file=sys.stderr)
+            return 1
+
+    if args.comando == "export" and getattr(args, "zip_only", False):
+        # --zip-only borra la carpeta al final asumiendo que el zip la
+        # sustituye. Si ninguno de los destinos elegidos instala en modo
+        # 'zip' -mistral-vibe-work sólo admite 'carpeta'-, esa asuncion es
+        # falsa: no se genera ningun zip y la carpeta se borra igual, y el
+        # export termina sin dejar ningun artefacto de skill, solo el informe.
+        modos = set()
+        for pid in (elegidos if elegidos else perfiles):
+            modos.update(perfiles[pid].modos())
+        if "zip" not in modos:
+            objetivo = ", ".join(sorted(elegidos)) if elegidos else "los destinos elegidos"
+            print(
+                "[error] --zip-only no tiene sentido con --target {}: ese destino solo "
+                "instala en modo 'carpeta', nunca 'zip'. Con --zip-only no quedaría ningún "
+                "artefacto de skill: se borraría la carpeta y no hay zip que la sustituya. "
+                "Quita --zip-only o añade un destino que sí acepte zip.".format(objetivo),
+                file=sys.stderr)
             return 1
 
     return ejecutar(args, perfiles, elegidos, hoy)

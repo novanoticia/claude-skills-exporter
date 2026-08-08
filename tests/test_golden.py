@@ -143,6 +143,18 @@ class CasosConcretos(unittest.TestCase):
         self.assertNotIn("allowed-tools", frontmatter)
         self.assertNotIn("model:", frontmatter)
 
+    def test_el_frontmatter_exotico_conserva_depends_bajo_metadata(self):
+        # `depends` es una lista YAML, no un str: el filtro que solo aceptaba
+        # str la descartaba en silencio pese a que references/portabilidad.md
+        # promete que se conserva. La fixture ya declara `depends: [otra-skill]`.
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        exportar("skill-frontmatter-exotico", Path(tmp))
+        texto = (Path(tmp) / "frontmatter-exotico" / "SKILL.md").read_text(encoding="utf-8")
+        frontmatter = texto.split("---")[1]
+        self.assertIn("depends:", frontmatter)
+        self.assertIn("- otra-skill", frontmatter)
+
 
 class SkillConEnlace(unittest.TestCase):
     """El octavo caso, con enlace simbolico.
