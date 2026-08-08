@@ -23,6 +23,64 @@ jobs:
       - name: Validar manifiestos, skills y comandos
         run: python3 .github/validate_plugin.py .
 
+      - name: Instalar dependencias de validacion
+        run: python3 -m pip install --quiet jsonschema
+
+      - name: Validar perfiles de destino y su concordancia con la documentacion
+        run: python3 .github/validar_perfiles.py .
+
+      - name: El analisis sigue siendo estatico
+        run: |
+          python3 - <<'PY'
+          import ast, pathlib, sys
+          # La garantia que hace seguro apuntar esta herramienta al repositorio de
+          # un desconocido: no ejecuta nada de lo que analiza. El unico proceso
+          # externo del programa es `git clone`. Hasta ahora eso se comprobaba a
+          # mano; aqui lo comprueba el CI.
+          PERMITIDO = {("subprocess", "run")}
+          PROHIBIDO = {"system", "popen", "Popen", "call", "check_output",
+                       "check_call", "spawnl", "spawnv", "execv", "execve"}
+          malos = []
+          for p in pathlib.Path("skills/plugin-to-agentskills/scripts").rglob("*.py"):
+              arbol = ast.parse(p.read_text(encoding="utf-8"))
+              for n in ast.walk(arbol):
+                  if not isinstance(n, ast.Call) or not isinstance(n.func, ast.Attribute):
+                      continue
+                  base = getattr(n.func.value, "id", None)
+                  par = (base, n.func.attr)
+                  if n.func.attr in PROHIBIDO or (base == "subprocess" and par not in PERMITIDO):
+                      malos.append("{}:{} -> {}.{}".format(p, n.lineno, base, n.func.attr))
+          if malos:
+              print("[error] llamadas a procesos externos no permitidas:", file=sys.stderr)
+              [print("  " + m, file=sys.stderr) for m in malos]
+              sys.exit(1)
+          print("Analisis estatico: ningun proceso externo fuera de subprocess.run(git clone).")
+          PY
+
+      - name: Validar el resumen.json contra su schema
+        run: |
+          python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida-ci
+          python3 - <<'PY'
+          import json, jsonschema, pathlib
+          esquema = json.loads(pathlib.Path(
+              "skills/plugin-to-agentskills/scripts/exporter/resumen.schema.json"
+          ).read_text(encoding="utf-8"))
+          datos = json.loads(pathlib.Path("/tmp/salida-ci/resumen.json").read_text(encoding="utf-8"))
+          jsonschema.validate(datos, esquema)
+          print("resumen.json valida contra su schema.")
+          PY
+
+      - name: Pruebas unitarias
+        run: python3 -m unittest discover -s tests -t tests -v
+
+      - name: El conversor arranca desde una copia aislada
+        run: |
+          cp -R . /tmp/cse-aislado
+          python3 /tmp/cse-aislado/skills/plugin-to-agentskills/scripts/convert.py \
+            /tmp/cse-aislado --out /tmp/salida-aislada
+          test -f /tmp/salida-aislada/INFORME-PORTABILIDAD.md
+          echo "Arranca sin instalacion desde una ruta ajena al repositorio."
+
       - name: Prueba de humo del conversor
         run: |
           python3 skills/plugin-to-agentskills/scripts/convert.py --help

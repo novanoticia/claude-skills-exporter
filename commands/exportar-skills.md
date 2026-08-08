@@ -21,3 +21,5 @@ Después:
    `<skill>/` a Mistral Vibe Work. Advierte de que **no son intercambiables**: llevan los
    mismos ficheros, pero la descripción se ajusta al presupuesto de cada destino (850 bytes
    en el zip, 490 en la carpeta), así que descomprimir el zip no sirve para Mistral.
+6. Si el usuario sólo quiere saber dónde puede subir la skill, sin paquetes,
+   usa `audit` en vez de `export`: no escribe ningún fichero.

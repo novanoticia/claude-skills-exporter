@@ -12,9 +12,12 @@ incluso comercialmente, conservando este aviso de copyright y la licencia.
 Sólo biblioteca estándar. Python 3.8+.
 
 Uso:
-    python3 convert.py <repo-url-o-ruta> [--out DIR] [--only NOMBRE ...]
+    python3 convert.py inspect <repo-url-o-ruta>              # qué exige, sin destino
+    python3 convert.py audit   <repo-url-o-ruta> [--target …] # matriz; no escribe nada
+    python3 convert.py export  <repo-url-o-ruta> [--out DIR] [--only NOMBRE ...]
+    python3 convert.py <repo-url-o-ruta> ...                  # forma corta = export
 
-Salidas en <out>/:
+Salidas de `export` en <out>/:
     <skill>.zip                se sube tal cual a ChatGPT, claude.ai y Perplexity
     <skill>/                   se sube a Mistral Vibe Work
     INFORME-PORTABILIDAD.md    qué se adaptó y qué se romperá fuera de Claude
@@ -30,6 +33,7 @@ Una skill por zip — nunca un zip con varias dentro.
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -37,9 +41,29 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from exporter.compatibilidad import evaluar
+from exporter.descripcion import (
+    clamp_description,
+    compact_description,
+    nbytes,
+    reorder_description,
+    tiene_activacion,
+)
+from exporter.deteccion import (
+    CLAUDE_TOOL_NAMES,
+    EXPLICACIONES,
+    IGNORED_DIRS,
+    detectar,
+    detectar_en_arbol,
+)
+from exporter.empaquetado import comprobar_limites, copiar_skill, zip_dir
+from exporter.frontmatter import split_frontmatter, yaml_escape
+from exporter.informes import informe_markdown, resumen_json
+from exporter.modelo import Estado, SkillPortatil, capacidades_de
+from exporter.perfiles import PerfilInvalido, cargar_perfiles, presupuesto_por_modo
 
 # --------------------------------------------------------------------------
 # Límites y constantes del estándar Agent Skills
@@ -49,11 +73,11 @@ from pathlib import Path
 # ChatGPT (Skills), claude.ai y la Skills API, y lo aplican como error duro.
 MAX_DESCRIPTION_CHARS = 1024
 
-# Presupuestos POR DESTINO, en BYTES UTF-8 (no en caracteres: en español un acento
-# ocupa dos y una raya tres, así que contar letras engaña por un 2-3%).
-BUDGET_MISTRAL = 490              # carpeta descomprimida
-BUDGET_PERPLEXITY = 850           # dentro del .zip
-BUDGET_DEFAULT = BUDGET_PERPLEXITY
+# Los presupuestos POR DESTINO (en BYTES UTF-8, no en caracteres: en español un
+# acento ocupa dos y una raya tres, así que contar letras engaña por un 2-3%) ya
+# no son constantes de este fichero: se derivan de los perfiles de exporter/targets/
+# con presupuesto_por_modo(), el más restrictivo de los destinos que aceptan ese
+# modo de instalación. Añadir un destino es escribir un JSON, no tocar esta lista.
 # ChatGPT y claude.ai no necesitan presupuesto propio: su tope es el del estándar
 # (1024 caracteres) y el zip ya viaja con la descripción de 850 bytes, que cabe de
 # sobra. Por eso el mismo .zip de Perplexity sirve para los tres sin reexportar.
@@ -80,337 +104,11 @@ PORTABLE_KEYS = ["name", "description", "license", "compatibility"]
 # `version` vivía en PORTABLE_KEYS y se emitía al nivel superior, así que TODA
 # skill exportada fallaba al subirse. `metadata` también estaba en la lista pero
 # nunca sobrevivía: el filtro exigía valores str y un mapa no lo es.
+# `depends` es una lista YAML (`depends: [- una, - otra]`), no un str: el mismo
+# filtro la dejaba fuera en silencio pese a que references/portabilidad.md
+# prometía que se conservaba. write_skill_md() sabe emitir listas anidadas
+# bajo metadata, así que aquí basta con no descartarlas.
 KEYS_A_METADATA = ["version", "depends"]
-
-# Herramientas propias del entorno Claude que, si la skill las invoca por nombre,
-# probablemente no existan en Perplexity/Mistral con la misma semántica.
-CLAUDE_TOOL_NAMES = [
-    "TodoWrite", "AskUserQuestion", "NotebookEdit", "SlashCommand",
-    "ExitPlanMode", "WebFetch", "TaskCreate", "TaskUpdate", "ToolSearch",
-]
-
-PATTERNS = [
-    # (id, regex, severidad, explicación)
-    ("plugin-root", re.compile(r"\$\{?CLAUDE_PLUGIN_ROOT\}?"), "alta",
-     "Ruta ${CLAUDE_PLUGIN_ROOT}: sólo existe dentro de un plugin de Claude Code."),
-    ("mcp-tool", re.compile(r"\bmcp__[a-zA-Z0-9_\-]+"), "alta",
-     "Invoca herramientas MCP por nombre; esos servidores no estarán conectados."),
-    ("skill-tool", re.compile(r"\bSkill\s*\(\s*[\"'`]|\bSkill tool\b|\bherramienta Skill\b"), "alta",
-     "Invoca otras skills mediante la herramienta Skill de Claude."),
-    ("subagent", re.compile(r"\bTask tool\b|\bsubagent_type\b|\bAgent tool\b|\bsubagente\b", re.I), "alta",
-     "Delega en subagentes vía la herramienta Task, que no existe fuera de Claude Code."),
-    # Comando con namespace de plugin: /plugin:comando. Excluye namespaces XML tipo /w:p.
-    ("slash-plugin", re.compile(
-        r"(?:^|[\s(`])/[a-z][a-z0-9]{2,}(?:-[a-z0-9]+)*:[a-z][a-z0-9]{2,}(?:-[a-z0-9]+)*\b", re.M), "media",
-     "Referencia a comandos con namespace de plugin (/plugin:comando)."),
-    ("hooks", re.compile(r"\bhooks?\.json\b|\bPreToolUse\b|\bPostToolUse\b"), "media",
-     "Depende de hooks del plugin, que no se exportan."),
-    ("applescript", re.compile(r"\bosascript\b|\btell\s+application\b", re.I), "media",
-     "Usa AppleScript para llegar a aplicaciones del Mac. Perplexity Computer sí lo "
-     "ejecuta (comprobado), pero corta cada llamada en torno a 90 segundos: un lote largo "
-     "se queda a medias y deja el trabajo inconsistente. Trocea los lotes y verifica el "
-     "resultado después de cada trozo. Mistral no lo ejecuta en absoluto."),
-    ("lote-destructivo", re.compile(
-        r"\b(?:move|delete|borra|elimina|mueve|archiva)\b[^.\n]{0,60}\b(?:whose|todos|all|"
-        r"cada|every|lote|batch|masiv)", re.I), "alta",
-     "Modifica o mueve elementos en bloque a partir de un filtro. Si el entorno de destino "
-     "corta la llamada a mitad —Perplexity Computer lo hace— el lote queda parcialmente "
-     "aplicado y sin registro fiable de qué se tocó. Antes de exportar: procesa en trozos "
-     "pequeños, verifica releyendo el estado después de cada uno, y no confíes en que el "
-     "filtro se haya aplicado como esperabas: compruébalo sobre los elementos afectados."),
-    ("home-tilde", re.compile(r"(?<![\w/])(?:~/|\$HOME/)[\w.\-]"), "media",
-     "Lee o escribe en rutas con ~ o $HOME. Comprobado en Mistral Vibe Work: $HOME vale "
-     "'/', así que '~/.mi-skill/' termina creando '//.mi-skill/'. Usa rutas relativas a "
-     "la carpeta de la skill, o pide al usuario una ruta absoluta explícita."),
-    ("estado-persistente", re.compile(r">>\s*[\"']?[~$./][^\s\"'|;)]*"), "media",
-     "Acumula estado con anexado (>>). Comprobado en Mistral Vibe Work: la escritura "
-     "puede reportar éxito y el fichero no existir después. Reléelo para confirmarlo, o "
-     "reescribe el fichero entero de una vez en lugar de ir anexando."),
-    ("claude-md", re.compile(r"\bCLAUDE\.md\b"), "baja",
-     "Referencia a CLAUDE.md, convención específica de Claude Code."),
-    ("claude-brand", re.compile(r"\bClaude Code\b|\bCowork\b"), "baja",
-     "Menciona el producto Claude por su nombre; conviene neutralizarlo."),
-]
-
-
-# --------------------------------------------------------------------------
-# Frontmatter (parser mínimo, sin PyYAML)
-# --------------------------------------------------------------------------
-
-def split_frontmatter(text: str):
-    """Devuelve (dict_frontmatter, texto_frontmatter_bruto, cuerpo)."""
-    if not text.startswith("---"):
-        return {}, "", text
-    lines = text.splitlines(keepends=True)
-    end = None
-    for i, line in enumerate(lines[1:], start=1):
-        if line.strip() in ("---", "..."):
-            end = i
-            break
-    if end is None:
-        return {}, "", text
-    raw = "".join(lines[1:end])
-    body = "".join(lines[end + 1:])
-    return parse_simple_yaml(raw), raw, body
-
-
-def parse_simple_yaml(raw: str) -> dict:
-    """Parser de nivel superior: clave: valor, escalares en bloque (| >) y listas."""
-    data, key, buf, mode, indent = {}, None, [], None, 0
-
-    def flush():
-        nonlocal key, buf, mode
-        if key is None:
-            return
-        if mode == "block":
-            data[key] = "\n".join(buf).strip()
-        elif mode == "nested":
-            # Una clave sin valor puede abrir una lista (`- item`) o un mapa
-            # (`clave: valor`). Se decide aquí, con las líneas ya recogidas:
-            # antes se asumía lista siempre y un `metadata:` con claves dentro
-            # se perdía entero, que es justo donde la spec manda guardar los
-            # datos propios del autor.
-            items = [x for x in buf if x]
-            pares = [re.match(r"^([A-Za-z0-9_\-.]+)\s*:\s*(.+)$", x)
-                     for x in items if not x.startswith("- ")]
-            if items and all(x.startswith("- ") for x in items):
-                data[key] = [unquote(x[2:].strip()) for x in items]
-            elif items and all(pares):
-                data[key] = {m.group(1): unquote(m.group(2).strip())
-                             for m in pares}
-            else:
-                data[key] = [unquote(x[2:].strip()) for x in items
-                             if x.startswith("- ")]
-        key, buf, mode = None, [], None
-
-    for line in raw.splitlines():
-        if not line.strip() or line.lstrip().startswith("#"):
-            if mode == "block":
-                buf.append("")
-            continue
-        stripped = line.strip()
-        cur_indent = len(line) - len(line.lstrip())
-
-        if mode in ("block", "nested") and cur_indent > indent:
-            # En modo `nested` se guarda la línea CRUDA: aún no se sabe si el
-            # bloque es una lista o un mapa, y flush() necesita el prefijo.
-            buf.append(stripped)
-            continue
-        if mode == "nested" and stripped.startswith("- ") and cur_indent >= indent:
-            buf.append(stripped)
-            continue
-        flush()
-
-        m = re.match(r"^([A-Za-z0-9_\-.]+)\s*:\s*(.*)$", stripped)
-        if not m:
-            continue
-        k, v = m.group(1), m.group(2).strip()
-        indent = cur_indent
-        if v in ("|", "|-", ">", ">-", "|+", ">+"):
-            key, mode, buf = k, "block", []
-        elif v == "":
-            key, mode, buf = k, "nested", []
-        else:
-            data[k] = unquote(v)
-    flush()
-    return data
-
-
-def unquote(v: str) -> str:
-    v = v.strip()
-    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
-        return v[1:-1]
-    return v
-
-
-# Frases que marcan CUÁNDO cargar la skill. Es lo que el destino lee para decidir
-# si la activa, así que va delante de todo lo demás.
-ACTIVATION_RX = re.compile(
-    r"c[áa]rgal[ao]s?\s+cuando|act[íi]val[ao]s?\s+cuando|[úu]sal[ao]s?\s+cuando|"
-    r"inv[óo]cal[ao]s?\s+cuando|utiliza(?:l[ao]s?)?\s+cuando|empl[ée]al[ao]s?\s+cuando|"
-    r"se\s+activa\s+(?:con|cuando|ante)|se\s+dispara\s+(?:con|cuando)|"
-    r"cuando\s+el\s+usuario|si\s+el\s+usuario\s+(?:pide|dice|pregunta)|"
-    r"trigger\w*\s+(?:on|when|obligatorio)|"
-    r"use\s+(?:this\s+skill\s+)?when|used?\s+when|load\s+(?:this\s+)?when|"
-    r"this\s+skill\s+should\s+be\s+used\s+when|apply\s+when|invoke\s+when|"
-    r"when\s+the\s+user",
-    re.I)
-
-# Abreviaturas tras las que un punto NO cierra frase.
-ABBREV = {"etc", "ej", "p", "vs", "aprox", "sr", "sra", "srta", "dr", "dra", "prof",
-          "ee", "uu", "cf", "vgr", "i.e", "e.g", "núm", "num", "pág", "pag", "fig"}
-
-
-def split_sentences(text: str) -> list:
-    """Parte en frases sin romper dentro de comillas ni de paréntesis.
-
-    Necesario porque estas descripciones están llenas de disparadores entrecomillados
-    del tipo "¿es importante?", cuyo signo no cierra la frase.
-    """
-    out, buf, paren, quote = [], [], 0, False
-    n, i = len(text), 0
-    while i < n:
-        ch = text[i]
-        buf.append(ch)
-        i += 1
-        if ch == '"':
-            quote = not quote
-            continue
-        if ch in "“«":
-            quote = True
-            continue
-        if ch in "”»":
-            quote = False
-            continue
-        if ch in "([":
-            paren += 1
-            continue
-        if ch in ")]":
-            paren = max(0, paren - 1)
-            continue
-        if ch not in ".!?…" or quote or paren:
-            continue
-        # ¿Punto de abreviatura o de inicial?
-        prev = "".join(buf[:-1]).split()
-        word = prev[-1].lower().strip("(«“\"") if prev else ""
-        if ch == "." and (word in ABBREV or len(word) == 1):
-            continue
-        # Arrastra los cierres pegados al signo: ...decisión."»)
-        while i < n and text[i] in "\"”»)]":
-            buf.append(text[i])
-            i += 1
-        # Cierra frase sólo si lo siguiente empieza algo nuevo.
-        k = i
-        while k < n and text[k].isspace():
-            k += 1
-        if k >= n or text[k].isupper() or text[k] in "¿¡«“":
-            out.append("".join(buf).strip())
-            buf = []
-    tail = "".join(buf).strip()
-    if tail:
-        out.append(tail)
-    return [s for s in out if s]
-
-
-def reorder_description(desc: str):
-    """Pone delante las frases que dicen CUÁNDO cargar la skill.
-
-    Devuelve (texto, se_movio). No inventa nada: si no hay ninguna frase de
-    activación reconocible, deja la descripción intacta y el aviso lo dirá.
-    """
-    sents = split_sentences(desc)
-    if len(sents) < 2:
-        return desc, False
-    act_idx = [i for i, s in enumerate(sents) if ACTIVATION_RX.search(s)]
-    if not act_idx:
-        return desc, False
-    if act_idx == list(range(len(act_idx))):
-        return desc, False  # ya están agrupadas al principio
-    act = [sents[i] for i in act_idx]
-    rest = [s for i, s in enumerate(sents) if i not in set(act_idx)]
-    return " ".join(act + rest), True
-
-
-QUOTED_RX = re.compile(r'[“"«][^”"»\n]{2,60}[”"»]')
-
-
-def nbytes(s: str) -> int:
-    return len(s.encode("utf-8"))
-
-
-MAX_TRIGGER_EXAMPLES = 4   # más ejemplos no discriminan mejor; sólo alargan la lista
-
-
-def trim_quoted_examples(sentence: str, budget: int,
-                         max_keep: int = MAX_TRIGGER_EXAMPLES, floor_keep: int = 2) -> str:
-    """Deja unos pocos disparadores entrecomillados y resume el resto con '…'.
-
-    Una frase de activación suele ser larga por acumulación de ejemplos, no por
-    complejidad: con dos o cuatro el destino ya reconoce la intención, y lo que se
-    libera se invierte en decir para qué sirve la skill. Así el resultado se lee como
-    un párrafo y no como una enumeración.
-    """
-    quotes = list(QUOTED_RX.finditer(sentence))
-    if len(quotes) <= floor_keep:
-        return sentence
-    if len(quotes) <= max_keep and nbytes(sentence) <= budget:
-        return sentence
-    tail = sentence[quotes[-1].end():].lstrip(" ,;")
-    best = sentence
-    for keep in range(min(len(quotes) - 1, max_keep), floor_keep - 1, -1):
-        cand = sentence[:quotes[keep - 1].end()] + "… " + tail
-        best = cand
-        if nbytes(cand) <= budget:
-            return cand
-    return best
-
-
-def compact_description(desc: str, budget: int = BUDGET_DEFAULT) -> str:
-    """Reduce la descripción a `budget` bytes UTF-8 conservando el criterio de activación.
-
-    Devuelve **un solo párrafo**: primero cuándo cargar la skill, después una mención
-    breve de para qué sirve. Los ejemplos entrecomillados se podan antes que las frases,
-    porque una enumeración larga de disparadores casi sinónimos no discrimina mejor que
-    dos o tres y se come el presupuesto que necesita el propósito.
-    """
-    desc = " ".join(desc.split())          # un párrafo: sin saltos ni viñetas
-    if nbytes(desc) <= budget:
-        return desc
-    sents = split_sentences(desc)
-    act = [s for s in sents if ACTIVATION_RX.search(s)]
-    if not act:
-        return desc                        # sin activación no hay nada que priorizar
-    rest = [s for s in sents if not ACTIVATION_RX.search(s)]
-
-    # Se reserva un tercio del presupuesto para el propósito; la activación se poda
-    # hasta caber en el resto.
-    head = trim_quoted_examples(act[0], int(budget * 0.62))
-    out = head
-    for s in act[1:]:
-        if nbytes(out) + 1 + nbytes(s) <= int(budget * 0.75):
-            out += " " + s
-
-    # Mención corta del propósito: se prueba la frase descriptiva más breve primero,
-    # para maximizar la probabilidad de que quepa alguna.
-    for s in sorted(rest, key=nbytes):
-        if nbytes(out) + 1 + nbytes(s) <= budget:
-            out += " " + s
-            break
-    for s in rest:
-        if s in out:
-            continue
-        if nbytes(out) + 1 + nbytes(s) <= budget:
-            out += " " + s
-    return out
-
-
-def clamp_description(desc: str, budget: int = BUDGET_DEFAULT) -> str:
-    """Garantía dura: deja la descripción por debajo de `budget` bytes UTF-8.
-
-    Corta en el último final de frase que quepa; si no hay ninguno razonable, en el
-    último espacio. Nunca a mitad de palabra: la descripción es el criterio de
-    activación, y una frase partida no lo es.
-    """
-    if nbytes(desc) <= budget:
-        return desc
-    cut = desc.encode("utf-8")[:budget - 4].decode("utf-8", errors="ignore")
-    while nbytes(cut) > budget - 4:
-        cut = cut[:-1]
-    floor = int(len(cut) * 0.6)   # no dejar un muñón de una frase suelta
-    ends = list(re.finditer(r"[.!?](?=\s|$)", cut))
-    if ends and ends[-1].end() >= floor:
-        return cut[:ends[-1].end()]
-    sp = cut.rfind(" ")
-    base = cut[:sp] if sp >= floor else cut
-    return base.rstrip(" ,;:—-") + "…"
-
-
-def yaml_escape(v: str) -> str:
-    """Serializa un escalar en una sola línea de forma segura."""
-    v = " ".join(str(v).split())
-    if re.search(r'[:#\[\]{}&*!|>%@`"\']', v) or v == "":
-        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
-    return v
 
 
 # --------------------------------------------------------------------------
@@ -439,6 +137,9 @@ class SkillResult:
     body: str = ""
     fm_extra: dict = field(default_factory=dict)
     fm_meta: dict = field(default_factory=dict)
+    # Señales detectadas en toda la skill (SKILL.md adaptado + resto del árbol).
+    # Alimentan a_skill_portatil(), que las pasa al motor de compatibilidad.
+    senales: list = field(default_factory=list)
 
     @property
     def worst(self) -> str:
@@ -452,7 +153,9 @@ class SkillResult:
 # Descubrimiento
 # --------------------------------------------------------------------------
 
-IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+# IGNORED_DIRS vive en exporter.deteccion: es el mismo conjunto que
+# detectar_en_arbol() debe podar para no auditar ficheros que este modulo
+# nunca copia al paquete (ver copiar_skill() mas abajo).
 
 
 def discover_skills(root: Path) -> list:
@@ -477,7 +180,8 @@ def sanitize_name(raw: str) -> str:
 # Auditoría y adaptación
 # --------------------------------------------------------------------------
 
-def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> SkillResult:
+def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
+                    presupuesto_zip: int, reorder: bool = True) -> SkillResult:
     src_dir = skill_md.parent
     text = skill_md.read_text(encoding="utf-8", errors="replace")
     fm, _raw_fm, body = split_frontmatter(text)
@@ -513,7 +217,7 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
                 "Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han "
                 "puesto delante de las que describen qué hace. Es lo único que el destino lee "
                 "para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.")
-    if not ACTIVATION_RX.search(res.description):
+    if not tiene_activacion(res.description):
         res.findings.append(Finding("alta", "description-sin-activacion",
             "La descripción no dice en ningún momento CUÁNDO cargar la skill: no hay ni un "
             "'Cárgala cuando…', ni un 'cuando el usuario…', ni ejemplos de frases reales. "
@@ -525,31 +229,31 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
     origen_bytes = nbytes(res.description)
     if reorder:
         res.desc_folder = clamp_description(
-            compact_description(res.description, BUDGET_MISTRAL), BUDGET_MISTRAL)
+            compact_description(res.description, presupuesto_carpeta), presupuesto_carpeta)
         res.desc_zip = clamp_description(
-            compact_description(res.description, BUDGET_PERPLEXITY), BUDGET_PERPLEXITY)
+            compact_description(res.description, presupuesto_zip), presupuesto_zip)
     else:
-        res.desc_folder = clamp_description(res.description, BUDGET_MISTRAL)
-        res.desc_zip = clamp_description(res.description, BUDGET_PERPLEXITY)
+        res.desc_folder = clamp_description(res.description, presupuesto_carpeta)
+        res.desc_zip = clamp_description(res.description, presupuesto_zip)
     res.description = res.desc_zip   # la que se muestra en el informe
 
-    if origen_bytes > BUDGET_MISTRAL:
+    if origen_bytes > presupuesto_carpeta:
         res.adaptations.append(
             f"Descripción ajustada a cada destino: {origen_bytes} bytes de origen → "
-            f"{nbytes(res.desc_zip)} B en el `.zip` (Perplexity, tope {BUDGET_PERPLEXITY}) y "
-            f"{nbytes(res.desc_folder)} B en la carpeta (Mistral, tope {BUDGET_MISTRAL}). "
+            f"{nbytes(res.desc_zip)} B en el `.zip` (Perplexity, tope {presupuesto_zip}) y "
+            f"{nbytes(res.desc_folder)} B en la carpeta (Mistral, tope {presupuesto_carpeta}). "
             "Se podan primero los ejemplos entrecomillados y después las frases que sólo "
             "cuentan qué hace la skill; el criterio de activación se conserva.")
-    if origen_bytes > BUDGET_PERPLEXITY:
+    if origen_bytes > presupuesto_zip:
         res.findings.append(Finding("media", "description-larga",
             f"La descripción de origen medía {origen_bytes} bytes UTF-8 y no cabe entera en "
             "ningún destino. El recorte automático mantiene frases completas, pero no puede "
             "reescribir: revisa el resultado y, si ha perdido matiz, redáctala a mano en un "
             "solo párrafo que diga primero cuándo activarse y luego para qué sirve."))
-    elif origen_bytes > BUDGET_MISTRAL:
+    elif origen_bytes > presupuesto_carpeta:
         res.findings.append(Finding("baja", "description-densa",
             f"Descripción de {origen_bytes} bytes: cabe en el zip de Perplexity pero no en la "
-            f"carpeta de Mistral ({BUDGET_MISTRAL} B), donde va recortada. El índice del "
+            f"carpeta de Mistral ({presupuesto_carpeta} B), donde va recortada. El índice del "
             "destino paga este coste en cada sesión, así que cuanto más breve, mejor."))
 
     # Claves no portables
@@ -565,12 +269,30 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
         res.adaptations.append("Rutas ${CLAUDE_PLUGIN_ROOT}/... convertidas en rutas relativas a la skill.")
         body = new_body
 
-    # Patrones problemáticos en el cuerpo
-    for code, rx, sev, expl in PATTERNS:
-        hits = rx.findall(body)
-        if hits:
-            sample = sorted({h if isinstance(h, str) else h[0] for h in hits})[:4]
-            res.findings.append(Finding(sev, code, f"{expl} Ejemplos: {', '.join(sample)}"))
+    # Patrones problemáticos en todo el árbol de la skill (SKILL.md, references/,
+    # scripts/, y cualquier otro fichero de texto), no sólo en el cuerpo.
+    #
+    # El SKILL.md se audita sobre el cuerpo YA ADAPTADO, y el resto del arbol
+    # desde disco. La razon esta en el orden que ya seguia este fichero:
+    # adaptar antes de auditar, para no avisar de lo que uno mismo acaba de
+    # arreglar. La reescritura de ${CLAUDE_PLUGIN_ROOT} solo alcanza al cuerpo
+    # del SKILL.md, asi que en references/ y scripts/ ese patron SI es un
+    # riesgo real y debe seguir avisando.
+    #
+    # `body` ya no empieza en la linea 1 del fichero real: split_frontmatter()
+    # se lo quito. detectar() numera desde 1 salvo que se le diga cuanto se
+    # quito, o cada senal del SKILL.md sale con un numero de linea que no es
+    # el que tiene el fichero de verdad -el offset se mide por diferencia de
+    # lineas totales porque sobrevive a las reescrituras de arriba, que
+    # cambian texto DENTRO de una linea pero nunca el numero de lineas-.
+    offset_skill_md = len(text.splitlines()) - len(body.splitlines())
+    senales = (detectar(body, "SKILL.md", offset=offset_skill_md)
+               + detectar_en_arbol(src_dir, excluir={"SKILL.md"}))
+    res.senales = senales
+    for s in senales:
+        res.findings.append(Finding(s.severidad_base, s.id,
+                                    "{} Visto en {}: {}".format(
+                                        EXPLICACIONES[s.id], s.ubicacion, s.muestra)))
 
     tools_used = sorted({t for t in CLAUDE_TOOL_NAMES if re.search(rf"\b{t}\b", body)})
     if tools_used:
@@ -589,7 +311,12 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
     dest = out_dir / name
     if dest.exists():
         shutil.rmtree(dest)
-    shutil.copytree(src_dir, dest, ignore=shutil.ignore_patterns(*IGNORED_DIRS, "SKILL.md"))
+    enlaces = copiar_skill(src_dir, dest, ignorar=set(IGNORED_DIRS) | {"SKILL.md"})
+    for s in enlaces:
+        res.findings.append(Finding("alta", "enlace-simbolico",
+            "Se omitió un enlace simbólico al empaquetar: {} ({}). Copiar su "
+            "contenido habría metido en el paquete un fichero de fuera de la "
+            "skill.".format(s.ubicacion, s.muestra)))
 
     for p in sorted(dest.rglob("*")):
         if p.is_file():
@@ -618,6 +345,9 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, reorder: bool = True) -> Skil
         if isinstance(v, str) and v:
             meta.setdefault(k, v)
             bajadas.append(k)
+        elif isinstance(v, list) and v:
+            meta.setdefault(k, list(v))
+            bajadas.append(k)
     if meta:
         res.fm_meta = meta
     if bajadas:
@@ -635,10 +365,17 @@ def write_skill_md(res: SkillResult, dest: Path, description: str) -> None:
     fm_out = {"name": res.name, "description": description}
     fm_out.update(res.fm_extra)
     lines = ["---"] + [f"{k}: {yaml_escape(v)}" for k, v in fm_out.items()]
-    # `metadata` es un mapa, no un escalar: va como bloque anidado.
+    # `metadata` es un mapa, no un escalar: va como bloque anidado. Un valor
+    # que sea lista (p. ej. `depends`) se anida a su vez como lista YAML: no
+    # se aplana a texto porque `parse_simple_yaml` sabe leer justo esa forma.
     if res.fm_meta:
         lines.append("metadata:")
-        lines += [f"  {k}: {yaml_escape(v)}" for k, v in res.fm_meta.items()]
+        for k, v in res.fm_meta.items():
+            if isinstance(v, list):
+                lines.append(f"  {k}:")
+                lines += [f"    - {yaml_escape(item)}" for item in v]
+            else:
+                lines.append(f"  {k}: {yaml_escape(v)}")
     lines.append("---")
     (dest / "SKILL.md").write_text(
         "\n".join(lines) + "\n" + res.body.rstrip() + render_notes(res), encoding="utf-8")
@@ -672,108 +409,220 @@ def render_notes(res: SkillResult) -> str:
     return "\n".join(out) + "\n"
 
 
-# --------------------------------------------------------------------------
-# Empaquetado
-# --------------------------------------------------------------------------
+def a_skill_portatil(res: SkillResult) -> SkillPortatil:
+    """Convierte el SkillResult del conversor en el modelo intermedio.
 
-def zip_dir(src: Path, dest_zip: Path, arc_prefix: str = "") -> None:
-    dest_zip.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(dest_zip, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in sorted(src.rglob("*")):
-            if p.is_file():
-                arc = Path(arc_prefix) / p.relative_to(src) if arc_prefix else p.relative_to(src)
-                z.write(p, arc.as_posix())
-
-
-def write_report(results: list, out: Path, source: str) -> None:
-    sev_icon = {"alta": "🔴", "media": "🟡", "baja": "🔵", "ninguna": "🟢"}
-    L = [
-        "# Informe de portabilidad",
-        "",
-        f"- **Origen:** `{source}`",
-        f"- **Skills exportadas:** {len(results)}",
-        "",
-        "## Dónde sube cada cosa",
-        "",
-        "**El `.zip` y la carpeta no son intercambiables.** Llevan los mismos ficheros, pero",
-        f"la descripción se ajusta al presupuesto de cada destino: {BUDGET_PERPLEXITY} bytes",
-        f"en el zip y {BUDGET_MISTRAL} en la carpeta. Descomprimir el zip **no** produce la",
-        "carpeta de Mistral: su descripción sería demasiado larga.",
-        "",
-        "| Destino | Qué subir | Dónde |",
-        "|---|---|---|",
-        "| Perplexity Computer | `<skill>.zip` — tal cual, sin tocar | "
-        "perplexity.ai/computer/skills → Create skill → Upload a skill |",
-        "| Mistral Vibe Work | `<skill>/` — la carpeta, no el zip | "
-        "chat.mistral.ai/work → Context → Skills → New Skill |",
-        "",
-        "## Resumen",
-        "",
-        "| Skill | Riesgo | Avisos | Adaptaciones | Ficheros extra |",
-        "|---|---|---|---|---|",
-    ]
-    for r in results:
-        L.append(f"| `{r.name}` | {sev_icon[r.worst]} {r.worst} | {len(r.findings)} | "
-                 f"{len(r.adaptations)} | {len(r.extra_files)} |")
-    L += ["", "**Riesgo alto** = la skill contiene instrucciones que casi seguro fallarán "
-          "fuera de Claude. **Medio** = funcionará, pero degradada. **Bajo** = cosmético.", ""]
-
-    for r in results:
-        L += [f"## `{r.name}`", "",
-              f"- Origen: `{r.src_dir}`",
-              f"- Descripción ({len(r.description)} car.): {r.description[:300]}", ""]
-        if r.adaptations:
-            L += ["**Adaptado automáticamente:**", ""] + [f"- {a}" for a in r.adaptations] + [""]
-        if r.findings:
-            L += ["**Avisos:**", ""]
-            for f in r.findings:
-                L.append(f"- {sev_icon[f.severity]} *{f.code}* — {f.message}")
-            L.append("")
-        else:
-            L += ["Sin avisos: esta skill es portable tal cual.", ""]
-    (out / "INFORME-PORTABILIDAD.md").write_text("\n".join(L), encoding="utf-8")
+    Puente temporal: SkillResult existe desde antes del modelo y sigue siendo
+    lo que manejan audit_and_adapt y el empaquetado.
+    """
+    skill = SkillPortatil(
+        nombre=res.name, nombre_original=res.orig_name, carpeta=str(res.src_dir),
+        descripcion=res.description, descripcion_bytes=nbytes(res.description),
+        tiene_activacion=tiene_activacion(res.description),
+        cuerpo_tokens=len(res.body) // CHARS_PER_TOKEN,
+        ficheros=list(res.extra_files),
+        tiene_scripts=any(f.startswith("scripts/") for f in res.extra_files),
+        senales=list(res.senales), adaptaciones=list(res.adaptations))
+    skill.capacidades = capacidades_de(skill.senales, skill.tiene_scripts)
+    return skill
 
 
 # --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
 
+# Limites defensivos sobre lo que se acepta analizar. No se descomprime nada
+# ni se ejecuta nada, pero un repositorio absurdo puede agotar el disco.
+MAX_BYTES_REPO = 200 * 1024 * 1024
+MAX_FICHEROS_REPO = 20000
+TIMEOUT_CLON = 300
+
+
+def comprobar_tamano(raiz: Path) -> None:
+    """Aborta si el arbol excede los limites. No sigue enlaces."""
+    total, n = 0, 0
+    for base, dirs, ficheros in os.walk(str(raiz)):
+        dirs[:] = [d for d in dirs
+                   if d != ".git" and not os.path.islink(os.path.join(base, d))]
+        for nombre in ficheros:
+            ruta = os.path.join(base, nombre)
+            if os.path.islink(ruta):
+                continue
+            n += 1
+            total += os.path.getsize(ruta)
+            if n > MAX_FICHEROS_REPO:
+                sys.exit("[error] El origen supera los {} ficheros. Se aborta el "
+                         "análisis.".format(MAX_FICHEROS_REPO))
+            if total > MAX_BYTES_REPO:
+                sys.exit("[error] El origen supera los {} MB. Se aborta el "
+                         "análisis.".format(MAX_BYTES_REPO // (1024 * 1024)))
+
+
 def resolve_source(src: str, workdir: Path) -> Path:
     p = Path(src).expanduser()
     if p.exists():
+        comprobar_tamano(p.resolve())
         return p.resolve()
     if not re.match(r"^(https?://|git@)", src):
-        sys.exit(f"[error] '{src}' no existe como ruta ni parece una URL de repositorio.")
+        sys.exit("[error] '{}' no existe como ruta ni parece una URL de "
+                 "repositorio.".format(src))
     target = workdir / "repo"
-    print(f"[info] clonando {src} ...")
-    r = subprocess.run(["git", "clone", "--depth", "1", src, str(target)],
-                       capture_output=True, text=True)
+    print("[info] clonando {} ...".format(src))
+    entorno = dict(os.environ)
+    # Sin esto, un repositorio privado deja el proceso colgado esperando
+    # credenciales que nadie va a teclear.
+    entorno["GIT_TERMINAL_PROMPT"] = "0"
+    try:
+        r = subprocess.run(
+            ["git", "clone", "--depth", "1", "--no-recurse-submodules", src, str(target)],
+            capture_output=True, text=True, env=entorno, timeout=TIMEOUT_CLON)
+    except subprocess.TimeoutExpired:
+        sys.exit("[error] el clon superó los {} s y se ha cancelado.".format(TIMEOUT_CLON))
     if r.returncode != 0:
-        sys.exit(f"[error] git clone falló:\n{r.stderr.strip()}")
+        sys.exit("[error] git clone falló:\n{}\n\nSi el repositorio es privado, "
+                 "necesitas git ya autenticado, o descárgalo a mano y pasa la "
+                 "ruta local.".format(r.stderr.strip()))
+    comprobar_tamano(target)
     return target
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Plugin de Claude → Agent Skills portable",
-        epilog="Salida: <skill>.zip para Perplexity y <skill>/ para Mistral. Mismos "
-               "ficheros, pero la descripción se ajusta al presupuesto de cada destino: "
-               "descomprimir el zip NO produce la carpeta de Mistral.")
-    ap.add_argument("source", help="URL del repositorio o ruta local")
-    ap.add_argument("--out", default="./dist-agentskills", help="directorio de salida")
-    ap.add_argument("--only", nargs="*", default=None, help="exportar sólo estas skills")
-    ap.add_argument("--zip-only", action="store_true",
-                    help="dejar sólo los .zip (pierdes la variante de Mistral)")
-    ap.add_argument("--keep-description-order", action="store_true",
-                    help="no reordenar la descripción (por defecto la activación va primero)")
-    args = ap.parse_args()
+SUBCOMANDOS = ("inspect", "audit", "export")
 
-    out = Path(args.out).expanduser().resolve()
-    if out.exists():
-        shutil.rmtree(out)
-    # Las carpetas de skill cuelgan directamente de <out>, al lado de su zip: mismos
-    # ficheros, distinta descripción.
-    out.mkdir(parents=True)
+
+def normalizar_argv(argv: list) -> list:
+    """Antepone `export` cuando el primer argumento es un origen suelto.
+
+    `convert.py <repo>` funcionaba antes de que existieran los subcomandos, y
+    lo usan el «Paso 0» del SKILL.md, el comando /exportar-skills y el
+    workflow de CI. Romperlo llegaría a todo el que tenga el plugin
+    instalado en el mismo push, porque el marketplace está en autosync.
+    """
+    if not argv or argv[0] in SUBCOMANDOS or argv[0].startswith("-"):
+        return list(argv)
+    return ["export"] + list(argv)
+
+
+def construir_parser():
+    ap = argparse.ArgumentParser(
+        prog="convert.py",
+        description="Audita y exporta skills de un plugin de Claude al estándar "
+                    "abierto Agent Skills.")
+    subs = ap.add_subparsers(dest="comando", required=True)
+
+    def comun(p):
+        p.add_argument("source", help="URL del repositorio o ruta local")
+        p.add_argument("--fail-on", dest="fail_on", default="ninguno",
+                       choices=["ninguno", "degradado", "no_compatible"],
+                       help="devolver código 2 si algún estado alcanza este umbral")
+        return p
+
+    ins = comun(subs.add_parser(
+        "inspect", help="qué contiene y qué exige la skill, sin elegir destino"))
+    ins.add_argument("--keep-description-order", action="store_true",
+                     help="no reordenar la descripción")
+
+    aud = comun(subs.add_parser(
+        "audit", help="matriz de compatibilidad; no escribe paquetes"))
+    aud.add_argument("--target", nargs="*", default=None,
+                     help="destinos a auditar (por defecto, todos)")
+    aud.add_argument("--keep-description-order", action="store_true",
+                     help="no reordenar la descripción")
+
+    exp = comun(subs.add_parser("export", help="auditar y empaquetar"))
+    exp.add_argument("--target", nargs="*", default=None,
+                     help="restringe qué artefactos se producen; la auditoría "
+                          "sigue cubriendo todos los destinos")
+    exp.add_argument("--out", default="./dist-agentskills", help="directorio de salida")
+    exp.add_argument("--only", nargs="*", default=None,
+                     help="exportar sólo estas skills")
+    exp.add_argument("--zip-only", action="store_true",
+                     help="dejar sólo los .zip (pierdes la variante de carpeta)")
+    exp.add_argument("--keep-description-order", action="store_true",
+                     help="no reordenar la descripción")
+    return ap
+
+
+def codigo_por_umbral(evaluaciones, umbral: str) -> int:
+    if umbral == "ninguno":
+        return 0
+    limite = Estado.ORDEN.index(
+        Estado.DEGRADADO if umbral == "degradado" else Estado.NO_COMPATIBLE)
+    for por_destino in evaluaciones.values():
+        for evs in por_destino.values():
+            for ev in evs:
+                if Estado.ORDEN.index(ev.estado) >= limite:
+                    return 2
+    return 0
+
+
+def imprimir_inspect(skill) -> None:
+    """Vuelca el modelo intermedio: lo que la skill es y exige, sin destino."""
+    print("\n## {}".format(skill.nombre))
+    if skill.nombre != skill.nombre_original:
+        print("   nombre original: {}".format(skill.nombre_original))
+    print("   descripción: {} bytes{}".format(
+        skill.descripcion_bytes,
+        "" if skill.tiene_activacion else "  ⚠ SIN criterio de activación"))
+    print("   cuerpo: ~{} tokens".format(skill.cuerpo_tokens))
+    print("   ficheros: {}{}".format(
+        len(skill.ficheros), " (incluye scripts/)" if skill.tiene_scripts else ""))
+
+    if skill.capacidades:
+        print("   capacidades exigidas:")
+        for c in skill.capacidades:
+            print("     · {:<24} {}".format(c.nombre, c.nivel))
+    else:
+        print("   capacidades exigidas: ninguna")
+
+    if skill.senales:
+        print("   señales:")
+        for s in skill.senales:
+            print("     · {:<20} {}  {}".format(s.id, s.ubicacion, s.muestra))
+    else:
+        print("   señales: ninguna")
+
+    ambiguo = [c.nombre for c in skill.capacidades if c.nivel == "requerida"]
+    if ambiguo and not skill.tiene_activacion:
+        print("   ⚠ Exige capacidades y no dice cuándo cargarse: revisa la "
+              "descripción antes de auditar contra ningún destino.")
+
+
+def obtener_fecha_hoy() -> datetime.date:
+    """La fecha de 'hoy' para toda la evaluación de compatibilidad.
+
+    `CSE_FECHA` (ISO AAAA-MM-DD) la fija: la usan los golden files y las
+    pruebas de reproducibilidad, que necesitan una fecha estable para no
+    depender del día en que se ejecute la suite -de lo contrario, en cuanto
+    la fecha real supere un `revisar_tras` de un perfil, los veredictos
+    cambian de `compatible` a `no_verificable` y el CI se pone en rojo sin
+    que nadie haya tocado una línea de código-. Sin la variable, se usa la
+    fecha real del sistema.
+    """
+    bruta = os.environ.get("CSE_FECHA")
+    if not bruta:
+        return datetime.date.today()
+    try:
+        return datetime.date.fromisoformat(bruta)
+    except ValueError:
+        sys.exit(
+            "[error] CSE_FECHA='{}' no es una fecha ISO válida (AAAA-MM-DD).".format(bruta))
+
+
+def ejecutar(args, perfiles, elegidos, hoy) -> int:
+    # Los perfiles ya están cargados: de ellos salen los presupuestos de
+    # descripción (el más restrictivo por modo de instalación), con
+    # independencia del subcomando y de qué destinos se hayan elegido.
+    presupuesto_carpeta = presupuesto_por_modo(perfiles, "carpeta")   # Mistral: 490
+    presupuesto_zip = presupuesto_por_modo(perfiles, "zip")           # el resto: 850
+
+    out = None
+    if args.comando == "export":
+        out = Path(args.out).expanduser().resolve()
+        if out.exists():
+            shutil.rmtree(out)
+        # Las carpetas de skill cuelgan directamente de <out>, al lado de su
+        # zip: mismos ficheros, distinta descripción.
+        out.mkdir(parents=True)
 
     with tempfile.TemporaryDirectory() as tmp:
         root = resolve_source(args.source, Path(tmp))
@@ -784,48 +633,157 @@ def main() -> int:
                      "skills? Un plugin sin carpeta skills/ no tiene nada portable.")
 
         print(f"[info] {len(skill_files)} skill(s) encontradas.")
+
+        # `inspect` y `audit` no escriben ningún fichero de salida: trabajan
+        # sobre una copia efímera que desaparece con este bloque. `export`
+        # usa `out`, que sí sobrevive fuera de él.
+        work_dir = out if out is not None else Path(tmp) / "_trabajo"
+        work_dir.mkdir(parents=True, exist_ok=True)
+
+        solo = getattr(args, "only", None)
         results = []
         for sf in skill_files:
             nm = sanitize_name(sf.parent.name)
-            if args.only and nm not in {sanitize_name(x) for x in args.only}:
+            if solo and nm not in {sanitize_name(x) for x in solo}:
                 continue
-            r = audit_and_adapt(sf, out, reorder=not args.keep_description_order)
+            r = audit_and_adapt(sf, work_dir, presupuesto_carpeta, presupuesto_zip,
+                                reorder=not args.keep_description_order)
             results.append(r)
             print(f"  · {r.name:<40} riesgo={r.worst}")
 
         if not results:
             sys.exit("[error] --only no coincidió con ninguna skill.")
 
+        if args.comando == "inspect":
+            for r in results:
+                imprimir_inspect(a_skill_portatil(r))
+            return 0
+
+        # `hoy` ya llegó validado desde main(): CSE_FECHA se comprueba antes
+        # de tocar disco, no aquí en medio del procesamiento.
+
+        # `audit` respeta --target: es él quien decide qué destinos evaluar.
+        # `export` NO: su --target sólo restringe qué artefactos se
+        # escriben, la auditoría sigue cubriendo los cinco destinos.
+        perfiles_informe = perfiles
+        if args.comando == "audit" and elegidos:
+            perfiles_informe = {pid: perfiles[pid] for pid in elegidos}
+
+        evaluaciones = {}
+        for r in results:
+            skill = a_skill_portatil(r)
+            evaluaciones[r.name] = {
+                pid: evaluar(skill, perfil, hoy) for pid, perfil in perfiles_informe.items()
+            }
+
+        if args.comando == "audit":
+            print()
+            print(informe_markdown(results, evaluaciones, args.source, perfiles_informe))
+            return codigo_por_umbral(evaluaciones, args.fail_on)
+
+        # -------- export --------
+        # Qué artefactos hacen falta: la unión de los modos de instalación
+        # de los destinos elegidos (todos, si no se restringió con
+        # --target). `carpeta` es el único modo no-zip que este conversor
+        # sabe producir, así que cualquier modo que no sea `zip` ni
+        # `url_repositorio` (que no necesita ningún artefacto propio)
+        # implica querer la carpeta.
+        modos_deseados = set()
+        for pid in (elegidos if elegidos else perfiles):
+            modos_deseados.update(perfiles[pid].modos())
+        quiere_zip = "zip" in modos_deseados
+        quiere_carpeta = bool(modos_deseados - {"zip", "url_repositorio"})
+
         # Un zip por skill, con la carpeta de la skill en la raíz del zip:
         # es la única estructura que Perplexity acepta.
         for r in results:
-            write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
-            zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
-            write_skill_md(r, out / r.name, r.desc_folder)   # en disco: Mistral
+            if quiere_zip:
+                write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
+                zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
+                for pid, perfil in perfiles.items():
+                    if "zip" not in perfil.modos():
+                        continue
+                    for aviso in comprobar_limites(out / "{}.zip".format(r.name), perfil):
+                        r.findings.append(Finding("alta", "limite-de-paquete", aviso))
+            if quiere_carpeta:
+                write_skill_md(r, out / r.name, r.desc_folder)   # en disco: Mistral
+            elif (out / r.name).exists():
+                shutil.rmtree(out / r.name)
 
         if args.zip_only:
             for r in results:
-                shutil.rmtree(out / r.name)
+                if (out / r.name).exists():
+                    shutil.rmtree(out / r.name)
 
-        write_report(results, out, args.source)
-        (out / "resumen.json").write_text(json.dumps(
-            [{"name": r.name, "risk": r.worst, "findings": [f.__dict__ for f in r.findings],
-              "adaptations": r.adaptations} for r in results], ensure_ascii=False, indent=2),
+        (out / "INFORME-PORTABILIDAD.md").write_text(
+            informe_markdown(results, evaluaciones, args.source, perfiles),
+            encoding="utf-8")
+        (out / "resumen.json").write_text(
+            json.dumps(resumen_json(results, evaluaciones, args.source),
+                       ensure_ascii=False, indent=2),
             encoding="utf-8")
 
     print(f"\n[ok] Salida en: {out}")
-    print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill; "
-          f"descripción ≤{BUDGET_PERPLEXITY} B)")
-    if not args.zip_only:
-        print(f"     Mistral    → <skill>/      (descripción ≤{BUDGET_MISTRAL} B — NO es el "
-              f"zip descomprimido)")
-    else:
-        print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de {BUDGET_MISTRAL} B")
+    if quiere_zip:
+        print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill; "
+              f"descripción ≤{presupuesto_zip} B)")
+    if quiere_carpeta:
+        if args.zip_only:
+            print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de "
+                  f"{presupuesto_carpeta} B")
+        else:
+            print(f"     Mistral    → <skill>/      (descripción ≤{presupuesto_carpeta} B — NO es el "
+                  f"zip descomprimido)")
     print(f"     Informe    → INFORME-PORTABILIDAD.md")
     riesgo = [r.name for r in results if r.worst == "alta"]
     if riesgo:
         print(f"\n[aviso] Riesgo alto en: {', '.join(riesgo)}. Lee el informe antes de subirlas.")
-    return 0
+
+    return codigo_por_umbral(evaluaciones, args.fail_on)
+
+
+def main(argv=None) -> int:
+    args = construir_parser().parse_args(normalizar_argv(
+        sys.argv[1:] if argv is None else argv))
+
+    # Se valida cuanto antes, antes de tocar disco: un CSE_FECHA invalido
+    # debe abortar limpio, sin dejar un directorio de salida a medias.
+    hoy = obtener_fecha_hoy()
+
+    try:
+        perfiles = cargar_perfiles()
+    except PerfilInvalido as e:
+        print("[error] perfil de destino inválido: {}".format(e), file=sys.stderr)
+        return 1
+
+    elegidos = getattr(args, "target", None)
+    if elegidos:
+        desconocidos = [t for t in elegidos if t not in perfiles]
+        if desconocidos:
+            print("[error] destino desconocido: {}. Disponibles: {}".format(
+                ", ".join(desconocidos), ", ".join(sorted(perfiles))), file=sys.stderr)
+            return 1
+
+    if args.comando == "export" and getattr(args, "zip_only", False):
+        # --zip-only borra la carpeta al final asumiendo que el zip la
+        # sustituye. Si ninguno de los destinos elegidos instala en modo
+        # 'zip' -mistral-vibe-work sólo admite 'carpeta'-, esa asuncion es
+        # falsa: no se genera ningun zip y la carpeta se borra igual, y el
+        # export termina sin dejar ningun artefacto de skill, solo el informe.
+        modos = set()
+        for pid in (elegidos if elegidos else perfiles):
+            modos.update(perfiles[pid].modos())
+        if "zip" not in modos:
+            objetivo = ", ".join(sorted(elegidos)) if elegidos else "los destinos elegidos"
+            print(
+                "[error] --zip-only no tiene sentido con --target {}: ese destino solo "
+                "instala en modo 'carpeta', nunca 'zip'. Con --zip-only no quedaría ningún "
+                "artefacto de skill: se borraría la carpeta y no hay zip que la sustituya. "
+                "Quita --zip-only o añade un destino que sí acepte zip.".format(objetivo),
+                file=sys.stderr)
+            return 1
+
+    return ejecutar(args, perfiles, elegidos, hoy)
 
 
 if __name__ == "__main__":

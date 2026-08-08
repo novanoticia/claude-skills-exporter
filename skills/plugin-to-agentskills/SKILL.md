@@ -68,22 +68,42 @@ puede hacer por ninguna vía.
 
 ## Flujo
 
+El conversor tiene tres modos. Elige según lo que el usuario pida — no asumas que
+quiere paquetes si sólo pregunta por portabilidad.
+
+| Comando | Qué hace | ¿Escribe ficheros? |
+|---|---|---|
+| `convert.py inspect <origen>` | Qué contiene la skill y qué exige, sin elegir destino | No |
+| `convert.py audit <origen>` | Matriz de compatibilidad por destino | No |
+| `convert.py export <origen>` | Audita y empaqueta | Sí |
+
+`convert.py <origen>` sin subcomando sigue exportando, como siempre.
+
 1. **Pide el origen** si no lo dio: URL del repo o ruta local. Si es un repo privado,
    necesitará `git` autenticado o descargarlo a mano.
-2. **Ejecuta el conversor** con la ruta resuelta en el paso 0:
+2. **Decide el modo:**
+   - Si sólo quiere saber qué trae la skill (frontmatter, tamaño, patrones detectados),
+     sin pensar todavía en un destino: `inspect`.
+   - Si pregunta **"¿es portable?"**, **"¿puedo subir esto a X?"** o quiere la matriz
+     de compatibilidad sin generar nada en disco: `audit`. No escribe ficheros.
+   - Si quiere los paquetes para subir: `export` (o el modo por defecto, sin
+     subcomando).
+3. **Ejecuta el conversor** con la ruta resuelta en el paso 0, por ejemplo para exportar:
 
    ```bash
    python3 "$CONV" <url-o-ruta> --out ./dist-agentskills
    ```
 
-   Deja en `dist-agentskills/` un `<skill>.zip` (Perplexity) y una carpeta `<skill>/`
-   (Mistral) por cada skill. Añade `--only nombre1 nombre2` para exportar sólo algunas.
-   `--zip-only` borra las carpetas y **con ellas la variante de Mistral**: úsalo sólo si
-   el usuario dice que va a Perplexity y a ningún otro sitio.
+   Deja en `dist-agentskills/` un `<skill>.zip` (Perplexity, claude.ai, ChatGPT) y una
+   carpeta `<skill>/` (Mistral) por cada skill. Añade `--only nombre1 nombre2` para
+   exportar sólo algunas. `--zip-only` borra las carpetas y **con ellas la variante de
+   Mistral**: úsalo sólo si el usuario dice que va a Perplexity y a ningún otro sitio.
+   `--target` (en `audit` y `export`) restringe a qué destinos se audita o empaqueta.
 
-3. **Lee `INFORME-PORTABILIDAD.md`** y resume al usuario: cuántas skills salieron,
-   cuáles tienen riesgo alto y por qué. No te limites a decir "listo".
-4. **Entrega los ficheros** y di qué sube dónde.
+4. **Lee el informe** (`INFORME-PORTABILIDAD.md` en `export`, la salida por terminal en
+   `audit`) y resume al usuario: la matriz por destino, cuáles tienen riesgo alto y por
+   qué. No te limites a decir "listo".
+5. **Entrega los ficheros** (si los hay) y di qué sube dónde.
 
 ## Qué hace el conversor
 
@@ -111,6 +131,13 @@ puede hacer por ninguna vía.
 
 ## Gotchas
 
+- **El veredicto es por destino, no por skill.** El informe trae una matriz: la
+  misma skill puede ser `compatible` en Perplexity y `no compatible` en Mistral.
+  Si el usuario pregunta «¿es portable?», la respuesta correcta empieza por
+  «¿a dónde?».
+- **`no verificable` no es `compatible`.** Significa que el perfil del destino no
+  declara esa capacidad, o que su evidencia ha caducado. Dilo tal cual: no lo
+  redondees a favor.
 - **Nunca un zip con todas las skills dentro.** Perplexity espera la carpeta de *una*
   skill en la raíz del zip. Un zip global falla o sólo reconoce una. El conversor ya
   genera uno por skill; no los agrupes tú después.

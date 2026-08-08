@@ -108,6 +108,16 @@ Sólo necesita Python 3.8+ y `git`. Sin dependencias externas.
 | `--zip-only` | Deja sólo los `.zip` — se pierde la variante para Mistral |
 | `--keep-description-order` | No reordena la descripción (por defecto, la activación va primero) |
 
+## Los tres modos
+
+| Comando | Qué hace | ¿Escribe ficheros? |
+|---|---|---|
+| `convert.py inspect <origen>` | Qué contiene la skill y qué exige, sin elegir destino | No |
+| `convert.py audit <origen>` | Matriz de compatibilidad por destino | No |
+| `convert.py export <origen>` | Audita y empaqueta | Sí |
+
+`convert.py <origen>` sin subcomando sigue exportando, como siempre.
+
 ## Qué genera
 
 Dos artefactos por skill, con los mismos ficheros pero **distinta descripción**: cada
@@ -159,6 +169,13 @@ dist-agentskills/
 > ningún zip global.
 
 ## Qué audita
+
+El veredicto ya no es único por skill: es **uno por destino**. Una skill cuya
+lógica vive en `scripts/` es `no compatible` en Mistral Vibe Work, que no tiene
+Python, y `compatible` en Perplexity Computer, que sí lo ejecuta. Los destinos
+se declaran en `skills/plugin-to-agentskills/scripts/exporter/targets/*.json`,
+con la fecha en que se comprobó cada dato y una fecha de revisión: cuando esa
+fecha vence, el estado degrada a `no verificable` en vez de seguir afirmando.
 
 - Frontmatter ausente, incompleto o con claves que sólo existen en Claude.
 - Descripciones que describen *qué hace* la skill en vez de *cuándo* activarla — la

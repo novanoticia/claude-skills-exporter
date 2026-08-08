@@ -1,0 +1,92 @@
+{
+  "origen": "<origen>",
+  "report_version": "2.0",
+  "skills": [
+    {
+      "adaptaciones": [
+        "Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
+        "Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+      ],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [
+              "Adaptación aplicada: Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
+              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+            ],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptación aplicada: Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
+              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptación aplicada: Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
+              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "directorio_local",
+            "motivos": [
+              "Adaptación aplicada: Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
+              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+            ],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "carpeta",
+            "motivos": [
+              "Adaptación aplicada: Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
+              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+            ],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptación aplicada: Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
+              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+            ],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [
+        {
+          "codigo": "description-densa",
+          "mensaje": "Descripción de 523 bytes: cabe en el zip de Perplexity pero no en la carpeta de Mistral (490 B), donde va recortada. El índice del destino paga este coste en cada sesión, así que cuanto más breve, mejor.",
+          "severidad": "baja"
+        }
+      ],
+      "name": "description-larga"
+    }
+  ]
+}

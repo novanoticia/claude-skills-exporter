@@ -5,6 +5,11 @@ un aviso del informe importa.
 
 ## 1. Qué acepta cada destino
 
+> Los datos de esta tabla son ahora la copia legible de
+> `scripts/exporter/targets/*.json`, que es la fuente de verdad. El CI comprueba
+> que concuerdan. Lo que sigue viviendo sólo aquí es la evidencia narrativa: qué
+> se observó, en qué ejecución y por qué importa.
+
 | | Perplexity Computer | Mistral Vibe Work | Claude Code |
 |---|---|---|---|
 | Ruta de instalación | `perplexity.ai/computer/skills` → Create skill → Upload a skill | `chat.mistral.ai/work` → Context → Skills → New Skill | `/plugin install` o carpeta `skills/` |
@@ -291,3 +296,24 @@ mi-skill/
 - Perplexity Research — *Designing, Refining, and Maintaining Agent Skills*: https://research.perplexity.ai/articles/designing-refining-and-maintaining-agent-skills-at-perplexity
 - Mistral Docs — *Create your first Skill*: https://docs.mistral.ai/getting-started/quickstarts/vibe-work/create-first-skill
 - Claude Code — *Plugins reference*: https://docs.claude.com/en/docs/claude-code/plugins-reference
+
+## 9. Cómo añadir un destino
+
+1. Escribir `scripts/exporter/targets/<id>.json` siguiendo `_schema.json`. El
+   `id` debe coincidir con el nombre del fichero.
+2. Declarar cada capacidad. **Lo que no se haya comprobado va a `desconocido`,
+   nunca a `no`.** Callar no es negar: `desconocido` produce `no verificable`,
+   que es la respuesta honesta; `no` produce `no compatible`, que es una
+   afirmación.
+3. Los peligros de conducta —lo que la plataforma hace mal *teniendo* la
+   capacidad— van en `peligros[]`, enlazados por `dispara_con` al id de la señal.
+   **`dispara_con: []` significa «informativo»**: documenta un comportamiento de la
+   plataforma que no depende de ninguna señal detectable, así que `peligros_para()` nunca
+   lo devuelve y no afecta a ningún veredicto. Sirve como referencia para quien lea el
+   perfil. Si esperabas que tu peligro disparase y no lo hace, mira aquí primero.
+4. Poner `evidencia.verificado_el` a hoy y `revisar_tras` a tres meses vista.
+5. Añadir la etiqueta y el presupuesto a la tabla de la sección 1 y al README,
+   o el CI fallará.
+6. Regenerar los golden: `python3 tests/generar_golden.py`, y revisar el diff.
+
+No hay que tocar Python.

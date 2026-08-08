@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "chatgpt",
+  "label": "ChatGPT",
+  "instalacion": {
+    "modos": ["url_repositorio", "zip"],
+    "ruta_ui": "Con «Work» activado, en Complementos: buscar por nombre o añadir desde la URL del repositorio",
+    "una_skill_por_subida": true
+  },
+  "formato": {
+    "acepta": ["agent-skills", "agent-plugins"],
+    "frontmatter_cerrado": true,
+    "presupuesto_description_bytes": 850,
+    "tope_duro_description": { "valor": 1024, "unidad": "caracteres" },
+    "conserva_arbol": true
+  },
+  "limites_paquete": {
+    "zip_max_bytes": 52428800,
+    "ficheros_max": 500,
+    "fichero_max_bytes": 26214400
+  },
+  "capacidades": {
+    "scripts.ejecutar": "desconocido",
+    "shell.ejecutar": "desconocido",
+    "filesystem.leer": "desconocido",
+    "filesystem.escribir": "desconocido",
+    "red.fetch": "desconocido",
+    "mcp.cliente": "no",
+    "applescript": "no",
+    "subagentes": "no",
+    "hooks": "no",
+    "comandos.namespace": "no",
+    "skills.anidadas": "no",
+    "home.resolver": "desconocido"
+  },
+  "peligros": [],
+  "evidencia": {
+    "verificado_el": "2026-08-07",
+    "revisar_tras": "2026-11-07",
+    "confianza": "oficial-incompleto",
+    "fuentes": [
+      {
+        "titulo": "Agent Skills — Especificación",
+        "url": "https://agentskills.io/specification"
+      },
+      {
+        "titulo": "Agent Plugins 1.0.0 — Especificación",
+        "url": "https://agent-plugins.org/specification"
+      }
+    ]
+  }
+}

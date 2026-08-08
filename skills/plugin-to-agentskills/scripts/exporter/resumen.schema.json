@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "resumen.json",
+  "type": "object",
+  "required": ["report_version", "origen", "skills"],
+  "additionalProperties": false,
+  "properties": {
+    "report_version": { "const": "2.0" },
+    "origen": { "type": "string" },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "adaptaciones", "hallazgos", "compatibilidad"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "adaptaciones": { "type": "array", "items": { "type": "string" } },
+          "hallazgos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["severidad", "codigo", "mensaje"],
+              "additionalProperties": false,
+              "properties": {
+                "severidad": { "enum": ["alta", "media", "baja"] },
+                "codigo": { "type": "string" },
+                "mensaje": { "type": "string" }
+              }
+            }
+          },
+          "compatibilidad": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["modo_instalacion", "estado", "motivos",
+                             "peligros", "bloqueo_seguridad"],
+                "additionalProperties": false,
+                "properties": {
+                  "modo_instalacion": {
+                    "enum": ["zip", "carpeta", "directorio_local", "url_repositorio"]
+                  },
+                  "estado": {
+                    "enum": ["compatible", "compatible_con_adaptacion", "degradado",
+                             "no_verificable", "no_compatible"]
+                  },
+                  "motivos": { "type": "array", "items": { "type": "string" } },
+                  "peligros": { "type": "array", "items": { "type": "string" } },
+                  "bloqueo_seguridad": { "type": "null" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
