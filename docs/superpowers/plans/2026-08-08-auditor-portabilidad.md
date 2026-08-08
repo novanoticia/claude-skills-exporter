@@ -3754,6 +3754,34 @@ En `.github/workflows/validar.yml`, después de «Validar manifiestos, skills y 
       - name: Validar perfiles de destino y su concordancia con la documentacion
         run: python3 .github/validar_perfiles.py .
 
+      - name: El analisis sigue siendo estatico
+        run: |
+          python3 - <<'PY'
+          import ast, pathlib, sys
+          # La garantia que hace seguro apuntar esta herramienta al repositorio de
+          # un desconocido: no ejecuta nada de lo que analiza. El unico proceso
+          # externo del programa es `git clone`. Hasta ahora eso se comprobaba a
+          # mano; aqui lo comprueba el CI.
+          PERMITIDO = {("subprocess", "run")}
+          PROHIBIDO = {"system", "popen", "Popen", "call", "check_output",
+                       "check_call", "spawnl", "spawnv", "execv", "execve"}
+          malos = []
+          for p in pathlib.Path("skills/plugin-to-agentskills/scripts").rglob("*.py"):
+              arbol = ast.parse(p.read_text(encoding="utf-8"))
+              for n in ast.walk(arbol):
+                  if not isinstance(n, ast.Call) or not isinstance(n.func, ast.Attribute):
+                      continue
+                  base = getattr(n.func.value, "id", None)
+                  par = (base, n.func.attr)
+                  if n.func.attr in PROHIBIDO or (base == "subprocess" and par not in PERMITIDO):
+                      malos.append("{}:{} -> {}.{}".format(p, n.lineno, base, n.func.attr))
+          if malos:
+              print("[error] llamadas a procesos externos no permitidas:", file=sys.stderr)
+              [print("  " + m, file=sys.stderr) for m in malos]
+              sys.exit(1)
+          print("Analisis estatico: ningun proceso externo fuera de subprocess.run(git clone).")
+          PY
+
       - name: Validar el resumen.json contra su schema
         run: |
           python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida-ci
