@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -17,12 +18,24 @@ CON_SKILLS = ["skill-minima", "skill-con-scripts", "skill-con-mcp",
               "skill-sin-activacion", "skill-description-larga",
               "skill-frontmatter-exotico"]
 
+# Fecha fija para todo el modulo, via CSE_FECHA: los perfiles llevan
+# `revisar_tras` y, sin fijarla, el veredicto de un golden file cambia de
+# `compatible` a `no_verificable` el dia que la fecha real del sistema
+# supere esa fecha, con CI en rojo y cero cambios de codigo de por medio.
+FECHA_FIJA = "2026-08-08"
+
+
+def _entorno_con_fecha_fija() -> dict:
+    entorno = dict(os.environ)
+    entorno["CSE_FECHA"] = FECHA_FIJA
+    return entorno
+
 
 def exportar(fixture: str, destino: Path):
     return subprocess.run(
         [sys.executable, str(CONVERT), "export", str(FIXTURES / fixture),
          "--out", str(destino)],
-        capture_output=True, text=True, cwd=str(RAIZ))
+        capture_output=True, text=True, cwd=str(RAIZ), env=_entorno_con_fecha_fija())
 
 
 def exportar_ruta(origen: Path, destino: Path):
@@ -36,7 +49,7 @@ def exportar_ruta(origen: Path, destino: Path):
     return subprocess.run(
         [sys.executable, str(CONVERT), "export", str(origen),
          "--out", str(destino)],
-        capture_output=True, text=True, cwd=str(RAIZ))
+        capture_output=True, text=True, cwd=str(RAIZ), env=_entorno_con_fecha_fija())
 
 
 def normalizar(resumen: dict) -> dict:
@@ -202,6 +215,43 @@ class SkillConEnlace(unittest.TestCase):
             self.assertNotIn(
                 secreto_txt,
                 (destino / "resumen.json").read_text(encoding="utf-8"))
+
+
+class FechaSimulada(unittest.TestCase):
+    """CSE_FECHA es la mitigacion del criterio de aceptacion 7: convierte la
+    bomba de tiempo (los perfiles caducan y el veredicto cambia solo, sin que
+    nadie toque una linea de codigo) en un comportamiento cubierto por
+    pruebas.
+    """
+
+    def _exportar_con_fecha(self, fecha: str, destino: Path):
+        entorno = dict(os.environ)
+        entorno["CSE_FECHA"] = fecha
+        return subprocess.run(
+            [sys.executable, str(CONVERT), "export", str(FIXTURES / "skill-minima"),
+             "--out", str(destino)],
+            capture_output=True, text=True, cwd=str(RAIZ), env=entorno)
+
+    def test_una_fecha_posterior_a_revisar_tras_da_no_verificable(self):
+        # mistral-vibe-work.json tiene revisar_tras: 2026-10-27. Con una
+        # fecha simulada muy posterior, la evidencia de ese perfil ha
+        # caducado y el veredicto debe reflejarlo, no seguir afirmando
+        # "compatible" con datos vencidos.
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "salida"
+            r = self._exportar_con_fecha("2030-01-01", destino)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            resumen = json.loads((destino / "resumen.json").read_text(encoding="utf-8"))
+            estado = resumen["skills"][0]["compatibilidad"]["mistral-vibe-work"][0]["estado"]
+            self.assertEqual(estado, "no_verificable")
+
+    def test_una_fecha_csefecha_invalida_aborta_con_mensaje_en_espanol(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "salida"
+            r = self._exportar_con_fecha("no-es-una-fecha", destino)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("CSE_FECHA", r.stderr + r.stdout)
+            self.assertFalse(destino.exists())
 
 
 if __name__ == "__main__":

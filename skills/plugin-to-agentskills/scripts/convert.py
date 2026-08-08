@@ -556,7 +556,28 @@ def imprimir_inspect(skill) -> None:
               "descripción antes de auditar contra ningún destino.")
 
 
-def ejecutar(args, perfiles, elegidos) -> int:
+def obtener_fecha_hoy() -> datetime.date:
+    """La fecha de 'hoy' para toda la evaluación de compatibilidad.
+
+    `CSE_FECHA` (ISO AAAA-MM-DD) la fija: la usan los golden files y las
+    pruebas de reproducibilidad, que necesitan una fecha estable para no
+    depender del día en que se ejecute la suite -de lo contrario, en cuanto
+    la fecha real supere un `revisar_tras` de un perfil, los veredictos
+    cambian de `compatible` a `no_verificable` y el CI se pone en rojo sin
+    que nadie haya tocado una línea de código-. Sin la variable, se usa la
+    fecha real del sistema.
+    """
+    bruta = os.environ.get("CSE_FECHA")
+    if not bruta:
+        return datetime.date.today()
+    try:
+        return datetime.date.fromisoformat(bruta)
+    except ValueError:
+        sys.exit(
+            "[error] CSE_FECHA='{}' no es una fecha ISO válida (AAAA-MM-DD).".format(bruta))
+
+
+def ejecutar(args, perfiles, elegidos, hoy) -> int:
     # Los perfiles ya están cargados: de ellos salen los presupuestos de
     # descripción (el más restrictivo por modo de instalación), con
     # independencia del subcomando y de qué destinos se hayan elegido.
@@ -607,7 +628,8 @@ def ejecutar(args, perfiles, elegidos) -> int:
                 imprimir_inspect(a_skill_portatil(r))
             return 0
 
-        hoy = datetime.date.today()
+        # `hoy` ya llegó validado desde main(): CSE_FECHA se comprueba antes
+        # de tocar disco, no aquí en medio del procesamiento.
 
         # `audit` respeta --target: es él quien decide qué destinos evaluar.
         # `export` NO: su --target sólo restringe qué artefactos se
@@ -693,6 +715,10 @@ def main(argv=None) -> int:
     args = construir_parser().parse_args(normalizar_argv(
         sys.argv[1:] if argv is None else argv))
 
+    # Se valida cuanto antes, antes de tocar disco: un CSE_FECHA invalido
+    # debe abortar limpio, sin dejar un directorio de salida a medias.
+    hoy = obtener_fecha_hoy()
+
     try:
         perfiles = cargar_perfiles()
     except PerfilInvalido as e:
@@ -707,7 +733,7 @@ def main(argv=None) -> int:
                 ", ".join(desconocidos), ", ".join(sorted(perfiles))), file=sys.stderr)
             return 1
 
-    return ejecutar(args, perfiles, elegidos)
+    return ejecutar(args, perfiles, elegidos, hoy)
 
 
 if __name__ == "__main__":
