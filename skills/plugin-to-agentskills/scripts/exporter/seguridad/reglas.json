@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "reglas": [
+    {
+      "id": "SEC-EXEC-REMOTO-001",
+      "familia": "permisos_y_acciones",
+      "dimension": "tecnico",
+      "severidad": "alta",
+      "confianza": "alta",
+      "patron": "\\b(curl|wget)\\b[^|;\\n]{0,160}\\|\\s*(ba|z|k)?sh\\b",
+      "titulo": "Descarga contenido remoto y lo ejecuta",
+      "detalle": "Se descarga un script de la red y se pasa directamente al intérprete, sin verificar hash ni firma. Quien controle ese dominio controla lo que se ejecuta en tu máquina, hoy y en cualquier momento futuro.",
+      "mitigacion": "Sustituirlo por una dependencia versionada con hash verificable, o descargar y revisar el script antes de ejecutarlo.",
+      "extensiones": [".sh", ".bash", ".zsh", ".md", ".yml", ".yaml", ".py", ".json"]
+    },
+    {
+      "id": "SEC-EXEC-DINAMICO-001",
+      "familia": "permisos_y_acciones",
+      "dimension": "tecnico",
+      "severidad": "media",
+      "confianza": "media",
+      "patron": "\\b(eval|exec)\\s*\\(|\\bos\\.system\\s*\\(|\\bsubprocess\\.(Popen|call|run)\\s*\\(",
+      "titulo": "Ejecuta código o procesos construidos en tiempo de ejecución",
+      "detalle": "Construir el comando en ejecución impide saber, leyendo el código, qué se acabará ejecutando.",
+      "mitigacion": "Sustituirlo por una llamada con argumentos explícitos, sin interpolar entrada.",
+      "extensiones": [".py", ".sh", ".bash", ".js", ".ts"]
+    },
+    {
+      "id": "SEC-CRED-ENTORNO-001",
+      "familia": "permisos_y_acciones",
+      "dimension": "tecnico",
+      "severidad": "media",
+      "confianza": "media",
+      "patron": "(os\\.environ|process\\.env|\\$\\{?ENV)\\b[^\\n]{0,40}(TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL)",
+      "titulo": "Lee credenciales del entorno",
+      "detalle": "Accede a variables de entorno con nombre de credencial. Puede ser legítimo, pero conviene saber cuáles se leen y por qué.",
+      "mitigacion": "Documentar qué variables se leen y para qué, y no enviarlas a ningún destino externo.",
+      "extensiones": [".py", ".sh", ".bash", ".js", ".ts", ".md"]
+    },
+    {
+      "id": "SEC-PERSISTENCIA-001",
+      "familia": "permisos_y_acciones",
+      "dimension": "tecnico",
+      "severidad": "alta",
+      "confianza": "alta",
+      "patron": "\\b(crontab\\s+-|launchctl\\s+load|systemctl\\s+enable|schtasks\\s+/create)\\b",
+      "titulo": "Instala un proceso persistente",
+      "detalle": "Registra una tarea programada o un servicio que sobrevive al cierre de la sesión. Una skill no necesita persistir en el sistema.",
+      "mitigacion": "Eliminarlo. Si el proceso periódico es necesario, debe ser el usuario quien lo instale a conciencia.",
+      "extensiones": [".sh", ".bash", ".zsh", ".py", ".md", ".yml", ".yaml"]
+    },
+    {
+      "id": "SEC-DEP-URL-001",
+      "familia": "cadena_de_suministro",
+      "dimension": "cadena_de_suministro",
+      "severidad": "alta",
+      "confianza": "alta",
+      "patron": "\\b(pip|pip3)\\s+install\\b[^\\n]{0,120}(https?://|git\\+)",
+      "titulo": "Instala una dependencia desde una URL",
+      "detalle": "Instalar desde una URL directa, en vez de desde un índice con versión fijada, hace que lo instalado pueda cambiar sin que cambie el repositorio.",
+      "mitigacion": "Fijar la dependencia por nombre y versión, con hash si el gestor lo permite.",
+      "extensiones": [".sh", ".bash", ".zsh", ".md", ".txt", ".yml", ".yaml"]
+    },
+    {
+      "id": "SEC-OFUSCA-BASE64-001",
+      "familia": "ofuscacion",
+      "dimension": "tecnico",
+      "severidad": "alta",
+      "confianza": "alta",
+      "patron": "\\bbase64\\s+(-d|--decode|-D)\\b[^\\n]{0,80}\\|\\s*(ba|z|k)?sh\\b",
+      "titulo": "Decodifica contenido y lo ejecuta",
+      "detalle": "Codificar el contenido en base64 antes de ejecutarlo no tiene ninguna ventaja técnica: su único efecto es que no se pueda leer lo que se va a ejecutar.",
+      "mitigacion": "Sustituirlo por el comando en claro. Si no puede escribirse en claro, no debería ejecutarse.",
+      "extensiones": [".sh", ".bash", ".zsh", ".md", ".yml", ".yaml", ".py"]
+    },
+    {
+      "id": "SEC-OFUSCA-PS-001",
+      "familia": "ofuscacion",
+      "dimension": "tecnico",
+      "severidad": "alta",
+      "confianza": "alta",
+      "patron": "powershell(\\.exe)?\\s+[^\\n]{0,60}-(e|ec|enc|encodedcommand)\\b",
+      "titulo": "Ejecuta PowerShell con el comando codificado",
+      "detalle": "El parámetro de comando codificado oculta lo que se ejecuta. Es una técnica habitual para eludir revisión y registro.",
+      "mitigacion": "Sustituirlo por el comando en claro.",
+      "extensiones": [".ps1", ".sh", ".bash", ".md", ".yml", ".yaml", ".json"]
+    },
+    {
+      "id": "SEC-BORRA-RASTRO-001",
+      "familia": "ofuscacion",
+      "dimension": "comportamiento",
+      "severidad": "alta",
+      "confianza": "alta",
+      "patron": "\\b(history\\s+-c|rm\\s+[^\\n]{0,40}\\.bash_history|unset\\s+HISTFILE|export\\s+HISTFILE=)",
+      "titulo": "Borra el historial de la sesión",
+      "detalle": "Eliminar el rastro de lo ejecutado no sirve a ninguna finalidad legítima de una skill.",
+      "mitigacion": "Eliminarlo.",
+      "extensiones": [".sh", ".bash", ".zsh", ".md"]
+    },
+    {
+      "id": "SEC-PROMPT-IGNORA-001",
+      "familia": "conducta_de_prompt",
+      "dimension": "comportamiento",
+      "severidad": "alta",
+      "confianza": "media",
+      "patron": "(?i)\\b(ignor[ae]|olvida|disregard|forget)\\b[^\\n]{0,40}\\b(instrucciones anteriores|previous instructions|prior instructions|lo anterior|system prompt)\\b",
+      "titulo": "Contiene una instrucción de ignorar lo anterior",
+      "detalle": "Formulación característica de una inyección de prompt: intenta que el agente de destino descarte sus instrucciones previas. Sólo se reconocen formulaciones conocidas.",
+      "mitigacion": "Si es un ejemplo documentado, entrecomillarlo y decir que lo es. Si no, eliminarlo.",
+      "extensiones": [".md", ".txt", ".yml", ".yaml", ".json"]
+    },
+    {
+      "id": "SEC-PROMPT-REVELA-001",
+      "familia": "conducta_de_prompt",
+      "dimension": "comportamiento",
+      "severidad": "alta",
+      "confianza": "media",
+      "patron": "(?i)\\b(revela|muestra|imprime|reveal|print|output)\\b[^\\n]{0,40}\\b(system prompt|prompt del sistema|tus instrucciones|your instructions)\\b",
+      "titulo": "Pide revelar el prompt del sistema",
+      "detalle": "Intento de extraer las instrucciones del agente de destino. Sólo se reconocen formulaciones conocidas.",
+      "mitigacion": "Si es un ejemplo documentado, entrecomillarlo y decir que lo es. Si no, eliminarlo.",
+      "extensiones": [".md", ".txt", ".yml", ".yaml", ".json"]
+    },
+    {
+      "id": "SEC-PROMPT-OCULTA-001",
+      "familia": "conducta_de_prompt",
+      "dimension": "comportamiento",
+      "severidad": "alta",
+      "confianza": "media",
+      "patron": "(?i)\\b(no\\s+(se\\s+lo\\s+)?(menciones|digas|informes)|sin\\s+avisar|do\\s+not\\s+(tell|mention|inform)|without\\s+telling)\\b[^\\n]{0,40}\\b(al\\s+usuario|the\\s+user)\\b",
+      "titulo": "Pide ocultar acciones al usuario",
+      "detalle": "Instruye al agente para que actúe sin informar a quien lo usa. Contradice el principio de confirmación explícita. Sólo se reconocen formulaciones conocidas.",
+      "mitigacion": "Eliminarlo. Toda acción externa debe poder declararse.",
+      "extensiones": [".md", ".txt", ".yml", ".yaml", ".json"]
+    }
+  ]
+}
