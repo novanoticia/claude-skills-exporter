@@ -83,7 +83,7 @@ def _npm(f) -> list:
                 "SEC-POSTINSTALL-001", "cadena_de_suministro", "cadena_de_suministro",
                 "alta", "alta", f.ambito, f.ruta + ":1",
                 ", ".join(presentes),
-                "Ejecuta codigo con solo instalar la dependencia",
+                "Ejecuta código con solo instalar la dependencia",
                 "Retirar el hook. Lo que deba correr, que lo lance el usuario a conciencia."))
     for clave in ("dependencies", "devDependencies", "optionalDependencies"):
         deps = datos.get(clave)
@@ -96,8 +96,8 @@ def _npm(f) -> list:
                 "SEC-DEP-SIN-FIJAR-001", "cadena_de_suministro", "cadena_de_suministro",
                 "media", "alta", f.ambito, f.ruta + ":1",
                 ", ".join(sueltas[:6]),
-                "Dependencias npm sin version fijada",
-                "Fijar la version exacta, y acompanarla de un lockfile versionado."))
+                "Dependencias npm sin versión fijada",
+                "Fijar la versión exacta, y acompañarla de un lockfile versionado."))
     return salida
 
 
@@ -118,7 +118,7 @@ def _python(f) -> list:
     return [_h("SEC-DEP-SIN-FIJAR-002", "cadena_de_suministro", "cadena_de_suministro",
                "media", "alta", f.ambito, "{}:{}".format(f.ruta, numero),
                muestra[:120],
-               "Dependencias de Python sin version fijada",
+               "Dependencias de Python sin versión fijada",
                "Fijar con `==` y, si se puede, con hash.")]
 
 
@@ -150,7 +150,7 @@ def _pyproject(f) -> list:
             return [_h("SEC-DEP-SIN-FIJAR-002", "cadena_de_suministro",
                        "cadena_de_suministro", "media", "media", f.ambito,
                        "{}:{}".format(f.ruta, numero), cruda[:120],
-                       "Dependencias de Python sin version fijada",
+                       "Dependencias de Python sin versión fijada",
                        "Fijar con `==` y, si se puede, con hash.")]
         if en_array and cruda.endswith("]"):
             en_array = False
@@ -185,7 +185,7 @@ def analizar(raiz, ficheros) -> list:
                 "media", "alta", f.ambito, f.ruta + ":1", nombre,
                 "Archivo comprimido dentro del repositorio",
                 "No se abre: su contenido no se ha analizado. Descomprimirlo y "
-                "versionar los ficheros, o justificar por que viaja comprimido."))
+                "versionar los ficheros, o justificar por qué viaja comprimido."))
 
         if nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO):
             salida.append(_h(
@@ -193,7 +193,7 @@ def analizar(raiz, ficheros) -> list:
                 "alta", "alta", f.ambito, f.ruta + ":1", nombre,
                 "Fichero con nombre de credencial versionado en el repositorio",
                 "Retirarlo del control de versiones, rotar lo que contuviera y "
-                "anadirlo a .gitignore."))
+                "añadirlo a .gitignore."))
 
         if f.binario and ext not in EXTENSIONES_ARCHIVO:
             if not any(nombre in t or f.ruta in t for t in textos):
@@ -201,7 +201,7 @@ def analizar(raiz, ficheros) -> list:
                     "SEC-BINARIO-NO-DOCUMENTADO-001", "cadena_de_suministro",
                     "cadena_de_suministro", "media", "media", f.ambito,
                     f.ruta + ":1", nombre,
-                    "Fichero binario que ningun texto del repositorio menciona",
-                    "Documentar que es, de donde sale y como reproducirlo; o retirarlo."))
+                    "Fichero binario que ningún texto del repositorio menciona",
+                    "Documentar qué es, de dónde sale y cómo reproducirlo; o retirarlo."))
 
     return salida
