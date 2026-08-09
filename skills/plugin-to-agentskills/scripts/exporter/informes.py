@@ -90,10 +90,30 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles) -> str:
     return "\n".join(L) + "\n"
 
 
-def resumen_json(resultados, evaluaciones, origen) -> dict:
+def resumen_json(resultados, evaluaciones, origen, seguridad=None) -> dict:
+    # `seguridad` lleva valor por defecto None a proposito: tests/test_informes.py
+    # llama a esta funcion con la aridad antigua, y su cometido es la matriz de
+    # compatibilidad, no la seguridad.
     return {
-        "report_version": "2.0",
+        "report_version": "3.0",
         "origen": origen,
+        "seguridad": None if seguridad is None else {
+            "nivel_riesgo": seguridad.nivel,
+            "recomendacion_instalacion": seguridad.recomendacion,
+            "dimensiones": dict(seguridad.dimensiones),
+            "escalada_por_combinacion": seguridad.escalada_por_combinacion,
+            "hay_contenido_opaco": seguridad.hay_contenido_opaco,
+            "hallazgos": [
+                {
+                    "id": h.id, "familia": h.familia, "dimension": h.dimension,
+                    "severidad": h.severidad, "confianza": h.confianza,
+                    "ambito": h.ambito, "ubicacion": h.ubicacion,
+                    "muestra": h.muestra, "titulo": h.titulo,
+                    "mitigacion": h.mitigacion,
+                }
+                for h in seguridad.hallazgos
+            ],
+        },
         "skills": [
             {
                 "name": r.name,
@@ -109,7 +129,13 @@ def resumen_json(resultados, evaluaciones, origen) -> dict:
                             "estado": ev.estado,
                             "motivos": list(ev.motivos),
                             "peligros": [p["id"] for p in ev.peligros],
-                            "bloqueo_seguridad": ev.bloqueo_seguridad,
+                            "bloqueo_seguridad": (
+                                None if ev.bloqueo_seguridad is None else {
+                                    "regla_id": ev.bloqueo_seguridad.regla_id,
+                                    "severidad": ev.bloqueo_seguridad.severidad,
+                                    "fichero": ev.bloqueo_seguridad.fichero,
+                                    "linea": ev.bloqueo_seguridad.linea,
+                                }),
                         }
                         for ev in evs
                     ]

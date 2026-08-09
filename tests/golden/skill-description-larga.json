@@ -1,6 +1,18 @@
 {
   "origen": "<origen>",
-  "report_version": "2.0",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "bajo",
+      "tecnico": "bajo"
+    },
+    "escalada_por_combinacion": false,
+    "hallazgos": [],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "bajo",
+    "recomendacion_instalacion": "instalacion_razonable"
+  },
   "skills": [
     {
       "adaptaciones": [
