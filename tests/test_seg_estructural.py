@@ -79,6 +79,25 @@ class DependenciasSinFijar(Base):
         self.assertNotIn("SEC-DEP-SIN-FIJAR-002", self.ids(
             {"pyproject.toml": "[project]\nname = \"x\"\ndependencies = [\"requests==2.31.0\"]\n"}))
 
+    def test_pyproject_multilinea_sin_doble_igual(self):
+        # La forma habitual de un pyproject real. La cadena de requisito no
+        # es `clave = valor` sino `"paquete>=version"`, que es otra gramatica
+        # dentro del mismo fichero y necesita su propio matcher.
+        hs = self.hallazgos({"pyproject.toml":
+                             "[project]\nname = \"x\"\n"
+                             "dependencies = [\n    \"requests>=2.0\",\n]\n"})
+        sueltas = [h for h in hs if h.id == "SEC-DEP-SIN-FIJAR-002"]
+        self.assertTrue(sueltas)
+        # Senala la dependencia, no la cabecera del array.
+        self.assertEqual(sueltas[0].ubicacion, "pyproject.toml:4")
+
+    def test_pyproject_multilinea_fijado_no_dispara(self):
+        # Guarda de regresion: la cabecera `dependencies = [` no lleva `==`
+        # nunca, asi que evaluarla marcaria como suelto un array impecable.
+        self.assertNotIn("SEC-DEP-SIN-FIJAR-002", self.ids(
+            {"pyproject.toml": "[project]\nname = \"x\"\n"
+                               "dependencies = [\n    \"requests==2.31.0\",\n]\n"}))
+
 
 class Binarios(Base):
 

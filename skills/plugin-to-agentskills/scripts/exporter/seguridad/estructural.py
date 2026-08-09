@@ -49,6 +49,11 @@ CLAVES_ARRAY_DEPS = ("dependencies", "optional-dependencies")
 
 DEP_TOML = re.compile(r"^\s*[\"']?([A-Za-z0-9._-]+)[\"']?\s*[=:]")
 
+# Dentro de un array de dependencias la gramatica es otra: no `clave = valor`
+# sino la cadena de requisito `"paquete>=version"`. DEP_TOML no la reconoce
+# porque exige `=` o `:` justo tras el nombre, y ahi lo que hay es `>`.
+CADENA_DEP = re.compile(r"^\s*[\"']([A-Za-z0-9._-]+)\s*[<>=!~]")
+
 
 def _h(hid, familia, dimension, severidad, confianza, ambito,
        ubicacion, muestra, titulo, mitigacion) -> Hallazgo:
@@ -140,7 +145,8 @@ def _pyproject(f) -> list:
                 continue
         if not (dentro or en_array) or not cruda or cruda.startswith("#"):
             continue
-        if DEP_TOML.match(linea) and not PIN_PYTHON.search(linea):
+        casa = DEP_TOML.match(linea) or (en_array and CADENA_DEP.match(linea))
+        if casa and not PIN_PYTHON.search(linea):
             return [_h("SEC-DEP-SIN-FIJAR-002", "cadena_de_suministro",
                        "cadena_de_suministro", "media", "media", f.ambito,
                        "{}:{}".format(f.ruta, numero), cruda[:120],
