@@ -1,0 +1,138 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "alto",
+      "comportamiento": "alto",
+      "tecnico": "alto"
+    },
+    "escalada_por_combinacion": true,
+    "hallazgos": [
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "cadena_de_suministro",
+        "familia": "cadena_de_suministro",
+        "id": "SEC-DEP-SIN-FIJAR-001",
+        "mitigacion": "Fijar la versión exacta, y acompañarla de un lockfile versionado.",
+        "muestra": "izq",
+        "severidad": "media",
+        "titulo": "Dependencias npm sin versión fijada",
+        "ubicacion": "package.json:1"
+      },
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "cadena_de_suministro",
+        "familia": "cadena_de_suministro",
+        "id": "SEC-POSTINSTALL-001",
+        "mitigacion": "Retirar el hook. Lo que deba correr, que lo lance el usuario a conciencia.",
+        "muestra": "postinstall",
+        "severidad": "alta",
+        "titulo": "Ejecuta código con solo instalar la dependencia",
+        "ubicacion": "package.json:1"
+      },
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "tecnico",
+        "familia": "permisos_y_acciones",
+        "id": "SEC-PERSISTENCIA-001",
+        "mitigacion": "Eliminarlo. Si el proceso periódico es necesario, debe ser el usuario quien lo instale a conciencia.",
+        "muestra": "crontab -",
+        "severidad": "alta",
+        "titulo": "Instala un proceso persistente",
+        "ubicacion": "scripts/agenda.sh:2"
+      },
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "comportamiento",
+        "familia": "ofuscacion",
+        "id": "SEC-BORRA-RASTRO-001",
+        "mitigacion": "Eliminarlo.",
+        "muestra": "history -c",
+        "severidad": "alta",
+        "titulo": "Borra el historial de la sesión",
+        "ubicacion": "scripts/agenda.sh:3"
+      },
+      {
+        "ambito": "paquete",
+        "confianza": "media",
+        "dimension": "tecnico",
+        "familia": "permisos_y_acciones",
+        "id": "SEC-CRED-ENTORNO-001",
+        "mitigacion": "Documentar qué variables se leen y para qué, y no enviarlas a ningún destino externo.",
+        "muestra": "os.environ[\"API_TOKEN",
+        "severidad": "media",
+        "titulo": "Lee credenciales del entorno",
+        "ubicacion": "scripts/lee.py:3"
+      }
+    ],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "critico",
+    "recomendacion_instalacion": "bloqueada"
+  },
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [],
+      "name": "fechas"
+    }
+  ]
+}

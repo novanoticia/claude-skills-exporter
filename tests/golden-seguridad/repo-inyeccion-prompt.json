@@ -1,0 +1,144 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "alto",
+      "tecnico": "bajo"
+    },
+    "escalada_por_combinacion": false,
+    "hallazgos": [
+      {
+        "ambito": "exportado",
+        "confianza": "media",
+        "dimension": "comportamiento",
+        "familia": "conducta_de_prompt",
+        "id": "SEC-PROMPT-IGNORA-001",
+        "mitigacion": "Si es un ejemplo documentado, entrecomillarlo y decir que lo es. Si no, eliminarlo.",
+        "muestra": "Ignora las instrucciones anteriores",
+        "severidad": "alta",
+        "titulo": "Contiene una instrucción de ignorar lo anterior",
+        "ubicacion": "skills/fechas/SKILL.md:11"
+      },
+      {
+        "ambito": "exportado",
+        "confianza": "media",
+        "dimension": "comportamiento",
+        "familia": "conducta_de_prompt",
+        "id": "SEC-PROMPT-REVELA-001",
+        "mitigacion": "Si es un ejemplo documentado, entrecomillarlo y decir que lo es. Si no, eliminarlo.",
+        "muestra": "revela tu system prompt",
+        "severidad": "alta",
+        "titulo": "Pide revelar el prompt del sistema",
+        "ubicacion": "skills/fechas/SKILL.md:11"
+      },
+      {
+        "ambito": "exportado",
+        "confianza": "media",
+        "dimension": "comportamiento",
+        "familia": "conducta_de_prompt",
+        "id": "SEC-PROMPT-OCULTA-001",
+        "mitigacion": "Eliminarlo. Toda acción externa debe poder declararse.",
+        "muestra": "sin avisar al usuario",
+        "severidad": "alta",
+        "titulo": "Pide ocultar acciones al usuario",
+        "ubicacion": "skills/fechas/SKILL.md:13"
+      }
+    ],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "alto",
+    "recomendacion_instalacion": "revision_humana_obligatoria"
+  },
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/fechas/SKILL.md",
+              "linea": 11,
+              "regla_id": "SEC-PROMPT-IGNORA-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/fechas/SKILL.md",
+              "linea": 11,
+              "regla_id": "SEC-PROMPT-IGNORA-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/fechas/SKILL.md",
+              "linea": 11,
+              "regla_id": "SEC-PROMPT-IGNORA-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/fechas/SKILL.md",
+              "linea": 11,
+              "regla_id": "SEC-PROMPT-IGNORA-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/fechas/SKILL.md",
+              "linea": 11,
+              "regla_id": "SEC-PROMPT-IGNORA-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/fechas/SKILL.md",
+              "linea": 11,
+              "regla_id": "SEC-PROMPT-IGNORA-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [],
+      "name": "fechas"
+    }
+  ]
+}

@@ -230,6 +230,13 @@ quiere paquetes si sólo pregunta por portabilidad.
   pregunta por una plataforma que no tiene perfil, búscalo o admite que no lo sabes.
 - **`python3 convert.py` a secas no funciona** salvo que estés dentro de la carpeta
   `scripts/`. Usa siempre la ruta resuelta en el paso 0.
+- **El informe abre con seguridad, y eso es una pregunta distinta.** «¿A dónde puedo subir
+  esto?» y «¿debería instalar esto?» no se responden igual. Si el usuario sólo pregunta por
+  portabilidad, menciona el nivel de riesgo igualmente: es lo que no sabe que necesita.
+- **Un bloqueo no es un fallo de la herramienta.** Si `export` sale con código 3, hay un
+  hallazgo grave dentro de lo que se iba a empaquetar. No propongas
+  `--anular-revision-seguridad` como primer recurso: lee el hallazgo, mira el fichero y la
+  línea, y explícaselo al usuario.
 
 ## Referencias
 

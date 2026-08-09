@@ -119,3 +119,89 @@ def capacidades_de(senales, tiene_scripts: bool) -> list:
         for nombre, nivel in CAPACIDAD_POR_SENAL.get(s.id, []):
             anadir(nombre, nivel)
     return salida
+
+
+# --------------------------------------------------------------------------
+# Seguridad
+#
+# Vocabularios y estructuras del auditor de seguridad. Viven aqui, junto al
+# resto del modelo, porque la seguridad no es un anexo: su veredicto convive
+# con el de compatibilidad en el mismo informe y el mismo JSON.
+# --------------------------------------------------------------------------
+
+FAMILIAS = {"permisos_y_acciones", "cadena_de_suministro",
+            "ofuscacion", "conducta_de_prompt"}
+
+DIMENSIONES = {"tecnico", "cadena_de_suministro", "comportamiento"}
+
+SEVERIDADES_SEG = {"critica", "alta", "media", "baja"}
+
+CONFIANZAS_REGLA = {"alta", "media", "baja"}
+
+# De donde sale el hallazgo, y por tanto que provoca: `exportado` bloquea la
+# escritura del artefacto, `paquete` solo avisa. Es el campo del que cuelga
+# toda la logica del gate.
+AMBITOS = {"exportado", "paquete"}
+
+
+class Nivel:
+    """Nivel de riesgo del paquete, de menor a mayor."""
+
+    BAJO = "bajo"
+    MODERADO = "moderado"
+    ALTO = "alto"
+    CRITICO = "critico"
+
+    # `no_evaluable` NO esta en la escala. No significa "peor que moderado"
+    # sino "no puedo saberlo", y riesgo.py lo aplica aparte: solo sustituye a
+    # BAJO. Meterlo en ORDEN lo convertiria en un grado, que es justo lo que
+    # no es.
+    NO_EVALUABLE = "no_evaluable"
+
+    ORDEN = [BAJO, MODERADO, ALTO, CRITICO]
+
+    @classmethod
+    def peor(cls, niveles) -> str:
+        peor = cls.BAJO
+        for n in niveles:
+            if cls.ORDEN.index(n) > cls.ORDEN.index(peor):
+                peor = n
+        return peor
+
+
+@dataclass(frozen=True)
+class Hallazgo:
+    """Algo que el auditor de seguridad encontro, y donde."""
+
+    id: str
+    familia: str
+    dimension: str
+    severidad: str
+    confianza: str
+    ambito: str
+    ubicacion: str      # "scripts/setup.sh:2"
+    muestra: str
+    titulo: str
+    mitigacion: str
+
+
+@dataclass(frozen=True)
+class Bloqueo:
+    """Por que no se escribieron los artefactos de una skill."""
+
+    regla_id: str
+    severidad: str
+    fichero: str
+    linea: int
+
+
+@dataclass
+class VeredictoSeguridad:
+    """Lo que el auditor concluye sobre el paquete entero."""
+
+    nivel: str
+    recomendacion: str
+    dimensiones: dict
+    escalada_por_combinacion: bool
+    hallazgos: list = field(default_factory=list)
+    hay_contenido_opaco: bool = False

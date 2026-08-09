@@ -376,3 +376,30 @@ instalación de los cuatro del schema (`zip`, `carpeta`, `directorio_local`,
 `url_repositorio`) y capacidades del vocabulario ya definido. `export` sólo sabe fabricar
 dos artefactos —el zip y la carpeta—, así que un modo nuevo, o una capacidad que ninguna
 señal sepa exigir todavía, sí exige código.
+
+## 10. Cómo añadir una regla de seguridad
+
+1. Escribe la entrada en `exporter/seguridad/reglas.json`, respetando
+   `exporter/seguridad/_schema.json`: `id` con el formato `SEC-<FAMILIA>-<NNN>`, `familia`,
+   `dimension`, `severidad` y `confianza` de los vocabularios cerrados, `patron` como
+   expresión regular de Python, y `titulo`, `detalle`, `mitigacion` y `extensiones` sin
+   dejar ninguno vacío.
+2. Elige `confianza` con honestidad. `alta` es para patrones que no admiten lectura
+   inocente —descargar un script de la red y pasarlo directamente al intérprete, sin
+   verificar hash ni firma—; `media` o `baja` para los que sí pueden tener una razón
+   legítima. Si la regla es de la familia `conducta_de_prompt`, `confianza` es `media`
+   siempre: el `SKILL.md` viaja íntegro al agente de destino y ahí el listón para bloquear
+   es más bajo que en el resto (§5 del diseño).
+3. **Añade un fixture en `tests/fixtures/` que la dispare** —o el CI falla:
+   `.github/validar_reglas.py` exige al menos un fixture por regla—. Amplía la tabla de
+   fixtures de seguridad con la fila nueva.
+4. Regenera los *golden files*: `python3 tests/generar_golden.py`, y revisa el diff antes
+   de comitear. Es la única señal de que la regla nueva no ha cambiado el veredicto de
+   ningún fixture existente.
+
+> **Describe los patrones aquí, no los escribas.** Todo lo que hay bajo
+> `skills/plugin-to-agentskills/` tiene ámbito `exportado`, así que un patrón grave escrito
+> en claro en esta documentación bloquea la exportación de la propia herramienta: el
+> `.zip` deja de escribirse y `export` devuelve 3. Los patrones literales van en
+> `reglas.json` —que el motor se salta a sí mismo— y en `tests/fixtures/`, que está fuera
+> de toda skill. Aquí se explican con palabras.

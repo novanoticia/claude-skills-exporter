@@ -29,6 +29,9 @@ jobs:
       - name: Validar perfiles de destino y su concordancia con la documentacion
         run: python3 .github/validar_perfiles.py .
 
+      - name: Validar reglas de seguridad y su cobertura por fixtures
+        run: python3 .github/validar_reglas.py .
+
       - name: El analisis sigue siendo estatico
         run: |
           python3 - <<'PY'
@@ -59,7 +62,12 @@ jobs:
 
       - name: Validar el resumen.json contra su schema
         run: |
-          python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida-ci
+          # --anular-revision-seguridad es deliberado: este repositorio contiene a
+          # proposito su propio banco de pruebas malicioso (tests/fixtures/) y la
+          # documentacion de los patrones (docs/). Esta es la prueba de humo del
+          # conversor, no la del gate: el gate se prueba en tests/test_seg_gate.py.
+          python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida-ci \
+            --anular-revision-seguridad
           python3 - <<'PY'
           import json, jsonschema, pathlib
           esquema = json.loads(pathlib.Path(
@@ -77,14 +85,15 @@ jobs:
         run: |
           cp -R . /tmp/cse-aislado
           python3 /tmp/cse-aislado/skills/plugin-to-agentskills/scripts/convert.py \
-            /tmp/cse-aislado --out /tmp/salida-aislada
+            /tmp/cse-aislado --out /tmp/salida-aislada --anular-revision-seguridad
           test -f /tmp/salida-aislada/INFORME-PORTABILIDAD.md
           echo "Arranca sin instalacion desde una ruta ajena al repositorio."
 
       - name: Prueba de humo del conversor
         run: |
           python3 skills/plugin-to-agentskills/scripts/convert.py --help
-          python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida
+          python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida \
+            --anular-revision-seguridad
           test -f /tmp/salida/INFORME-PORTABILIDAD.md
           test -n "$(ls /tmp/salida/*.zip)"
           echo "El conversor se ejecuta y produce salida."

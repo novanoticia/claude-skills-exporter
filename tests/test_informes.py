@@ -77,7 +77,7 @@ class ResumenJson(unittest.TestCase):
 
     def test_estructura_minima(self):
         d = resumen_json(self.res, self.evaluaciones, "./x")
-        self.assertEqual(d["report_version"], "2.0")
+        self.assertEqual(d["report_version"], "3.0")
         self.assertEqual(d["origen"], "./x")
         skill = d["skills"][0]
         self.assertEqual(skill["name"], "email-triage")
@@ -86,6 +86,16 @@ class ResumenJson(unittest.TestCase):
     def test_el_bloqueo_de_seguridad_va_reservado_a_null(self):
         d = resumen_json(self.res, self.evaluaciones, "./x")
         self.assertIsNone(d["skills"][0]["compatibilidad"]["claude-code"][0]["bloqueo_seguridad"])
+
+    def test_un_bloqueo_se_serializa_como_objeto(self):
+        from exporter.modelo import Bloqueo
+        self.evaluaciones["email-triage"]["claude-code"][0].bloqueo_seguridad = Bloqueo(
+            regla_id="SEC-EXEC-REMOTO-001", severidad="alta",
+            fichero="skills/x/scripts/run.sh", linea=3)
+        d = resumen_json(self.res, self.evaluaciones, "./x")
+        b = d["skills"][0]["compatibilidad"]["claude-code"][0]["bloqueo_seguridad"]
+        self.assertEqual(b["regla_id"], "SEC-EXEC-REMOTO-001")
+        self.assertEqual(b["linea"], 3)
 
     def test_es_serializable_y_estable(self):
         import json

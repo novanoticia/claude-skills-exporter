@@ -2,11 +2,62 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "resumen.json",
   "type": "object",
-  "required": ["report_version", "origen", "skills"],
+  "required": ["report_version", "origen", "seguridad", "skills"],
   "additionalProperties": false,
   "properties": {
-    "report_version": { "const": "2.0" },
+    "report_version": { "const": "3.0" },
     "origen": { "type": "string" },
+    "seguridad": {
+      "type": "object",
+      "required": ["nivel_riesgo", "recomendacion_instalacion", "dimensiones",
+                   "escalada_por_combinacion", "hay_contenido_opaco", "hallazgos"],
+      "additionalProperties": false,
+      "properties": {
+        "nivel_riesgo": {
+          "enum": ["bajo", "moderado", "alto", "critico", "no_evaluable"]
+        },
+        "recomendacion_instalacion": {
+          "enum": ["instalacion_razonable", "revisar_permisos",
+                   "revision_humana_obligatoria", "bloqueada", "revision_incompleta"]
+        },
+        "dimensiones": {
+          "type": "object",
+          "required": ["tecnico", "cadena_de_suministro", "comportamiento"],
+          "additionalProperties": false,
+          "properties": {
+            "tecnico": { "$ref": "#/$defs/nivel" },
+            "cadena_de_suministro": { "$ref": "#/$defs/nivel" },
+            "comportamiento": { "$ref": "#/$defs/nivel" }
+          }
+        },
+        "escalada_por_combinacion": { "type": "boolean" },
+        "hay_contenido_opaco": { "type": "boolean" },
+        "hallazgos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "familia", "dimension", "severidad", "confianza",
+                         "ambito", "ubicacion", "muestra", "titulo", "mitigacion"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "familia": {
+                "enum": ["permisos_y_acciones", "cadena_de_suministro",
+                         "ofuscacion", "conducta_de_prompt"]
+              },
+              "dimension": { "enum": ["tecnico", "cadena_de_suministro", "comportamiento"] },
+              "severidad": { "enum": ["critica", "alta", "media", "baja"] },
+              "confianza": { "enum": ["alta", "media", "baja"] },
+              "ambito": { "enum": ["exportado", "paquete"] },
+              "ubicacion": { "type": "string" },
+              "muestra": { "type": "string" },
+              "titulo": { "type": "string" },
+              "mitigacion": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
     "skills": {
       "type": "array",
       "items": {
@@ -48,7 +99,22 @@
                   },
                   "motivos": { "type": "array", "items": { "type": "string" } },
                   "peligros": { "type": "array", "items": { "type": "string" } },
-                  "bloqueo_seguridad": { "type": "null" }
+                  "bloqueo_seguridad": {
+                    "oneOf": [
+                      { "type": "null" },
+                      {
+                        "type": "object",
+                        "required": ["regla_id", "severidad", "fichero", "linea"],
+                        "additionalProperties": false,
+                        "properties": {
+                          "regla_id": { "type": "string" },
+                          "severidad": { "enum": ["critica", "alta"] },
+                          "fichero": { "type": "string" },
+                          "linea": { "type": "integer", "minimum": 1 }
+                        }
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -56,5 +122,8 @@
         }
       }
     }
+  },
+  "$defs": {
+    "nivel": { "enum": ["bajo", "moderado", "alto", "critico", "no_evaluable"] }
   }
 }

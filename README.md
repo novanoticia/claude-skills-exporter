@@ -150,11 +150,13 @@ dist-agentskills/
 ```
 
 `resumen.json` es la salida para máquinas y tiene contrato: lleva `report_version` (hoy
-`"2.0"`) y valida contra
+`"3.0"`) y valida contra
 [`exporter/resumen.schema.json`](skills/plugin-to-agentskills/scripts/exporter/resumen.schema.json)
-en cada `push`. Es además el único artefacto que trae los hallazgos completos —severidad,
-código y el `fichero:línea` donde se vio cada señal—: el informe en Markdown se queda en
-la matriz y los motivos.
+en cada `push`. Desde la 3.0 trae además un bloque `seguridad` de nivel superior —nivel de
+riesgo, recomendación de instalación, las tres dimensiones y la lista completa de hallazgos
+con su `fichero:línea`— y `bloqueo_seguridad` ya puede no ser `null`. Es además el único
+artefacto que trae los hallazgos completos —severidad, código y el `fichero:línea` donde se
+vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 
 ## Dónde se sube cada cosa
 
@@ -225,6 +227,32 @@ estado **por destino** de la matriz — 🟢 compatible, 🟡 adaptación, 🟠 
 viven en `resumen.json` y en las notas que se incrustan al final del `SKILL.md` exportado,
 agrupados en «Probablemente no funcione en este entorno» y «Funcionará, pero con
 limitaciones».
+
+## Qué audita de seguridad
+
+Además de la portabilidad, la herramienta responde a una pregunta distinta: **qué puede
+hacer este paquete si lo instalas**. Para eso recorre el repositorio **entero**, no sólo las
+carpetas de skill — un `postinstall` malicioso en `package.json` no pertenece a ninguna
+skill, y hasta ahora era invisible.
+
+Cada hallazgo nace con un **ámbito**, y de ahí cuelga lo que ocurre:
+
+| Ámbito | Qué significa | Qué provoca |
+|---|---|---|
+| `exportado` | El fichero viaja dentro del `.zip` o la carpeta | Se **bloquea** la escritura de ese artefacto |
+| `paquete` | Se queda en el repositorio | Sale en cabecera del informe; código de salida ≠ 0 |
+
+El bloqueo es **por skill**: una skill limpia se exporta aunque su vecina esté bloqueada. Y
+`--anular-revision-seguridad` permite exportar igualmente, dejando constancia escrita en el
+informe.
+
+Cuatro familias de reglas —permisos y acciones, cadena de suministro, ofuscación y conducta
+de prompt— más comprobaciones estructurales sobre manifiestos, binarios y archivos
+comprimidos, que **se señalan y nunca se abren**.
+
+> **La familia de conducta de prompt cubre sólo formulaciones conocidas.** Reconocer una
+> inyección reformulada exige un juicio semántico que esta herramienta no hace y no pretende
+> hacer. Lo declara en cada informe donde aparece.
 
 ## Contribuir
 

@@ -62,8 +62,19 @@ from exporter.deteccion import (
 from exporter.empaquetado import comprobar_limites, copiar_skill, zip_dir
 from exporter.frontmatter import split_frontmatter, yaml_escape
 from exporter.informes import informe_markdown, resumen_json
-from exporter.modelo import Estado, SkillPortatil, capacidades_de
+from exporter.modelo import (
+    Bloqueo,
+    Estado,
+    Nivel,
+    SkillPortatil,
+    VeredictoSeguridad,
+    capacidades_de,
+)
 from exporter.perfiles import PerfilInvalido, cargar_perfiles, presupuesto_por_modo
+from exporter.seguridad import estructural as seg_estructural
+from exporter.seguridad import patrones as seg_patrones
+from exporter.seguridad import riesgo as seg_riesgo
+from exporter.seguridad.recorrido import recorrer
 
 # --------------------------------------------------------------------------
 # Límites y constantes del estándar Agent Skills
@@ -427,6 +438,52 @@ def a_skill_portatil(res: SkillResult) -> SkillPortatil:
     return skill
 
 
+def auditar_seguridad(raiz, dirs_skill) -> VeredictoSeguridad:
+    """Audita el paquete entero: patrones, estructura y veredicto."""
+    ficheros = recorrer(raiz, dirs_skill)
+    hallazgos = seg_patrones.analizar(ficheros, seg_patrones.cargar_reglas())
+    hallazgos += seg_estructural.analizar(raiz, ficheros)
+    # `opaco` se deriva de los HALLAZGOS, no del recorrido. Si se activara
+    # con cualquier fichero binario, un repositorio impecable con un logo
+    # citado en el README saldria `no_evaluable` con la lista de hallazgos
+    # vacia: un veredicto sin nada que lo justifique, que es justo lo que
+    # prohibe el criterio de aceptacion 9. Un binario que nadie documenta SI
+    # produce hallazgo, y por ahi entra en la cuenta.
+    opaco = any(h.id in ("SEC-ARCHIVO-ANIDADO-001", "SEC-BINARIO-NO-DOCUMENTADO-001")
+                for h in hallazgos)
+    return seg_riesgo.evaluar(hallazgos, opaco)
+
+
+def bloqueo_para(carpeta_skill: str, veredicto):
+    """El bloqueo de una skill, si lo hay.
+
+    Las tres condiciones son necesarias. La de confianza tanto como las
+    otras: un patron de confianza baja puede estar ahi por una razon
+    legitima —una skill que DOCUMENTA un ataque es el caso obvio— y negarse
+    a escribir por una sospecha debil convierte el gate en un obstaculo que
+    la gente aprende a saltarse sin leer.
+    """
+    carpeta = str(carpeta_skill).replace(os.sep, "/").strip("/")
+    # `Path(src_dir).relative_to(root)` devuelve "." cuando el origen ES el
+    # directorio de la skill (un repositorio de una sola skill con el
+    # SKILL.md en la raiz, que discover_skills si descubre). El prefijo
+    # vacio hace que toda ruta pertenezca a esa skill, que es lo correcto.
+    prefijo = "" if carpeta in ("", ".") else carpeta + "/"
+    for h in veredicto.hallazgos:
+        if h.ambito != "exportado":
+            continue
+        if h.severidad not in ("alta", "critica"):
+            continue
+        if h.confianza not in ("alta", "media"):
+            continue
+        fichero, _, linea = h.ubicacion.rpartition(":")
+        if not fichero.startswith(prefijo):
+            continue
+        return Bloqueo(regla_id=h.id, severidad=h.severidad,
+                       fichero=fichero, linea=int(linea))
+    return None
+
+
 # --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
@@ -539,6 +596,12 @@ def construir_parser():
                      help="dejar sólo los .zip (pierdes la variante de carpeta)")
     exp.add_argument("--keep-description-order", action="store_true",
                      help="no reordenar la descripción")
+    # Sólo en `export`: es la única rama que escribe artefactos y, por tanto,
+    # la única que puede bloquear. `audit` no tiene nada que anular.
+    exp.add_argument("--anular-revision-seguridad", dest="anular_seguridad",
+                     action="store_true",
+                     help="exportar aunque haya hallazgos de seguridad que bloqueen; "
+                          "queda constancia escrita en el informe")
     return ap
 
 
@@ -634,6 +697,14 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
 
         print(f"[info] {len(skill_files)} skill(s) encontradas.")
 
+        # Va aquí, ANTES de crear work_dir y del bucle de audit_and_adapt. Si
+        # se calculara después, el recorrido vería los artefactos recién
+        # escritos cuando `--out` cuelga del origen, y un `out/x.zip` propio
+        # produciría un SEC-ARCHIVO-ANIDADO-001 que ensuciaría el veredicto
+        # de un repositorio limpio.
+        veredicto_seguridad = auditar_seguridad(
+            root, [str(sf.parent.relative_to(root)) for sf in skill_files])
+
         # `inspect` y `audit` no escriben ningún fichero de salida: trabajan
         # sobre una copia efímera que desaparece con este bloque. `export`
         # usa `out`, que sí sobrevive fuera de él.
@@ -678,8 +749,16 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
 
         if args.comando == "audit":
             print()
-            print(informe_markdown(results, evaluaciones, args.source, perfiles_informe))
-            return codigo_por_umbral(evaluaciones, args.fail_on)
+            print(informe_markdown(results, evaluaciones, args.source,
+                                   perfiles_informe, veredicto_seguridad))
+            # `audit` no escribe nada, así que nunca devuelve 3 -no hay
+            # artefacto que bloquear-. Pero sí refleja el nivel de riesgo: el
+            # código 2 es lo que hace utilizable `audit` en un pre-commit o
+            # en un pipeline ajeno. Es el camino que la documentación
+            # recomienda antes de exportar, y un paquete crítico saliendo con
+            # código 0 no serviría para lo que se recomienda.
+            return codigo_por_umbral(evaluaciones, args.fail_on) or (
+                0 if veredicto_seguridad.nivel == Nivel.BAJO else 2)
 
         # -------- export --------
         # Qué artefactos hacen falta: la unión de los modos de instalación
@@ -694,9 +773,40 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         quiere_zip = "zip" in modos_deseados
         quiere_carpeta = bool(modos_deseados - {"zip", "url_repositorio"})
 
+        # El gate va aquí, DENTRO de `export`: `audit` no escribe nada, así
+        # que no hay nada que bloquear, y sus evaluaciones deben conservar
+        # bloqueo_seguridad=None — si no, la nota «Artefactos no escritos por
+        # seguridad» del informe aparecería en una ejecución que ni siquiera
+        # intentó escribirlos.
+        bloqueos = {}
+        for r in results:
+            carpeta = str(Path(r.src_dir).relative_to(root)).replace(os.sep, "/")
+            bloqueos[r.name] = bloqueo_para(carpeta, veredicto_seguridad)
+        for nombre, por_destino in evaluaciones.items():
+            for evs in por_destino.values():
+                for ev in evs:
+                    ev.bloqueo_seguridad = bloqueos.get(nombre)
+
+        anulado = getattr(args, "anular_seguridad", False)
+        bloqueadas = {n for n, b in bloqueos.items() if b is not None}
+
         # Un zip por skill, con la carpeta de la skill en la raíz del zip:
         # es la única estructura que Perplexity acepta.
         for r in results:
+            # El `continue` por sí solo no basta: audit_and_adapt ya copió la
+            # skill entera a out/<name>/ antes de que existiera este gate (en
+            # `export`, work_dir ES out), así que sin borrar lo ya escrito el
+            # artefacto peligroso se queda en disco y sólo nos habríamos
+            # ahorrado el .zip — la mitad menos importante de lo que se sube.
+            if r.name in bloqueadas and not anulado:
+                b = bloqueos[r.name]
+                print("[bloqueado] {}: {} en {}:{}. No se escriben sus artefactos.".format(
+                    r.name, b.regla_id, b.fichero, b.linea), file=sys.stderr)
+                if (out / r.name).exists():
+                    shutil.rmtree(out / r.name)
+                if (out / "{}.zip".format(r.name)).exists():
+                    (out / "{}.zip".format(r.name)).unlink()
+                continue
             if quiere_zip:
                 write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
                 zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
@@ -716,10 +826,12 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
                     shutil.rmtree(out / r.name)
 
         (out / "INFORME-PORTABILIDAD.md").write_text(
-            informe_markdown(results, evaluaciones, args.source, perfiles),
+            informe_markdown(results, evaluaciones, args.source, perfiles,
+                             veredicto_seguridad, anulado=anulado),
             encoding="utf-8")
         (out / "resumen.json").write_text(
-            json.dumps(resumen_json(results, evaluaciones, args.source),
+            json.dumps(resumen_json(results, evaluaciones, args.source,
+                                    veredicto_seguridad),
                        ensure_ascii=False, indent=2),
             encoding="utf-8")
 
@@ -739,7 +851,18 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
     if riesgo:
         print(f"\n[aviso] Riesgo alto en: {', '.join(riesgo)}. Lee el informe antes de subirlas.")
 
-    return codigo_por_umbral(evaluaciones, args.fail_on)
+    if bloqueadas and not anulado:
+        return 3
+    if anulado:
+        # La anulacion es una decision consciente que YA queda escrita en el
+        # informe. Devolver ademas !=0 despues de habersela pedido al usuario
+        # solo ensena a ignorar el codigo de salida. Ademas es lo que permite
+        # que tests/generar_golden.py, test_seg_golden.py,
+        # .github/validar_reglas.py y el CI ejecuten la herramienta sobre
+        # material deliberadamente sucio sin envolver cada llamada.
+        return codigo_por_umbral(evaluaciones, args.fail_on)
+    return codigo_por_umbral(evaluaciones, args.fail_on) or (
+        0 if veredicto_seguridad.nivel == Nivel.BAJO else 2)
 
 
 def main(argv=None) -> int:

@@ -31,3 +31,10 @@ Después:
    subcomando `audit`: `python3 "$CONV" audit $1` —opcionalmente con `--target <destino> …`—.
    Imprime la matriz por pantalla y no escribe ningún fichero. Hay también un `inspect`,
    que dice qué contiene y qué exige cada skill sin elegir destino.
+7. Antes de entregar los ficheros, lee la sección «## Seguridad del paquete» al principio
+   de `dist-agentskills/INFORME-PORTABILIDAD.md`: nivel de riesgo, recomendación de
+   instalación y, si los hay, los hallazgos con su `fichero:línea`. Menciónalo aunque el
+   usuario sólo haya preguntado por portabilidad —es la pregunta que no sabe que necesita
+   hacer—. Si el código de salida fue `3`, dilo explícitamente: alguna skill no se exportó
+   por un hallazgo grave dentro de lo que se iba a empaquetar, y `--anular-revision-
+   seguridad` no es el primer recurso — lee antes el hallazgo, el fichero y la línea.
