@@ -171,7 +171,12 @@ CONV = ROOT / "skills" / "plugin-to-agentskills" / "scripts" / "convert.py"
 if CONV.exists():
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "salida"
-        proc = subprocess.run([sys.executable, str(CONV), str(ROOT), "--out", str(out)],
+        # --anular-revision-seguridad es deliberado: este repositorio contiene a
+        # proposito su propio banco de pruebas malicioso (tests/fixtures/) y la
+        # documentacion de los patrones (docs/). Esta es la prueba de humo del
+        # conversor, no la del gate: el gate se prueba en tests/test_seg_gate.py.
+        proc = subprocess.run([sys.executable, str(CONV), str(ROOT), "--out", str(out),
+                               "--anular-revision-seguridad"],
                               capture_output=True, text=True, timeout=180)
         if proc.returncode != 0:
             cola = (proc.stderr or proc.stdout).strip().splitlines()[-3:]
