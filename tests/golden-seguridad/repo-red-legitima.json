@@ -1,0 +1,90 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "bajo",
+      "tecnico": "moderado"
+    },
+    "escalada_por_combinacion": false,
+    "hallazgos": [
+      {
+        "ambito": "paquete",
+        "confianza": "media",
+        "dimension": "tecnico",
+        "familia": "permisos_y_acciones",
+        "id": "SEC-EXEC-DINAMICO-001",
+        "mitigacion": "Sustituirlo por una llamada con argumentos explícitos, sin interpolar entrada.",
+        "muestra": "subprocess.run(",
+        "severidad": "media",
+        "titulo": "Ejecuta código o procesos construidos en tiempo de ejecución",
+        "ubicacion": "scripts/consulta.py:13"
+      }
+    ],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "moderado",
+    "recomendacion_instalacion": "revisar_permisos"
+  },
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [],
+      "name": "fechas"
+    }
+  ]
+}

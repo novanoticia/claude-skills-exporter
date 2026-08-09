@@ -43,6 +43,31 @@ def main() -> int:
             json.dumps(datos, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8")
         print("regenerado", fixture)
+
+    from test_seg_golden import FIXTURES_SEG  # noqa: E402
+    GOLDEN_SEG = Path(__file__).resolve().parent / "golden-seguridad"
+    GOLDEN_SEG.mkdir(exist_ok=True)
+    for fixture in FIXTURES_SEG:
+        with tempfile.TemporaryDirectory() as tmp:
+            r = subprocess.run(
+                [sys.executable, str(RAIZ_SCRIPTS / "convert.py"), "export",
+                 str(FIXTURES / fixture), "--out", tmp,
+                 "--anular-revision-seguridad"],
+                capture_output=True, text=True, cwd=str(RAIZ), env=entorno)
+            resumen = Path(tmp) / "resumen.json"
+            # Aqui NO se comprueba el codigo de salida: un fixture de
+            # seguridad esta hecho para ensuciar el veredicto, y con la
+            # anulacion devuelve 0 pero podria devolver 2 si alguien cambia
+            # la tabla. Lo unico que importa es que haya producido salida.
+            if not resumen.exists():
+                print("[error] {}: sin resumen.json\n{}".format(fixture, r.stderr),
+                      file=sys.stderr)
+                return 1
+            datos = normalizar(json.loads(resumen.read_text(encoding="utf-8")))
+        (GOLDEN_SEG / (fixture + ".json")).write_text(
+            json.dumps(datos, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8")
+        print("regenerado (seguridad)", fixture)
     return 0
 
 

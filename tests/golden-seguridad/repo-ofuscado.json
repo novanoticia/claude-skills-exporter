@@ -1,0 +1,102 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "bajo",
+      "tecnico": "alto"
+    },
+    "escalada_por_combinacion": false,
+    "hallazgos": [
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "tecnico",
+        "familia": "ofuscacion",
+        "id": "SEC-OFUSCA-PS-001",
+        "mitigacion": "Sustituirlo por el comando en claro.",
+        "muestra": "powershell.exe -NoProfile -enc",
+        "severidad": "alta",
+        "titulo": "Ejecuta PowerShell con el comando codificado",
+        "ubicacion": "scripts/w.ps1:1"
+      },
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "tecnico",
+        "familia": "ofuscacion",
+        "id": "SEC-OFUSCA-BASE64-001",
+        "mitigacion": "Sustituirlo por el comando en claro. Si no puede escribirse en claro, no debería ejecutarse.",
+        "muestra": "base64 -d | sh",
+        "severidad": "alta",
+        "titulo": "Decodifica contenido y lo ejecuta",
+        "ubicacion": "scripts/x.sh:2"
+      }
+    ],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "alto",
+    "recomendacion_instalacion": "revision_humana_obligatoria"
+  },
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [],
+      "name": "fechas"
+    }
+  ]
+}
