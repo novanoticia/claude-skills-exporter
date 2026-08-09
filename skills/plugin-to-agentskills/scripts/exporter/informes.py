@@ -6,7 +6,24 @@ a buscar: no «cuanto riesgo tiene esta skill», sino «donde puedo subirla».
 
 from __future__ import annotations
 
-from exporter.modelo import Estado
+from exporter.modelo import Estado, Nivel
+from exporter.seguridad.riesgo import TEXTO_RECOMENDACION
+
+ICONO_SEG = {
+    Nivel.BAJO: "🟢",
+    Nivel.MODERADO: "🟡",
+    Nivel.ALTO: "🟠",
+    Nivel.CRITICO: "🔴",
+    Nivel.NO_EVALUABLE: "🔵",
+}
+
+ICONO_SEVERIDAD = {"critica": "🔴", "alta": "🟠", "media": "🟡", "baja": "🔵"}
+
+ETIQUETA_DIMENSION = {
+    "tecnico": "Riesgo técnico",
+    "cadena_de_suministro": "Cadena de suministro",
+    "comportamiento": "Comportamiento",
+}
 
 ICONO = {
     Estado.COMPATIBLE: "🟢",
@@ -25,18 +42,84 @@ ETIQUETA = {
 }
 
 
+def seccion_seguridad(veredicto) -> str:
+    """La cabecera del informe: que puede hacer este paquete si lo instalas.
+
+    Va arriba porque es la pregunta que nadie viene a hacer. Quien ejecuta un
+    exportador quiere saber a donde puede subir sus skills, no si el
+    repositorio le va a robar las claves — y por eso no se le puede pedir que
+    la pida.
+    """
+    L = ["## Seguridad del paquete", "",
+         # Sin icono interpuesto: el spec §8 fija `**Nivel de riesgo:** alto`
+         # y la prueba busca esa subcadena literal. Los iconos viven en la
+         # tabla de dimensiones y en la lista de hallazgos, donde sirven para
+         # barrer con la vista; aqui solo estorbarian al grep.
+         "**Nivel de riesgo:** " + veredicto.nivel.replace("_", " "),
+         "",
+         "**Recomendación:** " + TEXTO_RECOMENDACION[veredicto.recomendacion],
+         ""]
+
+    if veredicto.escalada_por_combinacion:
+        dims = sorted({h.dimension for h in veredicto.hallazgos
+                       if h.severidad == "alta" and h.confianza == "alta"})
+        L += ["> Escalado a crítico **por combinación**: hay hallazgos graves en más de una "
+              "dimensión a la vez ({}). Cada uno por separado sería alto; juntos se "
+              "refuerzan.".format(", ".join(ETIQUETA_DIMENSION[d].lower() for d in dims)),
+              ""]
+
+    L += ["| Dimensión | Nivel |", "|---|---|"]
+    for d in ("tecnico", "cadena_de_suministro", "comportamiento"):
+        nivel = veredicto.dimensiones.get(d, Nivel.BAJO)
+        L.append("| {} | {} {} |".format(
+            ETIQUETA_DIMENSION[d], ICONO_SEG[nivel], nivel.replace("_", " ")))
+    L.append("")
+
+    if veredicto.hay_contenido_opaco:
+        L += ["> El paquete contiene material que **no se ha podido analizar** —binarios o "
+              "ficheros comprimidos, que no se abren—. Lo que sigue describe el resto.",
+              ""]
+
+    if not veredicto.hallazgos:
+        L += ["No se han detectado indicadores estáticos relevantes.", ""]
+        return "\n".join(L)
+
+    L += ["### Hallazgos", ""]
+    for i, h in enumerate(veredicto.hallazgos, start=1):
+        L += ["{}. {} `{}` · `{}` · ámbito: **{}**".format(
+                  i, ICONO_SEVERIDAD[h.severidad], h.id, h.ubicacion, h.ambito),
+              "   {}".format(h.titulo),
+              "   *Mitigación:* {}".format(h.mitigacion),
+              "   *Confianza:* {}.".format(h.confianza),
+              ""]
+
+    if any(h.familia == "conducta_de_prompt" for h in veredicto.hallazgos):
+        L += ["> Los hallazgos de conducta de prompt cubren **formulaciones conocidas**. "
+              "Reconocer una inyección reformulada exige un juicio semántico que esta "
+              "herramienta no hace y no pretende hacer.", ""]
+
+    return "\n".join(L)
+
+
 def _celda(evaluaciones) -> str:
     if not evaluaciones:
         return "—"
+    if any(e.bloqueo_seguridad is not None for e in evaluaciones):
+        # El bloqueo se decide por skill (tarea 8, `bloqueo_para`): todas las
+        # evaluaciones de una misma skill lo comparten. Sin esta guarda el
+        # icono normal de compatibilidad mentiria sobre un artefacto que no
+        # se ha escrito.
+        return "🚫 bloqueado"
     estado = Estado.peor([e.estado for e in evaluaciones])
     return "{} {}".format(ICONO[estado], ETIQUETA[estado])
 
 
-def informe_markdown(resultados, evaluaciones, origen, perfiles) -> str:
+def informe_markdown(resultados, evaluaciones, origen, perfiles, seguridad=None) -> str:
     ids = sorted(perfiles)
-    L = [
-        "# Informe de portabilidad",
-        "",
+    L = ["# Informe de portabilidad y seguridad", ""]
+    if seguridad is not None:
+        L += [seccion_seguridad(seguridad), ""]
+    L += [
         "- **Origen:** `{}`".format(origen),
         "- **Skills analizadas:** {}".format(len(resultados)),
         "",
@@ -56,8 +139,21 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles) -> str:
         "",
     ]
     for r in resultados:
-        L += ["### `{}`".format(r.name), "",
-              "- Origen: `{}`".format(r.src_dir),
+        L += ["### `{}`".format(r.name), ""]
+        bloqueo = next((ev.bloqueo_seguridad
+                        for i in ids
+                        for ev in evaluaciones.get(r.name, {}).get(i, [])
+                        if ev.bloqueo_seguridad is not None), None)
+        if bloqueo is not None:
+            # El §7 del diseno exige que la entrada de la skill se encabece
+            # con el bloqueo y su motivo. Sin esto el "por que" solo vive en
+            # stderr y en resumen.json, y el informe -que es lo que el
+            # usuario lee- dice que hay un 🚫 sin decir de donde sale.
+            L += ["> 🚫 **Artefactos no escritos por seguridad:** `{}` "
+                  "(severidad {}) en `{}:{}`.".format(
+                      bloqueo.regla_id, bloqueo.severidad,
+                      bloqueo.fichero, bloqueo.linea), ""]
+        L += ["- Origen: `{}`".format(r.src_dir),
               "- Descripción: {}".format(r.description[:300]), ""]
         if r.adaptations:
             L += ["**Adaptado automáticamente:**", ""]

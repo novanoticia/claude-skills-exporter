@@ -743,7 +743,8 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
 
         if args.comando == "audit":
             print()
-            print(informe_markdown(results, evaluaciones, args.source, perfiles_informe))
+            print(informe_markdown(results, evaluaciones, args.source,
+                                   perfiles_informe, veredicto_seguridad))
             return codigo_por_umbral(evaluaciones, args.fail_on)
 
         # -------- export --------
@@ -781,7 +782,8 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
                     shutil.rmtree(out / r.name)
 
         (out / "INFORME-PORTABILIDAD.md").write_text(
-            informe_markdown(results, evaluaciones, args.source, perfiles),
+            informe_markdown(results, evaluaciones, args.source, perfiles,
+                             veredicto_seguridad),
             encoding="utf-8")
         (out / "resumen.json").write_text(
             json.dumps(resumen_json(results, evaluaciones, args.source,
