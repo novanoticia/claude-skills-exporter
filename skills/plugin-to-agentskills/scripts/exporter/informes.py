@@ -19,6 +19,10 @@ ICONO_SEG = {
 
 ICONO_SEVERIDAD = {"critica": "🔴", "alta": "🟠", "media": "🟡", "baja": "🔵"}
 
+NOTA_ANULACION = (
+    "> **Exportación realizada con anulación manual de advertencias de seguridad.**\n"
+    "> Se escribieron artefactos de skills con hallazgos que normalmente lo impedirían.\n")
+
 ETIQUETA_DIMENSION = {
     "tecnico": "Riesgo técnico",
     "cadena_de_suministro": "Cadena de suministro",
@@ -114,11 +118,14 @@ def _celda(evaluaciones) -> str:
     return "{} {}".format(ICONO[estado], ETIQUETA[estado])
 
 
-def informe_markdown(resultados, evaluaciones, origen, perfiles, seguridad=None) -> str:
+def informe_markdown(resultados, evaluaciones, origen, perfiles,
+                     seguridad=None, anulado: bool = False) -> str:
     ids = sorted(perfiles)
     L = ["# Informe de portabilidad y seguridad", ""]
     if seguridad is not None:
         L += [seccion_seguridad(seguridad), ""]
+    if anulado:
+        L += [NOTA_ANULACION, ""]
     L += [
         "- **Origen:** `{}`".format(origen),
         "- **Skills analizadas:** {}".format(len(resultados)),

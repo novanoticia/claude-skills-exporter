@@ -596,6 +596,12 @@ def construir_parser():
                      help="dejar sólo los .zip (pierdes la variante de carpeta)")
     exp.add_argument("--keep-description-order", action="store_true",
                      help="no reordenar la descripción")
+    # Sólo en `export`: es la única rama que escribe artefactos y, por tanto,
+    # la única que puede bloquear. `audit` no tiene nada que anular.
+    exp.add_argument("--anular-revision-seguridad", dest="anular_seguridad",
+                     action="store_true",
+                     help="exportar aunque haya hallazgos de seguridad que bloqueen; "
+                          "queda constancia escrita en el informe")
     return ap
 
 
@@ -745,7 +751,14 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
             print()
             print(informe_markdown(results, evaluaciones, args.source,
                                    perfiles_informe, veredicto_seguridad))
-            return codigo_por_umbral(evaluaciones, args.fail_on)
+            # `audit` no escribe nada, así que nunca devuelve 3 -no hay
+            # artefacto que bloquear-. Pero sí refleja el nivel de riesgo: el
+            # código 2 es lo que hace utilizable `audit` en un pre-commit o
+            # en un pipeline ajeno. Es el camino que la documentación
+            # recomienda antes de exportar, y un paquete crítico saliendo con
+            # código 0 no serviría para lo que se recomienda.
+            return codigo_por_umbral(evaluaciones, args.fail_on) or (
+                0 if veredicto_seguridad.nivel == Nivel.BAJO else 2)
 
         # -------- export --------
         # Qué artefactos hacen falta: la unión de los modos de instalación
@@ -760,9 +773,40 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         quiere_zip = "zip" in modos_deseados
         quiere_carpeta = bool(modos_deseados - {"zip", "url_repositorio"})
 
+        # El gate va aquí, DENTRO de `export`: `audit` no escribe nada, así
+        # que no hay nada que bloquear, y sus evaluaciones deben conservar
+        # bloqueo_seguridad=None — si no, la nota «Artefactos no escritos por
+        # seguridad» del informe aparecería en una ejecución que ni siquiera
+        # intentó escribirlos.
+        bloqueos = {}
+        for r in results:
+            carpeta = str(Path(r.src_dir).relative_to(root)).replace(os.sep, "/")
+            bloqueos[r.name] = bloqueo_para(carpeta, veredicto_seguridad)
+        for nombre, por_destino in evaluaciones.items():
+            for evs in por_destino.values():
+                for ev in evs:
+                    ev.bloqueo_seguridad = bloqueos.get(nombre)
+
+        anulado = getattr(args, "anular_seguridad", False)
+        bloqueadas = {n for n, b in bloqueos.items() if b is not None}
+
         # Un zip por skill, con la carpeta de la skill en la raíz del zip:
         # es la única estructura que Perplexity acepta.
         for r in results:
+            # El `continue` por sí solo no basta: audit_and_adapt ya copió la
+            # skill entera a out/<name>/ antes de que existiera este gate (en
+            # `export`, work_dir ES out), así que sin borrar lo ya escrito el
+            # artefacto peligroso se queda en disco y sólo nos habríamos
+            # ahorrado el .zip — la mitad menos importante de lo que se sube.
+            if r.name in bloqueadas and not anulado:
+                b = bloqueos[r.name]
+                print("[bloqueado] {}: {} en {}:{}. No se escriben sus artefactos.".format(
+                    r.name, b.regla_id, b.fichero, b.linea), file=sys.stderr)
+                if (out / r.name).exists():
+                    shutil.rmtree(out / r.name)
+                if (out / "{}.zip".format(r.name)).exists():
+                    (out / "{}.zip".format(r.name)).unlink()
+                continue
             if quiere_zip:
                 write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
                 zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
@@ -783,7 +827,7 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
 
         (out / "INFORME-PORTABILIDAD.md").write_text(
             informe_markdown(results, evaluaciones, args.source, perfiles,
-                             veredicto_seguridad),
+                             veredicto_seguridad, anulado=anulado),
             encoding="utf-8")
         (out / "resumen.json").write_text(
             json.dumps(resumen_json(results, evaluaciones, args.source,
@@ -807,7 +851,18 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
     if riesgo:
         print(f"\n[aviso] Riesgo alto en: {', '.join(riesgo)}. Lee el informe antes de subirlas.")
 
-    return codigo_por_umbral(evaluaciones, args.fail_on)
+    if bloqueadas and not anulado:
+        return 3
+    if anulado:
+        # La anulacion es una decision consciente que YA queda escrita en el
+        # informe. Devolver ademas !=0 despues de habersela pedido al usuario
+        # solo ensena a ignorar el codigo de salida. Ademas es lo que permite
+        # que tests/generar_golden.py, test_seg_golden.py,
+        # .github/validar_reglas.py y el CI ejecuten la herramienta sobre
+        # material deliberadamente sucio sin envolver cada llamada.
+        return codigo_por_umbral(evaluaciones, args.fail_on)
+    return codigo_por_umbral(evaluaciones, args.fail_on) or (
+        0 if veredicto_seguridad.nivel == Nivel.BAJO else 2)
 
 
 def main(argv=None) -> int:
