@@ -117,6 +117,22 @@ pero el cuerpo viaja íntegro, y es justo donde vive el riesgo de esta familia: 
 en las instrucciones llega entera al agente de destino. Sólo quedan fuera del ámbito las
 claves de frontmatter que el conversor retira o baja a `metadata`.
 
+**La documentación de una skill también es `exportado`, y eso restringe cómo se escribe.**
+`references/`, y en general todo lo que cuelga de un directorio de skill sin estar en
+`IGNORED_DIRS`, viaja dentro del artefacto. Un patrón grave escrito **en claro** ahí cumple
+las tres condiciones del *gate* de la §7 —ámbito `exportado`, severidad alta, confianza al
+menos media— y bloquea la exportación de la propia skill que lo documenta.
+
+Esto afecta de lleno a este repositorio, cuya materia es precisamente describir patrones
+peligrosos. La regla es: **en la documentación de una skill los patrones se describen con
+palabras; los literales viven en `reglas.json` —que el motor se salta a sí mismo— y en
+`tests/fixtures/`, que está fuera de toda skill.** No es una convención de estilo: sin ella
+`plugin-to-agentskills.zip` deja de escribirse y `export` devuelve 3.
+
+La consecuencia buscada es que la herramienta se aplique su propio criterio sin excepciones
+cosméticas. Silenciar el caso en la prueba `EsteRepositorio` no serviría: esa lista sólo
+afecta al test, no al *gate*, y el artefacto seguiría sin escribirse.
+
 ### Ficheros binarios
 
 Un fichero cuyos primeros 8 KB contengan un byte nulo se trata como binario: no se le

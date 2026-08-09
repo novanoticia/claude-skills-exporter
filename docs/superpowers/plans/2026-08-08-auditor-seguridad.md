@@ -3806,3 +3806,85 @@ bash /tmp/aceptacion-seg.sh
 ```
 
 Esperado: `LOS DOCE CRITERIOS: OK`.
+
+---
+
+## Erratas de ejecución
+
+Registradas al ejecutar el plan, el 2026-08-09. **Los bloques de código de arriba se dejan
+tal cual se escribieron**: este plan es el registro de lo que se planeó, y reescribirlo
+borraría la diferencia entre eso y lo que realmente pasó. Lo que sigue es esa diferencia.
+
+Las cuatro estaban arregladas y con pruebas antes de cerrar la rama.
+
+### E1 · Tarea 3 — la prueba del orden contradecía a su propio módulo
+
+`tests/test_seg_patrones.py::Deteccion::test_el_orden_es_estable` construía las tuplas como
+`(h.id, h.ubicacion)` y afirmaba `uno == sorted(uno)`. Pero `patrones.analizar` emite en
+orden fichero → línea → orden del catálogo, que es `(ubicacion, id)` — el mismo orden
+canónico que `riesgo.evaluar` fija después con `key=(h.ubicacion, h.id)`. La aserción no
+podía pasar con el módulo que el propio plan daba.
+
+**Hecho:** invertida la tupla en la prueba. El módulo no se tocó, porque era el correcto. El
+fixture se mantiene en las líneas 1 y 2 a propósito: con números de dos cifras
+`"a.sh:10" < "a.sh:2"` lexicográficamente y la comparación con `sorted` dejaría de valer.
+Commit `ea89260`.
+
+### E2 · Tarea 4 — `[project]` no es una tabla de dependencias
+
+`TABLAS_DEPS` incluía `"[project]"`. En PEP 621 esa es la tabla de **metadatos**, donde
+`dependencies` es una clave más junto a `name`, `version` o `requires-python`. Escanearla
+entera con `DEP_TOML` hacía que `name = "x"` se declarase «dependencia sin versión fijada»,
+y como `_pyproject` retorna en la primera coincidencia, la dependencia real ni se miraba. Lo
+destapó `test_pyproject_fijado_no_dispara`, del propio plan.
+
+**Hecho:** bajo `[project]` sólo se mira el array `dependencies`, saltando su línea de
+cabecera cuando el array continúa —sin eso, un array multilínea con todo fijado se marcaría
+por una cabecera que nunca lleva `==`—. Commit `e333986`.
+
+Al cerrar ese falso positivo apareció el hueco simétrico: un array multilínea **sin** fijar
+no se detectaba, porque `DEP_TOML` exige `=` o `:` tras el nombre y en `"requests>=2.0"` lo
+que hay es `>`. Quedaba dentro del contrato declarado del módulo («puede quedarse corto pero
+nunca inventa»), pero un silencio así en una herramienta de seguridad se paga caro: quien lea
+un informe limpio creerá que se ha mirado. Cerrado con un segundo matcher, `CADENA_DEP`, que
+reconoce la gramática de cadena de requisito. Commit `2e948f6`.
+
+### E3 · Tarea 4 — prosa sin acentos en texto visible
+
+Las Global Constraints piden identificadores en ASCII pero informes «en español con
+acentuación correcta». `reglas.json` cumplía; `estructural.py` no, y se vio en cuanto la
+tarea 7 llevó esos textos al informe. Nueve cadenas de `titulo` y `mitigacion`.
+
+**Hecho:** corregidas antes de la tarea 9, para que los nueve *golden* de seguridad no
+congelaran los textos viejos. Ningún golden cambió — comprobado. Comentarios y *docstrings*
+se dejaron sin acentos, como en los otros cuatro módulos del subpaquete. Commit `37a90ec`.
+
+### E4 · Tarea 10 — la documentación bloqueaba la propia herramienta
+
+El texto que el Step 4 dicta para `references/portabilidad.md` contenía un patrón grave
+escrito en claro. Ese fichero vive dentro de la skill publicada, luego su ámbito es
+`exportado`, y la regla implicada es severidad alta y confianza alta: las tres condiciones
+del *gate*. Medido: `plugin-to-agentskills.zip` dejaba de escribirse y `export` devolvía 3.
+
+**Hecho:** la sección 10 describe los patrones en vez de escribirlos, y lo dice
+explícitamente para que no se repita. Commit `1d289e3`.
+
+Es la única de las cuatro que **no** es una errata local, así que ascendió al diseño: la §4
+enuncia ahora que la documentación de una skill es ámbito `exportado` y qué implica eso al
+escribirla. Lo cazó la guarda `EsteRepositorio` de la tarea 9, que es exactamente para lo que
+existe — aunque el plan la escribiera pensando en `reglas.json`.
+
+### Nota de método
+
+Los comandos de verificación del plan usan `python3 -m unittest ... 2>&1 | tail -3`, que
+**no muestra la línea `OK`**: varias pruebas lanzan `convert.py` por `subprocess` y su
+stdout tapa el resumen. Peor, encadenar con `&&` detrás de una tubería enmascara los fallos,
+porque el estado de salida es el de `tail`. En la ejecución se usó, y conviene usar:
+
+```bash
+python3 -m unittest discover -s tests -t tests > /tmp/suite.log 2>&1; echo "codigo=$?"
+grep -E "^(OK|FAILED|Ran )" /tmp/suite.log
+```
+
+`validar_perfiles.py` y `validar_reglas.py` necesitan `jsonschema`, que en este Mac no se
+instala a secas por PEP 668: van por el venv de `/tmp/venv-cse`.
