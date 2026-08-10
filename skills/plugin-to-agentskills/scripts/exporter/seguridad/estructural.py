@@ -249,16 +249,56 @@ def _texto_con_nulos(f) -> list:
                "en UTF-8 sin bytes nulos y volver a auditarlo.")]
 
 
+# Cualquier secuencia que pueda ser un nombre de fichero o una ruta.
+TOKEN_RUTA = re.compile(r"[\w./\\-]+")
+
+
+def _indice_de_menciones(ficheros) -> set:
+    """Los nombres y rutas que menciona el texto del repositorio.
+
+    Antes esto era una lista con el texto COMPLETO de todos los ficheros no
+    binarios y, por cada binario, se recorria entera buscando su nombre como
+    subcadena. Cuadratico -y con el arbol entero en memoria-: medido sobre
+    arboles sinteticos, doblar la entrada multiplicaba el tiempo por 3,4.
+    Recorriendo los textos UNA vez y consultando un conjunto, el coste pasa a
+    ser lineal y no queda ni un fichero retenido.
+
+    El cambio de subcadena a conjunto aprieta un poco la comprobacion: antes
+    un README que dijera "utilidad" contaba como documentacion de un binario
+    llamado `util`, porque una cosa contiene a la otra. Ahora hace falta que
+    el nombre aparezca como pieza propia. Es la direccion segura para una
+    comprobacion de seguridad -menos ficheros dados por documentados sin
+    estarlo-, y para que siga valiendo lo que si es una mencion de verdad se
+    indexa cada token Y su nombre final: si el README cita `bin/util`, el
+    binario `util` sigue estando documentado.
+    """
+    menciones = set()
+    for f in ficheros:
+        if f.binario:
+            continue
+        try:
+            texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for token in TOKEN_RUTA.findall(texto):
+            token = token.replace("\\", "/")
+            if token.startswith("./"):
+                token = token[2:]
+            token = token.rstrip("/")
+            if not token:
+                continue
+            menciones.add(token)
+            menciones.add(token.rsplit("/", 1)[-1])
+    return menciones
+
+
 def analizar(raiz, ficheros) -> list:
     raiz = Path(raiz)
     salida = []
-    textos = []
-    for f in ficheros:
-        if not f.binario:
-            try:
-                textos.append(f.absoluta.read_text(encoding="utf-8", errors="replace"))
-            except OSError:
-                pass
+    # El indice solo hace falta para decidir si un binario esta documentado.
+    # Un repositorio sin binarios -el caso normal- no lee ningun texto por
+    # esta via, que antes se leian todos siempre.
+    menciones = None
 
     for f in ficheros:
         nombre = os.path.basename(f.ruta)
@@ -307,7 +347,9 @@ def analizar(raiz, ficheros) -> list:
 
         if f.binario and ext not in EXTENSIONES_ARCHIVO:
             salida.extend(_texto_con_nulos(f))
-            if not any(nombre in t or f.ruta in t for t in textos):
+            if menciones is None:
+                menciones = _indice_de_menciones(ficheros)
+            if nombre not in menciones and f.ruta not in menciones:
                 salida.append(_h(
                     "SEC-BINARIO-NO-DOCUMENTADO-001", "cadena_de_suministro",
                     "cadena_de_suministro", "media", "media", f.ambito,

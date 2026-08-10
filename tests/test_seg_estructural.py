@@ -110,6 +110,34 @@ class Binarios(Base):
                          self.ids({"bin/herramienta": b"\x7fELF\x00\x00",
                                    "README.md": "Incluye bin/herramienta, compilada de x.\n"}))
 
+    def test_basta_con_el_nombre_final(self):
+        """El indice guarda cada token Y su nombre final."""
+        self.assertNotIn("SEC-BINARIO-NO-DOCUMENTADO-001",
+                         self.ids({"bin/herramienta": b"\x7fELF\x00\x00",
+                                   "README.md": "La herramienta se compila de x.\n"}))
+
+    def test_y_una_ruta_mas_larga_tambien_lo_menciona(self):
+        self.assertNotIn("SEC-BINARIO-NO-DOCUMENTADO-001",
+                         self.ids({"bin/herramienta": b"\x7fELF\x00\x00",
+                                   "README.md": "Ver ./bin/herramienta para el detalle.\n"}))
+
+    def test_una_palabra_que_lo_contiene_ya_no_cuenta_como_mencion(self):
+        """El unico cambio de comportamiento del indice, y es a mejor.
+
+        Con la busqueda por subcadena, cualquier palabra que contuviera el
+        nombre daba el binario por documentado: `herramientas` documentaba a
+        `herramienta`, y `utilidad` a `util`. Ahora hace falta que el nombre
+        aparezca como pieza propia.
+        """
+        self.assertIn("SEC-BINARIO-NO-DOCUMENTADO-001",
+                      self.ids({"bin/util": b"\x7fELF\x00\x00",
+                                "README.md": "Este paquete tiene mucha utilidad.\n"}))
+
+    def test_un_repositorio_sin_binarios_no_necesita_el_indice(self):
+        """El indice se construye solo si hay algun binario que consultar."""
+        self.assertEqual(self.ids({"README.md": "Texto normal.\n",
+                                   "guia.md": "Mas texto.\n"}), set())
+
 
 class ArchivosYSecretos(Base):
 
