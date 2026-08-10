@@ -86,14 +86,58 @@ class ElBloqueoEsPorSkill(Base):
 
 class Anulacion(Base):
 
-    def test_escribe_y_deja_constancia(self):
+    def montar_bloqueada(self, *args):
         raiz, salida = self.montar({"skills/mala/SKILL.md": skill_md("mala"),
                                     "skills/mala/scripts/run.sh": MALICIOSO})
-        r = self.exportar(raiz, salida, "--anular-revision-seguridad")
+        r = self.exportar(raiz, salida, *args)
+        informe = ""
+        if (salida / "INFORME-PORTABILIDAD.md").exists():
+            informe = (salida / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
+        return r, salida, informe
+
+    def test_escribe_y_deja_constancia(self):
+        r, salida, informe = self.montar_bloqueada("--anular-revision-seguridad")
         self.assertEqual(r.returncode, 0)
         self.assertTrue((salida / "mala.zip").exists())
-        informe = (salida / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
         self.assertIn("anulación manual de advertencias de seguridad", informe)
+
+    def test_el_informe_no_dice_que_no_escribio_lo_que_si_escribio(self):
+        """La contradiccion: los .zip estan en disco y el informe lo negaba."""
+        _r, salida, informe = self.montar_bloqueada("--anular-revision-seguridad")
+        self.assertTrue((salida / "mala.zip").exists())
+        self.assertNotIn("Artefactos no escritos por seguridad", informe)
+
+    def test_pero_el_bloqueo_sigue_siendo_lo_mas_visible_de_la_entrada(self):
+        """No se pierde informacion: cambia el verbo, no el contenido."""
+        _r, _salida, informe = self.montar_bloqueada("--anular-revision-seguridad")
+        self.assertIn("Exportada pese a un bloqueo de seguridad", informe)
+        self.assertIn("SEC-EXEC-REMOTO-001", informe)
+        self.assertIn("skills/mala/scripts/run.sh", informe)
+        self.assertIn("sí se han escrito", informe)
+
+    def test_la_matriz_tampoco_los_da_por_bloqueados(self):
+        """La misma afirmacion falsa estaba tambien en la tabla de arriba."""
+        _r, _salida, informe = self.montar_bloqueada("--anular-revision-seguridad")
+        self.assertNotIn("🚫 bloqueado", informe)
+        self.assertIn("(con bloqueo)", informe)
+
+    def test_el_bloqueo_sigue_entero_en_resumen_json(self):
+        """La anulacion cambia como se cuenta, no lo que se sabe."""
+        import json
+        _r, salida, _informe = self.montar_bloqueada("--anular-revision-seguridad")
+        datos = json.loads((salida / "resumen.json").read_text(encoding="utf-8"))
+        bloqueos = [ev["bloqueo_seguridad"]
+                    for s in datos["skills"]
+                    for evs in s["compatibilidad"].values() for ev in evs]
+        self.assertTrue(any(b is not None for b in bloqueos))
+
+    def test_sin_anulacion_la_formula_de_siempre_sigue_siendo_cierta(self):
+        """Es cierta ahi: sin anulacion los artefactos NO se escriben."""
+        r, salida, informe = self.montar_bloqueada()
+        self.assertEqual(r.returncode, 3)
+        self.assertFalse((salida / "mala.zip").exists())
+        self.assertIn("Artefactos no escritos por seguridad", informe)
+        self.assertIn("🚫 bloqueado", informe)
 
 
 class ConfianzaMedia(Base):

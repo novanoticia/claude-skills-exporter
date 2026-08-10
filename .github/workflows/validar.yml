@@ -33,32 +33,7 @@ jobs:
         run: python3 .github/validar_reglas.py .
 
       - name: El analisis sigue siendo estatico
-        run: |
-          python3 - <<'PY'
-          import ast, pathlib, sys
-          # La garantia que hace seguro apuntar esta herramienta al repositorio de
-          # un desconocido: no ejecuta nada de lo que analiza. El unico proceso
-          # externo del programa es `git clone`. Hasta ahora eso se comprobaba a
-          # mano; aqui lo comprueba el CI.
-          PERMITIDO = {("subprocess", "run")}
-          PROHIBIDO = {"system", "popen", "Popen", "call", "check_output",
-                       "check_call", "spawnl", "spawnv", "execv", "execve"}
-          malos = []
-          for p in pathlib.Path("skills/plugin-to-agentskills/scripts").rglob("*.py"):
-              arbol = ast.parse(p.read_text(encoding="utf-8"))
-              for n in ast.walk(arbol):
-                  if not isinstance(n, ast.Call) or not isinstance(n.func, ast.Attribute):
-                      continue
-                  base = getattr(n.func.value, "id", None)
-                  par = (base, n.func.attr)
-                  if n.func.attr in PROHIBIDO or (base == "subprocess" and par not in PERMITIDO):
-                      malos.append("{}:{} -> {}.{}".format(p, n.lineno, base, n.func.attr))
-          if malos:
-              print("[error] llamadas a procesos externos no permitidas:", file=sys.stderr)
-              [print("  " + m, file=sys.stderr) for m in malos]
-              sys.exit(1)
-          print("Analisis estatico: ningun proceso externo fuera de subprocess.run(git clone).")
-          PY
+        run: python3 .github/validar_estatico.py .
 
       - name: Validar el resumen.json contra su schema
         run: |
@@ -66,8 +41,10 @@ jobs:
           # proposito su propio banco de pruebas malicioso (tests/fixtures/) y la
           # documentacion de los patrones (docs/). Esta es la prueba de humo del
           # conversor, no la del gate: el gate se prueba en tests/test_seg_gate.py.
+          # --only lo es igual: en tests/fixtures/ hay ocho skills que publican
+          # todas `name: fechas`, y exportarlas juntas aborta por nombre repetido.
           python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida-ci \
-            --anular-revision-seguridad
+            --only plugin-to-agentskills --anular-revision-seguridad
           python3 - <<'PY'
           import json, jsonschema, pathlib
           esquema = json.loads(pathlib.Path(
@@ -85,7 +62,8 @@ jobs:
         run: |
           cp -R . /tmp/cse-aislado
           python3 /tmp/cse-aislado/skills/plugin-to-agentskills/scripts/convert.py \
-            /tmp/cse-aislado --out /tmp/salida-aislada --anular-revision-seguridad
+            /tmp/cse-aislado --out /tmp/salida-aislada \
+            --only plugin-to-agentskills --anular-revision-seguridad
           test -f /tmp/salida-aislada/INFORME-PORTABILIDAD.md
           echo "Arranca sin instalacion desde una ruta ajena al repositorio."
 
@@ -93,7 +71,7 @@ jobs:
         run: |
           python3 skills/plugin-to-agentskills/scripts/convert.py --help
           python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida \
-            --anular-revision-seguridad
+            --only plugin-to-agentskills --anular-revision-seguridad
           test -f /tmp/salida/INFORME-PORTABILIDAD.md
           test -n "$(ls /tmp/salida/*.zip)"
           echo "El conversor se ejecuta y produce salida."

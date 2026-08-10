@@ -18,22 +18,49 @@ import re
 from pathlib import Path
 
 from exporter.modelo import Hallazgo
+from exporter.seguridad.recorrido import leer_para_analisis
 
 RUTA_REGLAS = Path(__file__).resolve().parent / "reglas.json"
 
-# El catalogo NO se analiza a si mismo. reglas.json es, por definicion, un
-# fichero lleno de los patrones que el motor caza: comprobado que las lineas
-# que declaran SEC-PROMPT-IGNORA-001 y SEC-PROMPT-REVELA-001 casan con sus
-# propios patrones. Como el fichero vive dentro de la skill publicada, su
-# ambito es `exportado` y el gate se negaria a exportar la herramienta. Se
-# compara por sufijo de ruta y no por igualdad con RUTA_REGLAS para que la
-# exclusion valga tambien al auditar una COPIA de este repositorio, que es lo
-# que hacen el CI y `tests/test_seg_golden.EsteRepositorio`.
-SUFIJO_CATALOGO = "exporter/seguridad/reglas.json"
+def _es_el_catalogo(absoluta) -> bool:
+    """True solo si el fichero ES el catalogo que este motor esta usando.
 
+    El catalogo no se analiza a si mismo. reglas.json es, por definicion, un
+    fichero lleno de los patrones que el motor caza -las lineas que declaran
+    SEC-PROMPT-IGNORA-001 y SEC-PROMPT-REVELA-001 casan con sus propios
+    patrones-, y vive dentro de la skill publicada, asi que su ambito es
+    `exportado` y sin la exclusion el gate se negaria a exportar la
+    herramienta.
 
-def _es_el_catalogo(ruta_relativa: str) -> bool:
-    return ruta_relativa == SUFIJO_CATALOGO or ruta_relativa.endswith("/" + SUFIJO_CATALOGO)
+    La comparacion es por IDENTIDAD DE FICHERO, no por sufijo de ruta. Antes
+    bastaba con que la ruta terminara en "exporter/seguridad/reglas.json", y
+    esa ruta la elige el repositorio auditado: crear
+    `skills/x/exporter/seguridad/reglas.json` daba una exencion gratis, y en
+    un .json -que declaran las once reglas, las tres de inyeccion de prompt
+    incluidas- se esconde muy bien una carga. La exencion la concedia el
+    auditado; ahora la concede el sistema de ficheros, que no se puede
+    falsificar desde dentro del arbol auditado.
+
+    Comprobado que los dos casos que dependen de esto auditan el MISMO
+    inodo, no una copia: `tests/test_seg_golden.EsteRepositorio` ejecuta el
+    convert.py de este repositorio sobre este repositorio, y el paso de CI
+    "El conversor arranca desde una copia aislada" copia el arbol entero y
+    ejecuta el convert.py DE LA COPIA sobre la copia, asi que RUTA_REGLAS se
+    resuelve dentro de esa misma copia.
+
+    El unico caso que pierde la exencion es auditar una copia AJENA de este
+    repositorio con un conversor instalado en otro sitio. Y ahi perderla es
+    lo correcto: el motor no puede distinguir una copia legitima del
+    catalogo de un fichero que un tercero ha puesto en esa ruta con ese
+    contenido. Decirlo es mas honesto que callarlo, y para el humano que
+    sabe lo que esta auditando esta --anular-revision-seguridad.
+    """
+    try:
+        return os.path.samefile(str(absoluta), str(RUTA_REGLAS))
+    except OSError:
+        # El catalogo puede no existir donde se espera, o el fichero
+        # auditado haber desaparecido entre el recorrido y este momento.
+        return False
 
 
 CLAVES = ("id", "familia", "dimension", "severidad", "confianza",
@@ -79,6 +106,43 @@ def cargar_reglas(ruta=None) -> list:
     return reglas
 
 
+def reglas_aplicables(ext: str, reglas, conocidas) -> list:
+    """Que reglas se aplican a un fichero con esa extension.
+
+    `extensiones` era de facto una LISTA BLANCA: si ninguna regla declaraba
+    la extension, el fichero no se analizaba con ninguna. Como el nombre del
+    fichero lo elige el repositorio auditado, eso dejaba al auditado decidir
+    si se le audita: un `scripts/instalar` -la forma idiomatica de un script
+    ejecutable, sin extension- pasaba entero por delante del motor sin que
+    ninguna regla lo mirase.
+
+    Ahora la lista es un VETO, no un permiso. Se analiza todo texto, y la
+    lista solo sirve para NO aplicar una regla donde no tiene sentido:
+
+      - extension que alguna regla declara -> solo las que la declaran, que
+        es el comportamiento de siempre y lo que evita, por ejemplo, buscar
+        conducta_de_prompt dentro de un .py;
+      - extension ausente o que ninguna regla declara -> TODAS las reglas.
+
+    No hay lista de extensiones "inertes" exentas, y es deliberado: una lista
+    asi seria, por construccion, una lista de evasion. El defecto que esto
+    corrige es exactamente "el atacante elige un nombre que el motor no mira",
+    y reservar un conjunto de extensiones no miradas solo lo hace mas pequeno.
+
+    El coste en falsos positivos es bajo porque los patrones del catalogo son
+    frases muy concretas -un gestor de paquetes instalando desde una URL, una
+    descarga entubada a un interprete, una orden de desatender las
+    instrucciones previas- y no formas genericas. Los literales no se
+    escriben aqui: este fichero viaja dentro de la skill publicada, asi que
+    su ambito es `exportado` y escribirlos en claro haria que el motor se
+    delatase a si mismo (§4 del diseno). Viven en reglas.json, que el motor
+    se salta, y en tests/fixtures/, que esta fuera de toda skill.
+    """
+    if ext in conocidas:
+        return [r for r in reglas if ext in r["extensiones"]]
+    return list(reglas)
+
+
 def analizar(ficheros, reglas) -> list:
     """Un Hallazgo por cada (regla, fichero, linea) que coincida.
 
@@ -86,19 +150,32 @@ def analizar(ficheros, reglas) -> list:
     lector necesita es donde mirar, y la linea ya se lo dice.
     """
     salida = []
+    # La union de lo que el catalogo declara. Distingue "extension que alguna
+    # regla conoce" de "extension que ninguna conoce", que es lo unico que
+    # necesita reglas_aplicables para decidir.
+    conocidas = {e.lower() for r in reglas for e in r["extensiones"]}
     for f in ficheros:
-        if f.binario:
-            continue
-        if _es_el_catalogo(f.ruta):
+        if _es_el_catalogo(f.absoluta):
             continue
         ext = os.path.splitext(f.ruta)[1].lower()
-        aplicables = [r for r in reglas if ext in r["extensiones"]]
-        if not aplicables:
-            continue
-        try:
-            texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
+        aplicables = reglas_aplicables(ext, reglas, conocidas)
+        # Los marcados como binarios TAMBIEN se analizan. `es_binario` solo
+        # mira si hay un byte nulo en los primeros 8 KB, asi que un .sh
+        # perfectamente ejecutable con un \x00 dentro de un comentario
+        # quedaba fuera del motor entero: un unico byte bastaba para que
+        # ninguna regla lo mirase. Decodificando con errors="replace", un
+        # payload en texto plano sigue casando; lo que de verdad sea binario
+        # produce caracteres de reemplazo que no casan con nada.
+        if f.binario:
+            datos = leer_para_analisis(f.absoluta)
+            if datos is None:
+                continue
+            texto = datos.decode("utf-8", errors="replace")
+        else:
+            try:
+                texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
         for numero, linea in enumerate(texto.splitlines(), start=1):
             for r in aplicables:
                 m = r["_rx"].search(linea)

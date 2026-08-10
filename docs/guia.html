@@ -78,6 +78,7 @@
     <li><a href="#idea">La idea en 60 segundos</a></li>
     <li><a href="#instalar">Poner esta herramienta en tu ordenador</a></li>
     <li><a href="#usar">Convertir un repositorio</a></li>
+    <li><a href="#seguridad">Lo que la herramienta mira además de la portabilidad</a></li>
     <li><a href="#perplexity">Subir a Perplexity Computer</a></li>
     <li><a href="#mistral">Subir a Mistral (Vibe Work)</a></li>
     <li><a href="#problemas">Si algo falla</a></li>
@@ -208,7 +209,96 @@ un destino concreto).</p>
 </div>
 
 
-<h2 id="perplexity">4 · Subir a Perplexity Computer</h2>
+<h2 id="seguridad">4 · Lo que la herramienta mira además de la portabilidad</h2>
+
+<p>Al convertir un repositorio, la herramienta responde a dos preguntas distintas, y
+conviene no confundirlas. La primera es <em>«¿dónde puedo subir esto?»</em>, que es lo que
+has venido a hacer. La segunda es <em>«¿debería instalar esto?»</em>, que casi nadie se
+plantea, y por eso el informe la contesta arriba del todo sin que la pidas.</p>
+
+<p>Para contestarla lee el repositorio entero —no sólo las skills— buscando cosas que un
+paquete honrado no necesita hacer: descargar algo de internet y ejecutarlo sin mirarlo,
+dejar instalada una tarea que siga corriendo después, leer contraseñas del sistema, borrar
+el rastro de lo que ha hecho, o traer instrucciones escondidas para que el agente actúe a
+espaldas de quien lo usa.</p>
+
+<div class="note">
+  <strong>No ejecuta nada, sólo lee</strong>
+  Ni instala, ni descomprime, ni lanza ningún programa del repositorio. Sólo lee ficheros
+  y busca formas conocidas. Eso tiene una consecuencia honesta: encuentra lo que se parece
+  a algo que ya conoce, y no puede afirmar que un repositorio sea inofensivo. Sólo puede
+  decirte dónde mirar.
+</div>
+
+<h3>El nivel de riesgo</h3>
+
+<p>El informe empieza con una sola palabra que resume todo lo encontrado:</p>
+
+<table>
+  <tr><th>Nivel</th><th>Qué significa</th></tr>
+  <tr><td>🟢 <strong>bajo</strong></td><td>No se ha encontrado nada reseñable. Instalación razonable después de leer el informe</td></tr>
+  <tr><td>🟡 <strong>moderado</strong></td><td>Hay cosas que conviene mirar antes de instalar, pero ninguna grave</td></tr>
+  <tr><td>🟠 <strong>alto</strong></td><td>Hay algo que no encaja con un paquete que sólo pide lo que necesita. No lo instales sin que alguien lo revise</td></tr>
+  <tr><td>🔴 <strong>crítico</strong></td><td>Hay indicios serios, o varios problemas graves que se refuerzan entre sí. No se puede recomendar la instalación</td></tr>
+  <tr><td>🔵 <strong>no evaluable</strong></td><td>Hay material que no se ha podido leer —un fichero comprimido, un binario sin explicación, un fichero sin permisos—. No es que esté mal: es que no se sabe</td></tr>
+</table>
+
+<div class="note">
+  <strong>«No evaluable» no es un aprobado</strong>
+  Es lo contrario de un veredicto. Significa que parte del paquete quedó fuera del
+  análisis, así que lo que el informe diga sólo vale para el resto. Si lo que no se pudo
+  leer te importa, ábrelo tú.
+</div>
+
+<h3>Por qué el mismo problema a veces sólo avisa y a veces te frena</h3>
+
+<p>Es la idea más importante de todo esto y se entiende con una pregunta: <strong>¿ese
+fichero viaja dentro de lo que vas a subir, o se queda en el repositorio?</strong></p>
+
+<table>
+  <tr><th>Dónde está</th><th>Qué pasa</th></tr>
+  <tr><td>Dentro de la carpeta de una skill</td><td>Va a acabar en el <code>.zip</code> que subes a otra plataforma. Si el hallazgo es grave, <strong>la herramienta no escribe esa skill</strong></td></tr>
+  <tr><td>En cualquier otro sitio del repositorio</td><td>No viaja contigo. Sale en el informe como aviso, y los artefactos <strong>sí se escriben</strong></td></tr>
+</table>
+
+<p>Por eso el mismo fichero problemático puede ser un simple aviso o un frenazo, según en
+qué carpeta esté. No es una incoherencia: es que sólo una de las dos copias acaba en manos
+de la plataforma a la que subes la skill. Un instalador dudoso en la raíz del repositorio
+es asunto de quien clone ese repositorio; el mismo instalador dentro de la skill pasa a ser
+asunto tuyo, porque lo estás subiendo tú con tu nombre.</p>
+
+<p>Y el frenazo es <strong>por skill</strong>: si tienes cinco skills y una está señalada,
+las otras cuatro se exportan con normalidad.</p>
+
+<h3>Si la terminal termina con «3»</h3>
+
+<p>Ese número significa exactamente una cosa: había un hallazgo grave dentro de lo que se
+iba a empaquetar, así que esa skill <em>no se ha escrito</em>. No es que la herramienta se
+haya roto.</p>
+
+<div class="danger">
+  <strong>Qué hacer, en este orden</strong>
+  <ol style="margin:6px 0 0">
+    <li>Abre <code>INFORME-PORTABILIDAD.md</code> y busca el bloque de arriba. Te da el
+      fichero y la línea exactos.</li>
+    <li>Abre ese fichero por esa línea y <em>míralo</em>. En un minuto sabrás si es un
+      problema real o un ejemplo que el autor documentaba a propósito.</li>
+    <li>Si es un problema real, no lo subas. Avisa a quien mantiene el repositorio.</li>
+    <li>Si es un falso positivo, ya sabes por qué, y puedes decidir con criterio.</li>
+  </ol>
+</div>
+
+<div class="warn">
+  <strong>Existe una opción para saltárselo. No empieces por ahí.</strong>
+  <code>--anular-revision-seguridad</code> exporta igualmente y deja constancia escrita en
+  el informe. Está pensada para cuando ya has mirado el hallazgo y sabes que es un falso
+  positivo —una skill que <em>documenta</em> un ataque, por ejemplo, en vez de cometerlo—.
+  Usarla sin haber leído el hallazgo convierte la comprobación en un trámite, y entonces
+  deja de servir para nada el día que el aviso sea de verdad.
+</div>
+
+
+<h2 id="perplexity">5 · Subir a Perplexity Computer</h2>
 
 <div class="step">
   <h3><span class="n">1</span> Abre la página de skills</h3>
@@ -227,7 +317,7 @@ un destino concreto).</p>
 <div class="step">
   <h3><span class="n">4</span> Compruébalo</h3>
   <p>Abre un chat nuevo y pide algo que encaje con la descripción de la skill. Si no se
-  activa, el problema casi siempre es la descripción — ver <a href="#problemas">sección 6</a>.</p>
+  activa, el problema casi siempre es la descripción — ver <a href="#problemas">sección 7</a>.</p>
 </div>
 
 <div class="warn">
@@ -238,7 +328,7 @@ un destino concreto).</p>
 </div>
 
 
-<h2 id="mistral">5 · Subir a Mistral (Vibe Work)</h2>
+<h2 id="mistral">6 · Subir a Mistral (Vibe Work)</h2>
 
 <p>Son los mismos ficheros que acabas de subir a Perplexity, pero <strong>no el mismo
 artefacto</strong>: Mistral quiere la <strong>carpeta</strong> que dejó la herramienta
@@ -287,7 +377,7 @@ artefacto</strong>: Mistral quiere la <strong>carpeta</strong> que dejó la herr
 </div>
 
 
-<h2 id="problemas">6 · Si algo falla</h2>
+<h2 id="problemas">7 · Si algo falla</h2>
 
 <table>
   <tr><th>Síntoma</th><th>Causa habitual</th><th>Qué hacer</th></tr>

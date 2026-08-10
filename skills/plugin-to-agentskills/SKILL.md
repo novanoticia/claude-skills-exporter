@@ -106,6 +106,10 @@ quiere paquetes si sólo pregunta por portabilidad.
    el informe siguen cubriendo los cinco destinos—. `--fail-on degradado` o
    `--fail-on no_compatible` hacen que el conversor devuelva código 2 si algún estado
    alcanza ese umbral.
+   **`--out` se borra entero antes de escribir.** Por eso el conversor se niega a vaciar
+   un directorio con contenido que no haya escrito él, y aborta. Si ocurre, no pases
+   `--force` sin más: elige otro directorio, o pregunta al usuario si de verdad quiere
+   perder lo que hay dentro.
 
 4. **Lee el informe** (`INFORME-PORTABILIDAD.md` en `export`, la salida por terminal en
    `audit`) y resume al usuario: la matriz de estados por destino, cuáles salen

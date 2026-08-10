@@ -70,7 +70,7 @@ from exporter.modelo import (
     VeredictoSeguridad,
     capacidades_de,
 )
-from exporter.perfiles import PerfilInvalido, cargar_perfiles, presupuesto_por_modo
+from exporter.perfiles import PerfilInvalido, cargar_perfiles
 from exporter.seguridad import estructural as seg_estructural
 from exporter.seguridad import patrones as seg_patrones
 from exporter.seguridad import riesgo as seg_riesgo
@@ -87,8 +87,10 @@ MAX_DESCRIPTION_CHARS = 1024
 # Los presupuestos POR DESTINO (en BYTES UTF-8, no en caracteres: en español un
 # acento ocupa dos y una raya tres, así que contar letras engaña por un 2-3%) ya
 # no son constantes de este fichero: se derivan de los perfiles de exporter/targets/
-# con presupuesto_por_modo(), el más restrictivo de los destinos que aceptan ese
-# modo de instalación. Añadir un destino es escribir un JSON, no tocar esta lista.
+# con presupuesto_de(), el más restrictivo de los destinos que van a usar ese
+# artefacto. Añadir un destino es escribir un JSON, no tocar esta lista, y añadir
+# un MODO de instalación nuevo tampoco: perfiles_por_artefacto() reparte por lo
+# que el perfil declara, no por una lista de modos escrita a mano.
 # ChatGPT y claude.ai no necesitan presupuesto propio: su tope es el del estándar
 # (1024 caracteres) y el zip ya viaja con la descripción de 850 bytes, que cabe de
 # sobra. Por eso el mismo .zip de Perplexity sirve para los tres sin reexportar.
@@ -185,6 +187,60 @@ def sanitize_name(raw: str) -> str:
     n = re.sub(r"[^a-z0-9\-]+", "-", str(raw).strip().lower())
     n = re.sub(r"-{2,}", "-", n).strip("-")
     return n[:64] or "skill"
+
+
+def nombre_publicado(skill_md: Path) -> str:
+    """El identificador con el que la skill sale al mundo.
+
+    Sale del `name` del frontmatter, NO del nombre de la carpeta, y de el
+    cuelgan el nombre del zip, el de la carpeta exportada y las claves de
+    `evaluaciones` y `bloqueos`. audit_and_adapt lo vuelve a calcular igual;
+    aqui hace falta antes, para poder comprobar la unicidad sin haber escrito
+    todavia nada.
+    """
+    fm, _raw_fm, _body = split_frontmatter(
+        skill_md.read_text(encoding="utf-8", errors="replace"))
+    return sanitize_name(str(fm.get("name") or skill_md.parent.name))
+
+
+def _relativa(ruta: Path, raiz: Path) -> str:
+    try:
+        return str(Path(ruta).relative_to(raiz)).replace(os.sep, "/")
+    except ValueError:
+        return str(ruta)
+
+
+def comprobar_nombres_unicos(skill_files, raiz: Path) -> None:
+    """Aborta si dos skills reclaman el mismo nombre publicado.
+
+    Sin esto, la segunda skill machacaba los artefactos de la primera y solo
+    salia UN zip, mientras el informe y resumen.json seguian declarando dos.
+    Y lo mas grave no era eso: `evaluaciones` y `bloqueos` son diccionarios
+    con esa clave, asi que el veredicto de seguridad de una skill se
+    atribuia a la otra -una skill limpia se quedaba sin escribir porque otra,
+    sucia, se llamaba igual-.
+
+    Se aborta en vez de desambiguar sola. Renombrar en silencio produciria un
+    artefacto con un nombre que el autor no eligio, y quien lo subiera a otra
+    plataforma acabaria publicando una skill que no reconoce.
+    """
+    por_nombre = {}
+    for sf in skill_files:
+        por_nombre.setdefault(nombre_publicado(sf), []).append(sf.parent)
+    colisiones = {n: ds for n, ds in por_nombre.items() if len(ds) > 1}
+    if not colisiones:
+        return
+
+    lineas = ["[error] hay skills distintas que reclaman el mismo nombre publicado. "
+              "Se aborta sin escribir nada:"]
+    for nombre, dirs in sorted(colisiones.items()):
+        lineas.append("  · «{}» ← {}".format(
+            nombre, ", ".join(sorted(_relativa(d, raiz) for d in dirs))))
+    lineas.append(
+        "Ese nombre sale del campo 'name' del frontmatter -no del de la carpeta- y se "
+        "normaliza, así que 'My Skill' y 'my-skill' acaban siendo el mismo. Cambia el "
+        "'name' de una de ellas y vuelve a exportar.")
+    sys.exit("\n".join(lineas))
 
 
 # --------------------------------------------------------------------------
@@ -297,8 +353,15 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     # lineas totales porque sobrevive a las reescrituras de arriba, que
     # cambian texto DENTRO de una linea pero nunca el numero de lineas-.
     offset_skill_md = len(text.splitlines()) - len(body.splitlines())
-    senales = (detectar(body, "SKILL.md", offset=offset_skill_md)
-               + detectar_en_arbol(src_dir, excluir={"SKILL.md"}))
+    # Se excluye por el nombre REAL del fichero descubierto, no por el
+    # literal "SKILL.md": discover_skills acepta cualquier capitalizacion
+    # (`names = {f.lower(): f ...}`), asi que un `skills/x/skill.md` no casaba
+    # con el literal y acababa auditandose dos veces -una vez el cuerpo ya
+    # adaptado y otra el fichero crudo de disco-. La senal del fichero crudo
+    # senalaba ademas un problema que la adaptacion ya habia corregido.
+    del_arbol, ilegibles_al_leer = detectar_en_arbol(
+        src_dir, excluir={skill_md.name})
+    senales = detectar(body, "SKILL.md", offset=offset_skill_md) + del_arbol
     res.senales = senales
     for s in senales:
         res.findings.append(Finding(s.severidad_base, s.id,
@@ -322,12 +385,39 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     dest = out_dir / name
     if dest.exists():
         shutil.rmtree(dest)
-    enlaces = copiar_skill(src_dir, dest, ignorar=set(IGNORED_DIRS) | {"SKILL.md"})
+    # Igual que arriba: por el nombre real, no por el literal. write_skill_md
+    # escribe siempre el nombre canonico en mayusculas, asi que copiar ademas
+    # el original metia en el paquete una segunda copia SIN adaptar. En un
+    # sistema de ficheros sensible a mayusculas -Linux- el artefacto salia
+    # con `SKILL.md` y `skill.md` a la vez (comprobado sobre un volumen APFS
+    # sensible a mayusculas); en macOS los dos nombres colapsaban en uno y el
+    # paquete se quedaba sin ningun `SKILL.md`.
+    enlaces, ilegibles_al_copiar = copiar_skill(
+        src_dir, dest, ignorar=set(IGNORED_DIRS) | {skill_md.name})
     for s in enlaces:
         res.findings.append(Finding("alta", "enlace-simbolico",
             "Se omitió un enlace simbólico al empaquetar: {} ({}). Copiar su "
             "contenido habría metido en el paquete un fichero de fuera de la "
             "skill.".format(s.ubicacion, s.muestra)))
+
+    # Un fichero que no se pudo abrir no es un fichero limpio: nadie ha
+    # mirado lo que contiene y, al no poder copiarlo, tampoco esta en el
+    # artefacto. Callarlo dejaria el informe afirmando por omision que se
+    # reviso un arbol que no se reviso entero -el mismo silencio que el
+    # Bloque B viene a corregir en el motor de seguridad-.
+    #
+    # Las dos fases que leen el arbol (la deteccion de senales y la copia)
+    # pueden tropezar con el mismo fichero, asi que se deduplica por ruta: a
+    # quien lea el informe le importa que fichero se quedo fuera, no en cual
+    # de las dos pasadas fallo la lectura.
+    ilegibles = {}
+    for ruta_ileg, motivo in list(ilegibles_al_leer) + list(ilegibles_al_copiar):
+        ilegibles.setdefault(str(ruta_ileg).replace(os.sep, "/"), motivo)
+    for ruta_ileg, motivo in sorted(ilegibles.items()):
+        res.findings.append(Finding("media", "fichero-ilegible",
+            "No se pudo leer {}: {}. No se ha auditado su contenido y tampoco se "
+            "ha copiado al artefacto. Corrige sus permisos y vuelve a exportar, o "
+            "revísalo a mano antes de subir la skill.".format(ruta_ileg, motivo)))
 
     for p in sorted(dest.rglob("*")):
         if p.is_file():
@@ -449,7 +539,13 @@ def auditar_seguridad(raiz, dirs_skill) -> VeredictoSeguridad:
     # vacia: un veredicto sin nada que lo justifique, que es justo lo que
     # prohibe el criterio de aceptacion 9. Un binario que nadie documenta SI
     # produce hallazgo, y por ahi entra en la cuenta.
-    opaco = any(h.id in ("SEC-ARCHIVO-ANIDADO-001", "SEC-BINARIO-NO-DOCUMENTADO-001")
+    #
+    # SEC-ILEGIBLE-001 es la tercera fuente y la mas literal de las tres: un
+    # fichero que no se ha podido abrir es contenido del que no se sabe
+    # nada. Faltaba, y su ausencia era parte de por que `no_evaluable` no
+    # llegaba a significar lo que promete su nombre.
+    opaco = any(h.id in ("SEC-ARCHIVO-ANIDADO-001", "SEC-BINARIO-NO-DOCUMENTADO-001",
+                         "SEC-ILEGIBLE-001")
                 for h in hallazgos)
     return seg_riesgo.evaluar(hallazgos, opaco)
 
@@ -513,6 +609,95 @@ def comprobar_tamano(raiz: Path) -> None:
             if total > MAX_BYTES_REPO:
                 sys.exit("[error] El origen supera los {} MB. Se aborta el "
                          "análisis.".format(MAX_BYTES_REPO // (1024 * 1024)))
+
+
+# Marca de propiedad del directorio de salida. `export` la escribe nada mas
+# crear <out>, no al terminar: si una ejecucion se interrumpe a la mitad, el
+# directorio sigue siendo reconocible como propio y la siguiente ejecucion
+# puede limpiarlo sin exigir --force. Escribirla solo al final dejaria al
+# usuario un destino a medio escribir que la herramienta ya no se atreve a
+# tocar, es decir, un roto que ella misma ha causado.
+NOMBRE_CENTINELA = ".cse-salida"
+
+TEXTO_CENTINELA = (
+    "Directorio de salida de claude-skills-exporter (convert.py export --out).\n"
+    "Su contenido se borra y se regenera entero en cada exportación.\n"
+    "Si borras este fichero, la herramienta dejará de reconocer el directorio\n"
+    "como suyo y se negará a sobrescribirlo sin --force.\n"
+)
+
+
+def _cuelga_de(hijo: Path, padre: Path) -> bool:
+    """True si `hijo` esta dentro de `padre`, o es el mismo `padre`.
+
+    Path.is_relative_to no existe hasta Python 3.9 y aqui el minimo es 3.8.
+    """
+    try:
+        hijo.relative_to(padre)
+    except ValueError:
+        return False
+    return True
+
+
+def es_salida_propia(out: Path) -> bool:
+    """True si <out> puede vaciarse sin preguntar.
+
+    Lo es si no existe, si esta vacio, o si lleva la marca que escribe esta
+    herramienta. Un fichero suelto donde se esperaba un directorio no lo es.
+    """
+    if not out.exists():
+        return True
+    if not out.is_dir():
+        return False
+    if (out / NOMBRE_CENTINELA).exists():
+        return True
+    return not any(out.iterdir())
+
+
+def comprobar_salida_segura(out: Path, src: str, forzar: bool) -> None:
+    """Aborta antes de que `export` vacie un <out> que no ha escrito el.
+
+    Se ejecuta ANTES del rmtree y ANTES de resolve_source: el fallo mas caro
+    de esta herramienta consistia en borrar el destino y descubrir despues
+    que el origen no servia para nada.
+    """
+    p_origen = Path(src).expanduser()
+    # Un origen que no existe como ruta es una URL: se clonara en un temporal
+    # y no hay ningun arbol del usuario con el que <out> pueda solaparse.
+    origen = p_origen.resolve() if p_origen.exists() else None
+
+    if origen is not None:
+        # Estos dos casos no los salta ni --force. No son "borrar algo
+        # valioso" sino "borrar la propia entrada": aunque dejaramos hacerlo,
+        # el export destruiria el arbol que iba a leer y terminaria sin
+        # encontrar ningun SKILL.md. Ofrecer --force ahi seria mentir.
+        #
+        # El caso simetrico -<out> DENTRO del origen- si esta permitido, y a
+        # proposito: `export . --out ./salida` solo borra ./salida, el origen
+        # sobrevive entero y el export funciona. Es ademas la forma del --out
+        # por defecto y la que usan varias pruebas. La version peligrosa de
+        # esa misma forma (`--out ./scripts`, sobre un directorio del propio
+        # repositorio) ya la para la comprobacion de propiedad de abajo, que
+        # no mira donde esta <out> sino si lo escribimos nosotros.
+        if out == origen:
+            sys.exit(
+                "[error] --out apunta al propio origen ({}). Exportar ahí borraría el "
+                "repositorio que se va a leer, y el export terminaría sin nada que "
+                "empaquetar. Elige un directorio de salida fuera del origen.".format(out))
+        if _cuelga_de(origen, out):
+            sys.exit(
+                "[error] el origen ({}) está dentro de --out ({}). Vaciar la salida "
+                "borraría el repositorio que se va a leer. Elige un directorio de "
+                "salida que no contenga al origen.".format(origen, out))
+
+    if not forzar and not es_salida_propia(out):
+        motivo = ("no está vacío" if out.is_dir()
+                  else "ya existe y no es un directorio")
+        sys.exit(
+            "[error] --out ({}) {} y no lo ha escrito esta herramienta: no lleva la "
+            "marca «{}». Se aborta sin borrar nada. Usa un directorio vacío o "
+            "inexistente, o pasa --force si aceptas perder su contenido.".format(
+                out, motivo, NOMBRE_CENTINELA))
 
 
 def resolve_source(src: str, workdir: Path) -> Path:
@@ -589,9 +774,15 @@ def construir_parser():
     exp.add_argument("--target", nargs="*", default=None,
                      help="restringe qué artefactos se producen; la auditoría "
                           "sigue cubriendo todos los destinos")
-    exp.add_argument("--out", default="./dist-agentskills", help="directorio de salida")
+    exp.add_argument("--out", default="./dist-agentskills",
+                     help="directorio de salida; SE BORRA ENTERO antes de escribir")
+    exp.add_argument("--force", action="store_true",
+                     help="vaciar el directorio de salida aunque no lo haya escrito "
+                          "esta herramienta (pierdes lo que hubiera dentro)")
     exp.add_argument("--only", nargs="*", default=None,
-                     help="exportar sólo estas skills")
+                     help="exportar sólo estas skills; vale tanto el nombre de la "
+                          "carpeta como el 'name' del frontmatter, que es el que "
+                          "llevan el informe y los artefactos")
     exp.add_argument("--zip-only", action="store_true",
                      help="dejar sólo los .zip (pierdes la variante de carpeta)")
     exp.add_argument("--keep-description-order", action="store_true",
@@ -671,21 +862,64 @@ def obtener_fecha_hoy() -> datetime.date:
             "[error] CSE_FECHA='{}' no es una fecha ISO válida (AAAA-MM-DD).".format(bruta))
 
 
+# El unico modo que no necesita ningun artefacto propio: el destino se
+# instala apuntando a la URL del repositorio.
+MODOS_SIN_ARTEFACTO = {"url_repositorio"}
+
+
+def perfiles_por_artefacto(perfiles, elegidos):
+    """Que destinos se sirven de cada uno de los dos artefactos.
+
+    Devuelve `(ids_del_zip, ids_de_la_carpeta)`, ya restringidos a los
+    destinos elegidos. `carpeta` es cualquier modo que produzca un
+    directorio en disco, sea cual sea su nombre: `carpeta` en Mistral,
+    `directorio_local` en Claude Code, y el que venga despues.
+    """
+    ids = sorted(elegidos) if elegidos else sorted(perfiles)
+    del_zip = [i for i in ids if "zip" in perfiles[i].modos()]
+    de_carpeta = [i for i in ids
+                  if set(perfiles[i].modos()) - {"zip"} - MODOS_SIN_ARTEFACTO]
+    return del_zip, de_carpeta
+
+
+def presupuesto_de(perfiles, ids) -> int:
+    """El presupuesto mas restrictivo de esos destinos.
+
+    Un artefacto es uno solo y tiene que valer para todos los destinos que lo
+    usen, asi que manda el mas estrecho. Sin ninguno, el tope del estandar.
+    """
+    return min([perfiles[i].presupuesto() for i in ids],
+               default=MAX_DESCRIPTION_CHARS)
+
+
 def ejecutar(args, perfiles, elegidos, hoy) -> int:
-    # Los perfiles ya están cargados: de ellos salen los presupuestos de
-    # descripción (el más restrictivo por modo de instalación), con
-    # independencia del subcomando y de qué destinos se hayan elegido.
-    presupuesto_carpeta = presupuesto_por_modo(perfiles, "carpeta")   # Mistral: 490
-    presupuesto_zip = presupuesto_por_modo(perfiles, "zip")           # el resto: 850
+    # Los presupuestos salen de los modos que REALMENTE declaran los perfiles
+    # elegidos, no de las dos constantes "carpeta" y "zip". Con esas dos, un
+    # modo nuevo caia en el cajon de `carpeta` sin decirlo: `--target
+    # claude-code` -que instala en modo `directorio_local`, con un tope
+    # propio de 1024 B- recibia el presupuesto de Mistral, 490, y se le
+    # rotulaba «Mistral» en los mensajes finales. Era el punto donde el
+    # codigo contradecia su propio comentario, que promete que todo se deriva
+    # de los perfiles.
+    ids_zip, ids_carpeta = perfiles_por_artefacto(perfiles, elegidos)
+    presupuesto_carpeta = presupuesto_de(perfiles, ids_carpeta)
+    presupuesto_zip = presupuesto_de(perfiles, ids_zip)
 
     out = None
     if args.comando == "export":
         out = Path(args.out).expanduser().resolve()
-        if out.exists():
+        # Lo primero de todo, antes del rmtree y antes de resolve_source.
+        comprobar_salida_segura(out, args.source, getattr(args, "force", False))
+        if out.is_dir():
             shutil.rmtree(out)
+        elif out.exists():
+            # Solo se llega aqui con --force: sin el, un fichero donde se
+            # esperaba un directorio ya habria abortado la comprobacion.
+            out.unlink()
         # Las carpetas de skill cuelgan directamente de <out>, al lado de su
         # zip: mismos ficheros, distinta descripción.
         out.mkdir(parents=True)
+        (out / NOMBRE_CENTINELA).write_text(TEXTO_CENTINELA, encoding="utf-8")
 
     with tempfile.TemporaryDirectory() as tmp:
         root = resolve_source(args.source, Path(tmp))
@@ -697,33 +931,69 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
 
         print(f"[info] {len(skill_files)} skill(s) encontradas.")
 
-        # Va aquí, ANTES de crear work_dir y del bucle de audit_and_adapt. Si
-        # se calculara después, el recorrido vería los artefactos recién
-        # escritos cuando `--out` cuelga del origen, y un `out/x.zip` propio
-        # produciría un SEC-ARCHIVO-ANIDADO-001 que ensuciaría el veredicto
-        # de un repositorio limpio.
+        # Va aquí, antes del bucle de audit_and_adapt. Desde que los
+        # artefactos se preparan en un temporal y no en `out`, el recorrido
+        # ya no podría verlos aunque se calculara después; se mantiene el
+        # orden porque sigue siendo el correcto -auditar el origen tal como
+        # está, no como queda después de trabajar sobre él-, pero ha dejado
+        # de ser una condición de la que dependa el veredicto.
         veredicto_seguridad = auditar_seguridad(
             root, [str(sf.parent.relative_to(root)) for sf in skill_files])
 
-        # `inspect` y `audit` no escriben ningún fichero de salida: trabajan
-        # sobre una copia efímera que desaparece con este bloque. `export`
-        # usa `out`, que sí sobrevive fuera de él.
-        work_dir = out if out is not None else Path(tmp) / "_trabajo"
+        # Los TRES subcomandos preparan sus artefactos en un temporal que
+        # desaparece con este bloque. `export` no es una excepción: publica a
+        # `out` despues, y solo lo que el gate haya aprobado.
+        #
+        # Antes `export` usaba `out` directamente como directorio de trabajo,
+        # asi que audit_and_adapt escribia la skill entera en el destino
+        # final antes de que el gate opinara. El gate no podia entonces
+        # limitarse a no escribir: tenia que BORRAR lo ya escrito, y entre
+        # una cosa y otra existia una ventana en la que el artefacto
+        # peligroso estaba en el directorio que el usuario mira -y que puede
+        # estar sincronizado con un servicio en la nube, o vigilado por otro
+        # proceso-.
+        work_dir = Path(tmp) / "_trabajo"
         work_dir.mkdir(parents=True, exist_ok=True)
 
         solo = getattr(args, "only", None)
+        # --only acepta los DOS identificadores que tiene una skill, porque
+        # los dos son visibles y ninguno es mas legitimo que el otro: quien
+        # mira el disco ve la carpeta, y quien lee el informe o los
+        # artefactos ve el nombre del frontmatter. Antes filtraba solo por la
+        # carpeta, mientras que artefactos, evaluaciones y bloqueos se
+        # indexaban por el del frontmatter, asi que `--only <nombre-que-el-
+        # usuario-acaba-de-leer>` podia no encontrar nada.
+        pedidas = {sanitize_name(x) for x in (solo or ())}
+        seleccionadas = [
+            sf for sf in skill_files
+            if not solo or pedidas & {sanitize_name(sf.parent.name),
+                                      nombre_publicado(sf)}]
+        if not seleccionadas:
+            sys.exit(
+                "[error] --only no coincidió con ninguna skill. Se admite tanto el "
+                "nombre de la carpeta como el del frontmatter; disponibles: {}".format(
+                    ", ".join(sorted({
+                        "{} ({})".format(nombre_publicado(sf), sf.parent.name)
+                        for sf in skill_files}))))
+
+        # Antes del primer audit_and_adapt, que ya escribe en work_dir. La
+        # comprobacion mira solo las skills SELECCIONADAS: si --only deja
+        # fuera a una de las dos que colisionan, no hay colision que resolver.
+        #
+        # `inspect` se libra a proposito: no indexa nada por nombre -imprime
+        # cada skill por separado y vuelve antes de construir `evaluaciones`-,
+        # asi que no puede atribuir mal ningun veredicto. Y es justo el
+        # comando al que uno acude para diagnosticar este problema: abortarlo
+        # dejaria al usuario sin la herramienta que se lo enseña.
+        if args.comando != "inspect":
+            comprobar_nombres_unicos(seleccionadas, root)
+
         results = []
-        for sf in skill_files:
-            nm = sanitize_name(sf.parent.name)
-            if solo and nm not in {sanitize_name(x) for x in solo}:
-                continue
+        for sf in seleccionadas:
             r = audit_and_adapt(sf, work_dir, presupuesto_carpeta, presupuesto_zip,
                                 reorder=not args.keep_description_order)
             results.append(r)
             print(f"  · {r.name:<40} riesgo={r.worst}")
-
-        if not results:
-            sys.exit("[error] --only no coincidió con ninguna skill.")
 
         if args.comando == "inspect":
             for r in results:
@@ -761,17 +1031,12 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
                 0 if veredicto_seguridad.nivel == Nivel.BAJO else 2)
 
         # -------- export --------
-        # Qué artefactos hacen falta: la unión de los modos de instalación
-        # de los destinos elegidos (todos, si no se restringió con
-        # --target). `carpeta` es el único modo no-zip que este conversor
-        # sabe producir, así que cualquier modo que no sea `zip` ni
-        # `url_repositorio` (que no necesita ningún artefacto propio)
-        # implica querer la carpeta.
-        modos_deseados = set()
-        for pid in (elegidos if elegidos else perfiles):
-            modos_deseados.update(perfiles[pid].modos())
-        quiere_zip = "zip" in modos_deseados
-        quiere_carpeta = bool(modos_deseados - {"zip", "url_repositorio"})
+        # Qué artefactos hacen falta: los mismos destinos de los que ya
+        # salieron los presupuestos, arriba. Se derivan una sola vez para que
+        # el presupuesto con el que se recorta una descripción y el rótulo
+        # con el que se anuncia no puedan discrepar nunca.
+        quiere_zip = bool(ids_zip)
+        quiere_carpeta = bool(ids_carpeta)
 
         # El gate va aquí, DENTRO de `export`: `audit` no escribe nada, así
         # que no hay nada que bloquear, y sus evaluaciones deben conservar
@@ -793,20 +1058,22 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         # Un zip por skill, con la carpeta de la skill en la raíz del zip:
         # es la única estructura que Perplexity acepta.
         for r in results:
-            # El `continue` por sí solo no basta: audit_and_adapt ya copió la
-            # skill entera a out/<name>/ antes de que existiera este gate (en
-            # `export`, work_dir ES out), así que sin borrar lo ya escrito el
-            # artefacto peligroso se queda en disco y sólo nos habríamos
-            # ahorrado el .zip — la mitad menos importante de lo que se sube.
+            # Ahora el `continue` basta: no hay nada escrito en `out` que
+            # deshacer. Lo que el gate rechaza sencillamente no se publica, y
+            # se queda en el temporal hasta que este bloque lo borre. Aquí
+            # había un rmtree y un unlink que existían solo para limpiar lo
+            # que audit_and_adapt ya había escrito en el destino final.
             if r.name in bloqueadas and not anulado:
                 b = bloqueos[r.name]
                 print("[bloqueado] {}: {} en {}:{}. No se escriben sus artefactos.".format(
                     r.name, b.regla_id, b.fichero, b.linea), file=sys.stderr)
-                if (out / r.name).exists():
-                    shutil.rmtree(out / r.name)
-                if (out / "{}.zip".format(r.name)).exists():
-                    (out / "{}.zip".format(r.name)).unlink()
                 continue
+
+            # Publicar: del temporal al destino final. `move` renombra cuando
+            # los dos estan en el mismo sistema de ficheros y copia cuando no,
+            # asi que no se paga una segunda copia del arbol sin necesidad.
+            shutil.move(str(work_dir / r.name), str(out / r.name))
+
             if quiere_zip:
                 write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
                 zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
@@ -835,18 +1102,25 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
                        ensure_ascii=False, indent=2),
             encoding="utf-8")
 
+    # Los rótulos salen de los perfiles que de verdad usan cada artefacto, no
+    # de dos nombres escritos a mano. Antes decian siempre «Perplexity» y
+    # «Mistral», asi que un `--target claude-code` anunciaba un artefacto de
+    # Mistral que Mistral no iba a recibir.
+    etiquetas = lambda ids: ", ".join(perfiles[i].label for i in ids)   # noqa: E731
     print(f"\n[ok] Salida en: {out}")
     if quiere_zip:
-        print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill; "
+        print(f"     <skill>.zip → {etiquetas(ids_zip)}")
+        print(f"                   ({len(results)} zip(s), uno por skill; "
               f"descripción ≤{presupuesto_zip} B)")
     if quiere_carpeta:
         if args.zip_only:
-            print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de "
-                  f"{presupuesto_carpeta} B")
+            print(f"     <skill>/    → no disponible: --zip-only ha borrado la variante "
+                  f"de {presupuesto_carpeta} B que necesita {etiquetas(ids_carpeta)}")
         else:
-            print(f"     Mistral    → <skill>/      (descripción ≤{presupuesto_carpeta} B — NO es el "
+            print(f"     <skill>/    → {etiquetas(ids_carpeta)}")
+            print(f"                   (descripción ≤{presupuesto_carpeta} B — NO es el "
                   f"zip descomprimido)")
-    print(f"     Informe    → INFORME-PORTABILIDAD.md")
+    print(f"     Informe     → INFORME-PORTABILIDAD.md")
     riesgo = [r.name for r in results if r.worst == "alta"]
     if riesgo:
         print(f"\n[aviso] Riesgo alto en: {', '.join(riesgo)}. Lee el informe antes de subirlas.")

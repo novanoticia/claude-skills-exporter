@@ -65,6 +65,71 @@ class InformeMarkdown(unittest.TestCase):
         self.assertIn(ev_perfil["verificado_el"], md)
 
 
+class Finding:
+    """Doble minimo del Finding de convert.py, que no es importable aqui."""
+
+    def __init__(self, severity, code, message):
+        self.severity, self.code, self.message = severity, code, message
+
+
+class HallazgosDePortabilidadEnElInforme(unittest.TestCase):
+    """El informe no imprimia ni un solo Finding.
+
+    Renderizaba origen, descripcion, adaptaciones y evaluaciones por destino,
+    pero nunca recorria `r.findings`. Vivian solo en resumen.json, y el CLI
+    remite al informe: quien lo leia no los veia nunca.
+    """
+
+    def setUp(self):
+        self.perfiles = cargar_perfiles()
+        self.res = [Resultado("email-triage")]
+        self.evaluaciones = {"email-triage": {
+            "perplexity-computer": evs("perplexity-computer", Estado.COMPATIBLE)}}
+
+    def md(self):
+        return informe_markdown(self.res, self.evaluaciones, "./x", self.perfiles)
+
+    def test_el_markdown_los_contiene(self):
+        self.res[0].findings = [
+            Finding("alta", "description-sin-activacion",
+                    "Falta el criterio de activación.")]
+        md = self.md()
+        self.assertIn("description-sin-activacion", md)
+        self.assertIn("Falta el criterio de activación.", md)
+
+    def test_lleva_severidad_codigo_y_mensaje(self):
+        self.res[0].findings = [Finding("media", "scripts", "Incluye scripts/.")]
+        md = self.md()
+        self.assertIn("`scripts`", md)
+        self.assertIn("severidad **media**", md)
+        self.assertIn("Incluye scripts/.", md)
+
+    def test_los_graves_van_primero(self):
+        self.res[0].findings = [
+            Finding("baja", "cuerpo-largo", "Cuerpo largo."),
+            Finding("alta", "sin-frontmatter", "Sin frontmatter."),
+            Finding("media", "scripts", "Incluye scripts/."),
+        ]
+        md = self.md()
+        self.assertLess(md.index("sin-frontmatter"), md.index("scripts"))
+        self.assertLess(md.index("scripts"), md.index("cuerpo-largo"))
+
+    def test_se_distinguen_de_los_de_seguridad(self):
+        """El informe lleva dos listas de hallazgos con vocabularios
+        distintos; llamarlas igual invitaria a confundirlas."""
+        self.res[0].findings = [Finding("alta", "sin-frontmatter", "Sin frontmatter.")]
+        self.assertIn("**Hallazgos de portabilidad (1):**", self.md())
+
+    def test_sin_hallazgos_no_aparece_la_seccion(self):
+        self.assertNotIn("Hallazgos de portabilidad", self.md())
+
+    def test_la_seccion_de_seguridad_no_se_toca(self):
+        """La de arriba ya funcionaba: esto no debe alterarla."""
+        self.res[0].findings = [Finding("alta", "sin-frontmatter", "Sin frontmatter.")]
+        md = self.md()
+        self.assertNotIn("## Seguridad del paquete", md)   # no se pasó veredicto
+
+
 class ResumenJson(unittest.TestCase):
 
     def setUp(self):

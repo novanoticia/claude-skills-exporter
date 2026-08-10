@@ -105,17 +105,62 @@ def seccion_seguridad(veredicto) -> str:
     return "\n".join(L)
 
 
-def _celda(evaluaciones) -> str:
+def _celda(evaluaciones, anulado: bool = False) -> str:
     if not evaluaciones:
         return "—"
+    estado = Estado.peor([e.estado for e in evaluaciones])
     if any(e.bloqueo_seguridad is not None for e in evaluaciones):
         # El bloqueo se decide por skill (tarea 8, `bloqueo_para`): todas las
         # evaluaciones de una misma skill lo comparten. Sin esta guarda el
         # icono normal de compatibilidad mentiria sobre un artefacto que no
         # se ha escrito.
-        return "🚫 bloqueado"
-    estado = Estado.peor([e.estado for e in evaluaciones])
+        #
+        # Con anulacion el artefacto SI esta escrito, asi que "bloqueado"
+        # seria igual de falso por el otro lado. Se dice lo que ha pasado:
+        # el estado real que le corresponde, marcado con el aviso de que
+        # arrastra un bloqueo que alguien decidio saltarse.
+        if not anulado:
+            return "🚫 bloqueado"
+        return "⚠️ {} (con bloqueo)".format(ETIQUETA[estado])
     return "{} {}".format(ICONO[estado], ETIQUETA[estado])
+
+
+# De peor a mejor. `Finding.severity` usa el vocabulario de portabilidad,
+# que no tiene `critica`: esa solo existe en el de seguridad.
+ORDEN_SEVERIDAD = ("alta", "media", "baja")
+
+
+def _hallazgos_de_portabilidad(r) -> list:
+    """Los Finding de una skill, que hasta ahora solo veia resumen.json.
+
+    El informe renderizaba origen, descripcion, adaptaciones y evaluaciones
+    por destino, pero nunca recorria `r.findings`. El CLI remite al informe,
+    asi que quien lo leia no llegaba a ver ni la descripcion sin criterio de
+    activacion, ni el enlace simbolico omitido, ni el fichero que no se pudo
+    leer: existian solo en el JSON.
+
+    Se dicen "de portabilidad" a proposito. El informe ya trae una lista de
+    hallazgos mas arriba, la de seguridad, con otro vocabulario -ids SEC-,
+    ambito, confianza-, y llamar igual a las dos cosas en el mismo documento
+    invitaria a confundirlas.
+
+    Se ordenan de peor a mejor, de forma estable: quien abre el informe por
+    una skill con veinte hallazgos necesita los graves arriba, y dentro de
+    cada severidad el orden en que el pipeline los encontro sigue siendo
+    informativo (primero el frontmatter, luego las senales, luego el
+    empaquetado).
+    """
+    if not r.findings:
+        return []
+    orden = {s: i for i, s in enumerate(ORDEN_SEVERIDAD)}
+    ordenados = sorted(r.findings,
+                       key=lambda f: orden.get(f.severity, len(ORDEN_SEVERIDAD)))
+    L = ["**Hallazgos de portabilidad ({}):**".format(len(ordenados)), ""]
+    for f in ordenados:
+        L.append("- {} `{}` · severidad **{}** — {}".format(
+            ICONO_SEVERIDAD.get(f.severity, "•"), f.code, f.severity, f.message))
+    L.append("")
+    return L
 
 
 def informe_markdown(resultados, evaluaciones, origen, perfiles,
@@ -136,7 +181,8 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
         "|---" * (len(ids) + 1) + "|",
     ]
     for r in resultados:
-        celdas = [_celda(evaluaciones.get(r.name, {}).get(i, [])) for i in ids]
+        celdas = [_celda(evaluaciones.get(r.name, {}).get(i, []), anulado)
+                  for i in ids]
         L.append("| `{}` | {} |".format(r.name, " | ".join(celdas)))
     L += [
         "",
@@ -156,16 +202,30 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
             # con el bloqueo y su motivo. Sin esto el "por que" solo vive en
             # stderr y en resumen.json, y el informe -que es lo que el
             # usuario lee- dice que hay un 🚫 sin decir de donde sale.
-            L += ["> 🚫 **Artefactos no escritos por seguridad:** `{}` "
-                  "(severidad {}) en `{}:{}`.".format(
-                      bloqueo.regla_id, bloqueo.severidad,
-                      bloqueo.fichero, bloqueo.linea), ""]
+            #
+            # Con anulacion los artefactos SI estan en disco, asi que la
+            # formula de siempre afirmaba algo falso. El bloqueo sigue siendo
+            # lo mas importante de esta entrada y no se pierde ni una linea
+            # de el: lo que cambia es el verbo, de "no se escribieron" a "se
+            # escribieron de todos modos, y fue una decision".
+            if anulado:
+                L += ["> ⚠️ **Exportada pese a un bloqueo de seguridad, por decisión "
+                      "explícita:** `{}` (severidad {}) en `{}:{}`. Los artefactos "
+                      "de esta skill **sí se han escrito**.".format(
+                          bloqueo.regla_id, bloqueo.severidad,
+                          bloqueo.fichero, bloqueo.linea), ""]
+            else:
+                L += ["> 🚫 **Artefactos no escritos por seguridad:** `{}` "
+                      "(severidad {}) en `{}:{}`.".format(
+                          bloqueo.regla_id, bloqueo.severidad,
+                          bloqueo.fichero, bloqueo.linea), ""]
         L += ["- Origen: `{}`".format(r.src_dir),
               "- Descripción: {}".format(r.description[:300]), ""]
         if r.adaptations:
             L += ["**Adaptado automáticamente:**", ""]
             L += ["- {}".format(a) for a in r.adaptations]
             L.append("")
+        L += _hallazgos_de_portabilidad(r)
         for i in ids:
             for ev in evaluaciones.get(r.name, {}).get(i, []):
                 if ev.estado == Estado.COMPATIBLE:

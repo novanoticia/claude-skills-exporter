@@ -28,7 +28,7 @@ class CopiaSinSeguirEnlaces(unittest.TestCase):
             (origen / "trampa.txt").symlink_to(secreto)
 
             destino = raiz / "salida"
-            senales = copiar_skill(origen, destino, ignorar=set())
+            senales, _ = copiar_skill(origen, destino, ignorar=set())
 
             self.assertFalse((destino / "trampa.txt").exists())
             self.assertTrue((destino / "nota.md").exists())
@@ -46,7 +46,7 @@ class CopiaSinSeguirEnlaces(unittest.TestCase):
             origen = Path(tmp) / "skill"
             (origen / "references").mkdir(parents=True)
             (origen / "references" / "guia.md").write_text("hola", encoding="utf-8")
-            senales = copiar_skill(origen, Path(tmp) / "salida", ignorar=set())
+            senales, _ = copiar_skill(origen, Path(tmp) / "salida", ignorar=set())
             self.assertEqual(senales, [])
             self.assertTrue((Path(tmp) / "salida" / "references" / "guia.md").exists())
 
@@ -95,7 +95,7 @@ class CopiaSinSeguirEnlaces(unittest.TestCase):
             (origen / "config").symlink_to(secretos, target_is_directory=True)
 
             destino = raiz / "salida"
-            senales = copiar_skill(origen, destino, ignorar=set())
+            senales, _ = copiar_skill(origen, destino, ignorar=set())
 
             self.assertFalse((destino / "config").exists())
             self.assertTrue((destino / "nota.md").exists())
@@ -125,7 +125,7 @@ class CopiaSinSeguirEnlaces(unittest.TestCase):
             (origen / "node_modules").symlink_to(objetivo, target_is_directory=True)
 
             destino = raiz / "salida"
-            senales = copiar_skill(origen, destino, ignorar={"node_modules"})
+            senales, _ = copiar_skill(origen, destino, ignorar={"node_modules"})
 
             self.assertEqual(senales, [])
             self.assertFalse((destino / "node_modules").exists())

@@ -18,6 +18,7 @@ import re
 from pathlib import Path
 
 from exporter.modelo import Hallazgo
+from exporter.seguridad.recorrido import leer_para_analisis
 
 HOOKS_NPM = ("preinstall", "install", "postinstall")
 
@@ -29,9 +30,30 @@ NOMBRES_SECRETO = {".env", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
                    "credentials.json", ".npmrc", ".pypirc"}
 SUFIJOS_SECRETO = (".pem", ".p12", ".pfx", ".keystore")
 
-RANGO_NPM = re.compile(r"^\s*[\^~*]|^\s*$|latest|^\s*(git\+|https?://)|\|\||\s-\s|[<>]")
+# Sufijos de `.env.<algo>` que son PLANTILLA y no secreto. La lista es corta
+# a proposito: marcar un `.env.example` es el falso positivo que ensena a la
+# gente a ignorar los avisos, y ese coste es peor que el hallazgo que se
+# gana. Todo lo demas -.env.local, .env.production- se trata como un .env,
+# porque eso es lo que es: un fichero de entorno con valores de verdad.
+ENV_PLANTILLA = {"example", "sample", "template", "dist", "defaults", "tpl"}
+
+# Un valor de dependencia npm que NO fija una version. Ademas de los rangos
+# clasicos, cualquier especificador con protocolo -github:, file:, link:,
+# workspace:, npm:...- y la forma corta `usuario/repo`: todos ellos traen lo
+# que haya en el otro extremo en el momento de instalar, que es exactamente
+# lo que "sin fijar" significa. Ni `:` ni `/` aparecen nunca en un semver,
+# asi que las dos alternativas nuevas no pueden tocar una version fijada.
+RANGO_NPM = re.compile(r"^\s*[\^~*]|^\s*$|latest|^\s*(git\+|https?://)|\|\||\s-\s|[<>]"
+                       r"|^\s*[a-z][\w+.-]*:|^\s*[\w.-]+/[\w.-]+")
+
 PIN_PYTHON = re.compile(r"==\s*[0-9]")
-LINEA_PYTHON = re.compile(r"^\s*[A-Za-z0-9._-]+\s*[<>=!~]")
+
+# Una linea de dependencia de Python: el nombre del paquete, sus extras
+# opcionales, y despues un operador de version, un marcador de entorno, o
+# NADA EN ABSOLUTO. Antes se exigia el operador, asi que `requests` a secas
+# -el caso mas suelto que existe, porque acepta cualquier version publicada
+# hoy y manana- era el unico que se escapaba limpio.
+LINEA_PYTHON = re.compile(r"^\s*[A-Za-z0-9._-]+\s*(\[[^\]]*\]\s*)?([<>=!~;].*)?$")
 
 # `pyproject.toml` se analiza por lineas y no con un parser TOML: Python 3.8
 # no trae `tomllib` y la restriccion de solo-stdlib es innegociable. Es un
@@ -61,6 +83,20 @@ def _h(hid, familia, dimension, severidad, confianza, ambito,
                     severidad=severidad, confianza=confianza, ambito=ambito,
                     ubicacion=ubicacion, muestra=muestra,
                     titulo=titulo, mitigacion=mitigacion)
+
+
+def _es_env_con_valores(nombre: str) -> bool:
+    """True para `.env` y sus variantes reales, False para las plantillas.
+
+    NOMBRES_SECRETO comparaba por igualdad exacta, asi que `.env.local` y
+    `.env.production` -que son justo los que llevan valores de verdad, no
+    los huecos- no contaban como credencial.
+    """
+    if nombre == ".env":
+        return True
+    if not nombre.startswith(".env."):
+        return False
+    return nombre.rsplit(".", 1)[-1].lower() not in ENV_PLANTILLA
 
 
 def _leer_json(f):
@@ -108,7 +144,12 @@ def _python(f) -> list:
         return []
     sueltas = []
     for numero, linea in enumerate(texto.splitlines(), start=1):
-        if not linea.strip() or linea.lstrip().startswith("#"):
+        # Las lineas que empiezan por `-` no son dependencias sino opciones
+        # del propio fichero (`-r otro.txt`, `--index-url ...`, `-e .`).
+        # Hay que saltarlas explicitamente desde que LINEA_PYTHON acepta un
+        # nombre suelto: `-` esta en su clase de caracteres, asi que un
+        # `--index-url` casaria y se reportaria como dependencia sin fijar.
+        if not linea.strip() or linea.lstrip().startswith(("#", "-")):
             continue
         if LINEA_PYTHON.match(linea) and not PIN_PYTHON.search(linea):
             sueltas.append((numero, linea.strip()))
@@ -157,16 +198,107 @@ def _pyproject(f) -> list:
     return []
 
 
+# Proporcion maxima de caracteres "no texto" que se tolera antes de dejar de
+# considerar que el contenido decodificado es texto. Se mide sobre el texto
+# YA sin bytes nulos: lo que cuenta como no-texto es el caracter de
+# reemplazo -es decir, bytes que no son UTF-8 valido- y los de control que no
+# sean tabulador ni salto de linea.
+UMBRAL_NO_TEXTO = 0.05
+
+
+def _texto_con_nulos(f) -> list:
+    """Un fichero marcado binario cuyo contenido es casi todo texto.
+
+    `es_binario` decide por un unico byte nulo en los primeros 8 KB. Eso
+    convierte a un `.sh` perfectamente ejecutable con un \\x00 dentro de un
+    comentario en "binario", y antes eso lo sacaba del motor entero. Un
+    fichero de TEXTO con bytes nulos no tiene explicacion inocente: o esta
+    ofuscado para esquivar el analisis, o esta en una codificacion (UTF-16)
+    que impide leerlo. En los dos casos el motor no ha podido analizarlo
+    como lo que es, y eso hay que decirlo.
+
+    La medida NO puede ser `str.isprintable()` sobre el texto decodificado:
+    con errors="replace" cada byte indecodificable se convierte en U+FFFD, y
+    U+FFFD ES imprimible, asi que un ELF puntuaria como "casi todo texto".
+    Se cuenta al reves: los caracteres de reemplazo son la evidencia de que
+    era binario de verdad. Un texto con nulos decodifica limpio -el nulo es
+    un punto de codigo valido- y un binario de verdad produce una avalancha
+    de U+FFFD.
+    """
+    datos = leer_para_analisis(f.absoluta)
+    if not datos or b"\x00" not in datos:
+        return []
+    sin_nulos = datos.replace(b"\x00", b"")
+    if not sin_nulos:
+        return []
+    texto = sin_nulos.decode("utf-8", errors="replace")
+    if not texto:
+        return []
+    no_texto = sum(1 for c in texto
+                   if c == "�" or (not c.isprintable() and c not in "\t\n\r"))
+    if no_texto / len(texto) > UMBRAL_NO_TEXTO:
+        return []
+
+    muestra = next((l.strip() for l in texto.splitlines() if l.strip()), "")
+    return [_h("SEC-OFUSCA-NULOS-001", "ofuscacion", "tecnico", "alta", "alta",
+               f.ambito, f.ruta + ":1", muestra[:120],
+               "Fichero de texto con bytes nulos",
+               "Un fichero de texto no debería contener bytes nulos: o se han "
+               "puesto para que el análisis lo tome por binario y no lo mire, o "
+               "está en una codificación como UTF-16 que impide leerlo. Guardarlo "
+               "en UTF-8 sin bytes nulos y volver a auditarlo.")]
+
+
+# Cualquier secuencia que pueda ser un nombre de fichero o una ruta.
+TOKEN_RUTA = re.compile(r"[\w./\\-]+")
+
+
+def _indice_de_menciones(ficheros) -> set:
+    """Los nombres y rutas que menciona el texto del repositorio.
+
+    Antes esto era una lista con el texto COMPLETO de todos los ficheros no
+    binarios y, por cada binario, se recorria entera buscando su nombre como
+    subcadena. Cuadratico -y con el arbol entero en memoria-: medido sobre
+    arboles sinteticos, doblar la entrada multiplicaba el tiempo por 3,4.
+    Recorriendo los textos UNA vez y consultando un conjunto, el coste pasa a
+    ser lineal y no queda ni un fichero retenido.
+
+    El cambio de subcadena a conjunto aprieta un poco la comprobacion: antes
+    un README que dijera "utilidad" contaba como documentacion de un binario
+    llamado `util`, porque una cosa contiene a la otra. Ahora hace falta que
+    el nombre aparezca como pieza propia. Es la direccion segura para una
+    comprobacion de seguridad -menos ficheros dados por documentados sin
+    estarlo-, y para que siga valiendo lo que si es una mencion de verdad se
+    indexa cada token Y su nombre final: si el README cita `bin/util`, el
+    binario `util` sigue estando documentado.
+    """
+    menciones = set()
+    for f in ficheros:
+        if f.binario:
+            continue
+        try:
+            texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for token in TOKEN_RUTA.findall(texto):
+            token = token.replace("\\", "/")
+            if token.startswith("./"):
+                token = token[2:]
+            token = token.rstrip("/")
+            if not token:
+                continue
+            menciones.add(token)
+            menciones.add(token.rsplit("/", 1)[-1])
+    return menciones
+
+
 def analizar(raiz, ficheros) -> list:
     raiz = Path(raiz)
     salida = []
-    textos = []
-    for f in ficheros:
-        if not f.binario:
-            try:
-                textos.append(f.absoluta.read_text(encoding="utf-8", errors="replace"))
-            except OSError:
-                pass
+    # El indice solo hace falta para decidir si un binario esta documentado.
+    # Un repositorio sin binarios -el caso normal- no lee ningun texto por
+    # esta via, que antes se leian todos siempre.
+    menciones = None
 
     for f in ficheros:
         nombre = os.path.basename(f.ruta)
@@ -187,7 +319,8 @@ def analizar(raiz, ficheros) -> list:
                 "No se abre: su contenido no se ha analizado. Descomprimirlo y "
                 "versionar los ficheros, o justificar por qué viaja comprimido."))
 
-        if nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO):
+        if (nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO)
+                or _es_env_con_valores(nombre)):
             salida.append(_h(
                 "SEC-SECRETO-EN-REPO-001", "permisos_y_acciones", "tecnico",
                 "alta", "alta", f.ambito, f.ruta + ":1", nombre,
@@ -195,8 +328,28 @@ def analizar(raiz, ficheros) -> list:
                 "Retirarlo del control de versiones, rotar lo que contuviera y "
                 "añadirlo a .gitignore."))
 
+        # Un fichero que no se pudo abrir es el caso mas puro de contenido
+        # opaco: no se sabe nada de el, ni siquiera si es texto. Antes se
+        # colaba disfrazado de binario -es_binario devolvia True ante un
+        # OSError-, asi que el paquete acababa acusado de traer un "binario
+        # no documentado", que afirma algo sobre un contenido que nadie ha
+        # visto. El motor tiene que decir lo que le pasa, no inventarse una
+        # categoria que encaje.
+        if not f.legible:
+            salida.append(_h(
+                "SEC-ILEGIBLE-001", "cadena_de_suministro", "cadena_de_suministro",
+                "media", "alta", f.ambito, f.ruta + ":1", nombre,
+                "Fichero que no se ha podido leer",
+                "El análisis no ha podido abrirlo, así que no dice nada sobre su "
+                "contenido. Corregir sus permisos y volver a auditar, o retirarlo "
+                "del paquete."))
+            continue
+
         if f.binario and ext not in EXTENSIONES_ARCHIVO:
-            if not any(nombre in t or f.ruta in t for t in textos):
+            salida.extend(_texto_con_nulos(f))
+            if menciones is None:
+                menciones = _indice_de_menciones(ficheros)
+            if nombre not in menciones and f.ruta not in menciones:
                 salida.append(_h(
                     "SEC-BINARIO-NO-DOCUMENTADO-001", "cadena_de_suministro",
                     "cadena_de_suministro", "media", "media", f.ambito,

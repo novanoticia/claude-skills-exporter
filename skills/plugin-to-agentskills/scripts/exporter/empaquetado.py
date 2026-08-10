@@ -17,13 +17,21 @@ from pathlib import Path
 from exporter.modelo import Senal
 
 
-def copiar_skill(src: Path, dest: Path, ignorar: set) -> list:
+def copiar_skill(src: Path, dest: Path, ignorar: set) -> tuple:
     """Copia el arbol omitiendo enlaces simbolicos y nombres ignorados.
 
-    Devuelve una Senal por cada enlace omitido.
+    Devuelve `(senales, ilegibles)`: una Senal por cada enlace omitido, y una
+    pareja `(ruta_relativa, motivo)` por cada fichero que no se pudo leer.
+
+    Un fichero sin permiso de lectura se omite igual que un enlace, y por la
+    misma razon: es lo unico que permite terminar el export. Antes el OSError
+    subia sin capturar y tumbaba el programa entero con un traceback. Omitirlo
+    en silencio, en cambio, produciria un artefacto al que le falta un fichero
+    sin que nadie lo diga.
     """
     src, dest = Path(src), Path(dest)
     senales = []
+    ilegibles = []
     for base, dirs, ficheros in os.walk(str(src)):
         dirs[:] = [d for d in dirs
                    if d not in ignorar and not os.path.islink(os.path.join(base, d))]
@@ -44,13 +52,20 @@ def copiar_skill(src: Path, dest: Path, ignorar: set) -> list:
                 senales.append(_senal_enlace(origen, src))
                 continue
             destino = destino_base / nombre
-            destino.write_bytes(Path(origen).read_bytes())
+            try:
+                datos = Path(origen).read_bytes()
+                modo = os.stat(origen).st_mode & 0o777
+            except OSError as e:
+                ilegibles.append((os.path.relpath(origen, str(src)),
+                                  e.strerror or str(e)))
+                continue
+            destino.write_bytes(datos)
             # read_bytes/write_bytes no conservan el modo del fichero, a
             # diferencia de shutil.copy2. Sin esto, un scripts/*.sh con +x
             # llega al paquete sin permiso de ejecucion, y Perplexity
             # Computer -que SI ejecuta scripts/- no puede lanzarlo.
-            os.chmod(destino, os.stat(origen).st_mode & 0o777)
-    return senales
+            os.chmod(destino, modo)
+    return senales, ilegibles
 
 
 def _senal_enlace(ruta: str, raiz: Path) -> Senal:

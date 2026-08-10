@@ -66,7 +66,7 @@ class DeteccionEnArbol(unittest.TestCase):
             fichero = carpeta / "guia.md"
             fichero.write_text("Primera linea\nUsa mcp__gmail__buscar aqui\n", encoding="utf-8")
 
-            senales = detectar_en_arbol(raiz)
+            senales, _ = detectar_en_arbol(raiz)
 
             self.assertEqual(len(senales), 1)
             self.assertEqual(senales[0].id, "mcp-tool")
@@ -77,7 +77,7 @@ class DeteccionEnArbol(unittest.TestCase):
             fichero = Path(raiz) / "logo.png"
             fichero.write_bytes(b"mcp__gmail__buscar\n")
 
-            senales = detectar_en_arbol(raiz)
+            senales, _ = detectar_en_arbol(raiz)
 
             self.assertEqual(senales, [])
 
@@ -88,7 +88,7 @@ class DeteccionEnArbol(unittest.TestCase):
             enlace = Path(raiz) / "enlace.md"
             os.symlink(objetivo, enlace)
 
-            senales = detectar_en_arbol(raiz)
+            senales, _ = detectar_en_arbol(raiz)
 
             # El fichero real SI produce senal; el symlink que apunta a el, no
             # se sigue, asi que solo se ve una vez (por real.md).
@@ -102,7 +102,7 @@ class DeteccionEnArbol(unittest.TestCase):
             (Path(raiz) / "otro.md").write_text(
                 "Tambien mcp__gmail__buscar\n", encoding="utf-8")
 
-            senales = detectar_en_arbol(raiz, excluir={"SKILL.md"})
+            senales, _ = detectar_en_arbol(raiz, excluir={"SKILL.md"})
 
             self.assertEqual(len(senales), 1)
             self.assertEqual(senales[0].ubicacion, "otro.md:1")
@@ -112,7 +112,7 @@ class DeteccionEnArbol(unittest.TestCase):
             (Path(raiz) / "SKILL.md").write_text(
                 "Un procedimiento normal y corriente.\n", encoding="utf-8")
 
-            self.assertEqual(detectar_en_arbol(raiz), [])
+            self.assertEqual(detectar_en_arbol(raiz), ([], []))
 
     def test_no_desciende_en_directorios_ignorados(self):
         # Sin podar node_modules/, una senal ahi dentro marcaba como
@@ -126,7 +126,7 @@ class DeteccionEnArbol(unittest.TestCase):
             (Path(raiz) / "SKILL.md").write_text(
                 "Un procedimiento normal y corriente.\n", encoding="utf-8")
 
-            self.assertEqual(detectar_en_arbol(raiz), [])
+            self.assertEqual(detectar_en_arbol(raiz), ([], []))
 
 
 if __name__ == "__main__":
