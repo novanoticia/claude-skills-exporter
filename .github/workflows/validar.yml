@@ -66,8 +66,10 @@ jobs:
           # proposito su propio banco de pruebas malicioso (tests/fixtures/) y la
           # documentacion de los patrones (docs/). Esta es la prueba de humo del
           # conversor, no la del gate: el gate se prueba en tests/test_seg_gate.py.
+          # --only lo es igual: en tests/fixtures/ hay ocho skills que publican
+          # todas `name: fechas`, y exportarlas juntas aborta por nombre repetido.
           python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida-ci \
-            --anular-revision-seguridad
+            --only plugin-to-agentskills --anular-revision-seguridad
           python3 - <<'PY'
           import json, jsonschema, pathlib
           esquema = json.loads(pathlib.Path(
@@ -85,7 +87,8 @@ jobs:
         run: |
           cp -R . /tmp/cse-aislado
           python3 /tmp/cse-aislado/skills/plugin-to-agentskills/scripts/convert.py \
-            /tmp/cse-aislado --out /tmp/salida-aislada --anular-revision-seguridad
+            /tmp/cse-aislado --out /tmp/salida-aislada \
+            --only plugin-to-agentskills --anular-revision-seguridad
           test -f /tmp/salida-aislada/INFORME-PORTABILIDAD.md
           echo "Arranca sin instalacion desde una ruta ajena al repositorio."
 
@@ -93,7 +96,7 @@ jobs:
         run: |
           python3 skills/plugin-to-agentskills/scripts/convert.py --help
           python3 skills/plugin-to-agentskills/scripts/convert.py . --out /tmp/salida \
-            --anular-revision-seguridad
+            --only plugin-to-agentskills --anular-revision-seguridad
           test -f /tmp/salida/INFORME-PORTABILIDAD.md
           test -n "$(ls /tmp/salida/*.zip)"
           echo "El conversor se ejecuta y produce salida."

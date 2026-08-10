@@ -175,7 +175,13 @@ if CONV.exists():
         # proposito su propio banco de pruebas malicioso (tests/fixtures/) y la
         # documentacion de los patrones (docs/). Esta es la prueba de humo del
         # conversor, no la del gate: el gate se prueba en tests/test_seg_gate.py.
+        # --only es obligatorio desde que existe la guarda de nombres unicos:
+        # tests/fixtures/ contiene ocho skills que publican todas `name:
+        # fechas`, asi que exportar el repositorio entero aborta -y hace bien,
+        # porque de esas ocho solo saldria un artefacto-. Aqui interesa la
+        # skill que se publica de verdad, no el banco de pruebas.
         proc = subprocess.run([sys.executable, str(CONV), str(ROOT), "--out", str(out),
+                               "--only", "plugin-to-agentskills",
                                "--anular-revision-seguridad"],
                               capture_output=True, text=True, timeout=180)
         if proc.returncode != 0:

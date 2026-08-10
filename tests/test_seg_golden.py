@@ -132,9 +132,14 @@ class EsteRepositorio(unittest.TestCase):
     def test_ningun_hallazgo_procede_de_la_skill_publicada(self):
         tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp)
+        # --only no debilita esta prueba: auditar_seguridad recorre el arbol
+        # ENTERO antes de que --only elija que artefactos escribir, asi que
+        # los hallazgos que se revisan aqui siguen siendo los de todo el
+        # repositorio. Hace falta porque tests/fixtures/ tiene ocho skills
+        # llamadas todas `fechas` y exportarlas juntas aborta.
         subprocess.run(
             [sys.executable, str(CONVERT), "export", str(RAIZ), "--out", tmp,
-             "--anular-revision-seguridad"],
+             "--only", "plugin-to-agentskills", "--anular-revision-seguridad"],
             capture_output=True, text=True, cwd=str(RAIZ),
             env=dict(os.environ, CSE_FECHA="2026-08-08"))
         s = json.loads((Path(tmp) / "resumen.json").read_text(encoding="utf-8"))["seguridad"]

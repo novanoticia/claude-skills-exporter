@@ -187,6 +187,60 @@ def sanitize_name(raw: str) -> str:
     return n[:64] or "skill"
 
 
+def nombre_publicado(skill_md: Path) -> str:
+    """El identificador con el que la skill sale al mundo.
+
+    Sale del `name` del frontmatter, NO del nombre de la carpeta, y de el
+    cuelgan el nombre del zip, el de la carpeta exportada y las claves de
+    `evaluaciones` y `bloqueos`. audit_and_adapt lo vuelve a calcular igual;
+    aqui hace falta antes, para poder comprobar la unicidad sin haber escrito
+    todavia nada.
+    """
+    fm, _raw_fm, _body = split_frontmatter(
+        skill_md.read_text(encoding="utf-8", errors="replace"))
+    return sanitize_name(str(fm.get("name") or skill_md.parent.name))
+
+
+def _relativa(ruta: Path, raiz: Path) -> str:
+    try:
+        return str(Path(ruta).relative_to(raiz)).replace(os.sep, "/")
+    except ValueError:
+        return str(ruta)
+
+
+def comprobar_nombres_unicos(skill_files, raiz: Path) -> None:
+    """Aborta si dos skills reclaman el mismo nombre publicado.
+
+    Sin esto, la segunda skill machacaba los artefactos de la primera y solo
+    salia UN zip, mientras el informe y resumen.json seguian declarando dos.
+    Y lo mas grave no era eso: `evaluaciones` y `bloqueos` son diccionarios
+    con esa clave, asi que el veredicto de seguridad de una skill se
+    atribuia a la otra -una skill limpia se quedaba sin escribir porque otra,
+    sucia, se llamaba igual-.
+
+    Se aborta en vez de desambiguar sola. Renombrar en silencio produciria un
+    artefacto con un nombre que el autor no eligio, y quien lo subiera a otra
+    plataforma acabaria publicando una skill que no reconoce.
+    """
+    por_nombre = {}
+    for sf in skill_files:
+        por_nombre.setdefault(nombre_publicado(sf), []).append(sf.parent)
+    colisiones = {n: ds for n, ds in por_nombre.items() if len(ds) > 1}
+    if not colisiones:
+        return
+
+    lineas = ["[error] hay skills distintas que reclaman el mismo nombre publicado. "
+              "Se aborta sin escribir nada:"]
+    for nombre, dirs in sorted(colisiones.items()):
+        lineas.append("  · «{}» ← {}".format(
+            nombre, ", ".join(sorted(_relativa(d, raiz) for d in dirs))))
+    lineas.append(
+        "Ese nombre sale del campo 'name' del frontmatter -no del de la carpeta- y se "
+        "normaliza, así que 'My Skill' y 'my-skill' acaban siendo el mismo. Cambia el "
+        "'name' de una de ellas y vuelve a exportar.")
+    sys.exit("\n".join(lineas))
+
+
 # --------------------------------------------------------------------------
 # Auditoría y adaptación
 # --------------------------------------------------------------------------
@@ -832,18 +886,31 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         work_dir.mkdir(parents=True, exist_ok=True)
 
         solo = getattr(args, "only", None)
+        seleccionadas = [
+            sf for sf in skill_files
+            if not solo or sanitize_name(sf.parent.name) in {
+                sanitize_name(x) for x in solo}]
+        if not seleccionadas:
+            sys.exit("[error] --only no coincidió con ninguna skill.")
+
+        # Antes del primer audit_and_adapt, que ya escribe en work_dir. La
+        # comprobacion mira solo las skills SELECCIONADAS: si --only deja
+        # fuera a una de las dos que colisionan, no hay colision que resolver.
+        #
+        # `inspect` se libra a proposito: no indexa nada por nombre -imprime
+        # cada skill por separado y vuelve antes de construir `evaluaciones`-,
+        # asi que no puede atribuir mal ningun veredicto. Y es justo el
+        # comando al que uno acude para diagnosticar este problema: abortarlo
+        # dejaria al usuario sin la herramienta que se lo enseña.
+        if args.comando != "inspect":
+            comprobar_nombres_unicos(seleccionadas, root)
+
         results = []
-        for sf in skill_files:
-            nm = sanitize_name(sf.parent.name)
-            if solo and nm not in {sanitize_name(x) for x in solo}:
-                continue
+        for sf in seleccionadas:
             r = audit_and_adapt(sf, work_dir, presupuesto_carpeta, presupuesto_zip,
                                 reorder=not args.keep_description_order)
             results.append(r)
             print(f"  · {r.name:<40} riesgo={r.worst}")
-
-        if not results:
-            sys.exit("[error] --only no coincidió con ninguna skill.")
 
         if args.comando == "inspect":
             for r in results:
