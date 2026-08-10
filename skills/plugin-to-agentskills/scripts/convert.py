@@ -297,8 +297,8 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     # lineas totales porque sobrevive a las reescrituras de arriba, que
     # cambian texto DENTRO de una linea pero nunca el numero de lineas-.
     offset_skill_md = len(text.splitlines()) - len(body.splitlines())
-    senales = (detectar(body, "SKILL.md", offset=offset_skill_md)
-               + detectar_en_arbol(src_dir, excluir={"SKILL.md"}))
+    del_arbol, ilegibles_al_leer = detectar_en_arbol(src_dir, excluir={"SKILL.md"})
+    senales = detectar(body, "SKILL.md", offset=offset_skill_md) + del_arbol
     res.senales = senales
     for s in senales:
         res.findings.append(Finding(s.severidad_base, s.id,
@@ -322,12 +322,32 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     dest = out_dir / name
     if dest.exists():
         shutil.rmtree(dest)
-    enlaces = copiar_skill(src_dir, dest, ignorar=set(IGNORED_DIRS) | {"SKILL.md"})
+    enlaces, ilegibles_al_copiar = copiar_skill(
+        src_dir, dest, ignorar=set(IGNORED_DIRS) | {"SKILL.md"})
     for s in enlaces:
         res.findings.append(Finding("alta", "enlace-simbolico",
             "Se omitió un enlace simbólico al empaquetar: {} ({}). Copiar su "
             "contenido habría metido en el paquete un fichero de fuera de la "
             "skill.".format(s.ubicacion, s.muestra)))
+
+    # Un fichero que no se pudo abrir no es un fichero limpio: nadie ha
+    # mirado lo que contiene y, al no poder copiarlo, tampoco esta en el
+    # artefacto. Callarlo dejaria el informe afirmando por omision que se
+    # reviso un arbol que no se reviso entero -el mismo silencio que el
+    # Bloque B viene a corregir en el motor de seguridad-.
+    #
+    # Las dos fases que leen el arbol (la deteccion de senales y la copia)
+    # pueden tropezar con el mismo fichero, asi que se deduplica por ruta: a
+    # quien lea el informe le importa que fichero se quedo fuera, no en cual
+    # de las dos pasadas fallo la lectura.
+    ilegibles = {}
+    for ruta_ileg, motivo in list(ilegibles_al_leer) + list(ilegibles_al_copiar):
+        ilegibles.setdefault(str(ruta_ileg).replace(os.sep, "/"), motivo)
+    for ruta_ileg, motivo in sorted(ilegibles.items()):
+        res.findings.append(Finding("media", "fichero-ilegible",
+            "No se pudo leer {}: {}. No se ha auditado su contenido y tampoco se "
+            "ha copiado al artefacto. Corrige sus permisos y vuelve a exportar, o "
+            "revísalo a mano antes de subir la skill.".format(ruta_ileg, motivo)))
 
     for p in sorted(dest.rglob("*")):
         if p.is_file():

@@ -94,8 +94,21 @@ def detectar(texto: str, ruta: str, offset: int = 0) -> list:
     return salida
 
 
-def detectar_en_arbol(raiz, excluir=frozenset()) -> list:
+def detectar_en_arbol(raiz, excluir=frozenset()) -> tuple:
     """Recorre los ficheros de texto de una skill y acumula sus senales.
+
+    Devuelve `(senales, ilegibles)`. `ilegibles` es la lista de
+    `(ruta_relativa, motivo)` de los ficheros que no se pudieron abrir.
+
+    Un fichero sin permiso de lectura NO es un fichero limpio. Antes, el
+    OSError sin capturar tumbaba el export entero con un traceback; pero
+    tragarselo en silencio habria sido igual de malo por el otro lado,
+    porque un informe sin hallazgos se lee como "aqui no hay nada" cuando en
+    realidad significa "esto no lo he mirado". Por eso se devuelven aparte
+    de las senales: no son un patron encontrado en la skill sino una
+    limitacion de la propia auditoria, y quien llama decide como contarlo.
+    `copiar_skill` tropieza despues con los mismos ficheros -tampoco puede
+    leerlos para copiarlos-, asi que convert.py junta las dos listas.
 
     `excluir` es un conjunto de nombres de fichero (basename, no ruta) que se
     saltan. Lo usa quien ya audito ese fichero por otra via -por ejemplo el
@@ -107,6 +120,7 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> list:
     como no_compatible un fichero que el paquete exportado nunca incluye.
     """
     salida = []
+    ilegibles = []
     for base, dirs, ficheros in os.walk(str(raiz)):
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
         for nombre in sorted(ficheros):
@@ -117,8 +131,12 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> list:
                 continue
             if os.path.islink(ruta):
                 continue
-            with open(ruta, encoding="utf-8", errors="replace") as fh:
-                texto = fh.read()
             relativa = os.path.relpath(ruta, str(raiz))
+            try:
+                with open(ruta, encoding="utf-8", errors="replace") as fh:
+                    texto = fh.read()
+            except OSError as e:
+                ilegibles.append((relativa, e.strerror or str(e)))
+                continue
             salida.extend(detectar(texto, relativa))
-    return salida
+    return salida, ilegibles
