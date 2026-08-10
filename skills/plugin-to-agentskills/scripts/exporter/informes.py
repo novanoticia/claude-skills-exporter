@@ -105,16 +105,23 @@ def seccion_seguridad(veredicto) -> str:
     return "\n".join(L)
 
 
-def _celda(evaluaciones) -> str:
+def _celda(evaluaciones, anulado: bool = False) -> str:
     if not evaluaciones:
         return "—"
+    estado = Estado.peor([e.estado for e in evaluaciones])
     if any(e.bloqueo_seguridad is not None for e in evaluaciones):
         # El bloqueo se decide por skill (tarea 8, `bloqueo_para`): todas las
         # evaluaciones de una misma skill lo comparten. Sin esta guarda el
         # icono normal de compatibilidad mentiria sobre un artefacto que no
         # se ha escrito.
-        return "🚫 bloqueado"
-    estado = Estado.peor([e.estado for e in evaluaciones])
+        #
+        # Con anulacion el artefacto SI esta escrito, asi que "bloqueado"
+        # seria igual de falso por el otro lado. Se dice lo que ha pasado:
+        # el estado real que le corresponde, marcado con el aviso de que
+        # arrastra un bloqueo que alguien decidio saltarse.
+        if not anulado:
+            return "🚫 bloqueado"
+        return "⚠️ {} (con bloqueo)".format(ETIQUETA[estado])
     return "{} {}".format(ICONO[estado], ETIQUETA[estado])
 
 
@@ -174,7 +181,8 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
         "|---" * (len(ids) + 1) + "|",
     ]
     for r in resultados:
-        celdas = [_celda(evaluaciones.get(r.name, {}).get(i, [])) for i in ids]
+        celdas = [_celda(evaluaciones.get(r.name, {}).get(i, []), anulado)
+                  for i in ids]
         L.append("| `{}` | {} |".format(r.name, " | ".join(celdas)))
     L += [
         "",
@@ -194,10 +202,23 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
             # con el bloqueo y su motivo. Sin esto el "por que" solo vive en
             # stderr y en resumen.json, y el informe -que es lo que el
             # usuario lee- dice que hay un 🚫 sin decir de donde sale.
-            L += ["> 🚫 **Artefactos no escritos por seguridad:** `{}` "
-                  "(severidad {}) en `{}:{}`.".format(
-                      bloqueo.regla_id, bloqueo.severidad,
-                      bloqueo.fichero, bloqueo.linea), ""]
+            #
+            # Con anulacion los artefactos SI estan en disco, asi que la
+            # formula de siempre afirmaba algo falso. El bloqueo sigue siendo
+            # lo mas importante de esta entrada y no se pierde ni una linea
+            # de el: lo que cambia es el verbo, de "no se escribieron" a "se
+            # escribieron de todos modos, y fue una decision".
+            if anulado:
+                L += ["> ⚠️ **Exportada pese a un bloqueo de seguridad, por decisión "
+                      "explícita:** `{}` (severidad {}) en `{}:{}`. Los artefactos "
+                      "de esta skill **sí se han escrito**.".format(
+                          bloqueo.regla_id, bloqueo.severidad,
+                          bloqueo.fichero, bloqueo.linea), ""]
+            else:
+                L += ["> 🚫 **Artefactos no escritos por seguridad:** `{}` "
+                      "(severidad {}) en `{}:{}`.".format(
+                          bloqueo.regla_id, bloqueo.severidad,
+                          bloqueo.fichero, bloqueo.linea), ""]
         L += ["- Origen: `{}`".format(r.src_dir),
               "- Descripción: {}".format(r.description[:300]), ""]
         if r.adaptations:
