@@ -22,19 +22,45 @@ from exporter.seguridad.recorrido import leer_para_analisis
 
 RUTA_REGLAS = Path(__file__).resolve().parent / "reglas.json"
 
-# El catalogo NO se analiza a si mismo. reglas.json es, por definicion, un
-# fichero lleno de los patrones que el motor caza: comprobado que las lineas
-# que declaran SEC-PROMPT-IGNORA-001 y SEC-PROMPT-REVELA-001 casan con sus
-# propios patrones. Como el fichero vive dentro de la skill publicada, su
-# ambito es `exportado` y el gate se negaria a exportar la herramienta. Se
-# compara por sufijo de ruta y no por igualdad con RUTA_REGLAS para que la
-# exclusion valga tambien al auditar una COPIA de este repositorio, que es lo
-# que hacen el CI y `tests/test_seg_golden.EsteRepositorio`.
-SUFIJO_CATALOGO = "exporter/seguridad/reglas.json"
+def _es_el_catalogo(absoluta) -> bool:
+    """True solo si el fichero ES el catalogo que este motor esta usando.
 
+    El catalogo no se analiza a si mismo. reglas.json es, por definicion, un
+    fichero lleno de los patrones que el motor caza -las lineas que declaran
+    SEC-PROMPT-IGNORA-001 y SEC-PROMPT-REVELA-001 casan con sus propios
+    patrones-, y vive dentro de la skill publicada, asi que su ambito es
+    `exportado` y sin la exclusion el gate se negaria a exportar la
+    herramienta.
 
-def _es_el_catalogo(ruta_relativa: str) -> bool:
-    return ruta_relativa == SUFIJO_CATALOGO or ruta_relativa.endswith("/" + SUFIJO_CATALOGO)
+    La comparacion es por IDENTIDAD DE FICHERO, no por sufijo de ruta. Antes
+    bastaba con que la ruta terminara en "exporter/seguridad/reglas.json", y
+    esa ruta la elige el repositorio auditado: crear
+    `skills/x/exporter/seguridad/reglas.json` daba una exencion gratis, y en
+    un .json -que declaran las once reglas, las tres de inyeccion de prompt
+    incluidas- se esconde muy bien una carga. La exencion la concedia el
+    auditado; ahora la concede el sistema de ficheros, que no se puede
+    falsificar desde dentro del arbol auditado.
+
+    Comprobado que los dos casos que dependen de esto auditan el MISMO
+    inodo, no una copia: `tests/test_seg_golden.EsteRepositorio` ejecuta el
+    convert.py de este repositorio sobre este repositorio, y el paso de CI
+    "El conversor arranca desde una copia aislada" copia el arbol entero y
+    ejecuta el convert.py DE LA COPIA sobre la copia, asi que RUTA_REGLAS se
+    resuelve dentro de esa misma copia.
+
+    El unico caso que pierde la exencion es auditar una copia AJENA de este
+    repositorio con un conversor instalado en otro sitio. Y ahi perderla es
+    lo correcto: el motor no puede distinguir una copia legitima del
+    catalogo de un fichero que un tercero ha puesto en esa ruta con ese
+    contenido. Decirlo es mas honesto que callarlo, y para el humano que
+    sabe lo que esta auditando esta --anular-revision-seguridad.
+    """
+    try:
+        return os.path.samefile(str(absoluta), str(RUTA_REGLAS))
+    except OSError:
+        # El catalogo puede no existir donde se espera, o el fichero
+        # auditado haber desaparecido entre el recorrido y este momento.
+        return False
 
 
 CLAVES = ("id", "familia", "dimension", "severidad", "confianza",
@@ -129,7 +155,7 @@ def analizar(ficheros, reglas) -> list:
     # necesita reglas_aplicables para decidir.
     conocidas = {e.lower() for r in reglas for e in r["extensiones"]}
     for f in ficheros:
-        if _es_el_catalogo(f.ruta):
+        if _es_el_catalogo(f.absoluta):
             continue
         ext = os.path.splitext(f.ruta)[1].lower()
         aplicables = reglas_aplicables(ext, reglas, conocidas)
