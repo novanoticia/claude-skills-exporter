@@ -61,18 +61,41 @@ class EscaladaPorCombinacion(unittest.TestCase):
 
 
 class ContenidoOpaco(unittest.TestCase):
+    """`no_evaluable` no es un grado peor: es la ausencia de veredicto.
+
+    Manda cuando lo peor encontrado es un aviso, y cede ante cualquier cosa
+    de verdad mala, que informa mas que "no he podido mirarlo todo".
+    """
 
     def test_sustituye_a_bajo(self):
         self.assertEqual(evaluar([], True).nivel, Nivel.NO_EVALUABLE)
 
-    def test_no_sustituye_a_moderado(self):
-        self.assertEqual(evaluar([h(severidad="media")], True).nivel, Nivel.MODERADO)
+    def test_sustituye_tambien_a_moderado(self):
+        # Esta prueba afirmaba lo contrario, y entre ella y el resto del
+        # sistema hacian `no_evaluable` INALCANZABLE: toda fuente de
+        # opacidad produce un hallazgo -tiene que producirlo, o el veredicto
+        # no se podria justificar- y esos hallazgos son de severidad media,
+        # luego el nivel nunca era BAJO cuando habia opacidad. El valor
+        # existia en el vocabulario publico y no podia darse jamas.
+        self.assertEqual(evaluar([h(severidad="media")], True).nivel,
+                         Nivel.NO_EVALUABLE)
 
     def test_no_sustituye_a_alto(self):
         self.assertEqual(evaluar([h(severidad="alta")], True).nivel, Nivel.ALTO)
 
+    def test_no_sustituye_a_critico(self):
+        self.assertEqual(evaluar([h(severidad="critica")], True).nivel, Nivel.CRITICO)
+
+    def test_sin_opacidad_una_media_sigue_siendo_moderado(self):
+        """La otra mitad: el cambio no toca el caso sin opacidad."""
+        self.assertEqual(evaluar([h(severidad="media")], False).nivel, Nivel.MODERADO)
+
     def test_el_veredicto_recuerda_que_habia_opacidad(self):
         self.assertTrue(evaluar([h(severidad="alta")], True).hay_contenido_opaco)
+
+    def test_la_recomendacion_acompana_al_nivel(self):
+        v = evaluar([h(severidad="media")], True)
+        self.assertEqual(v.recomendacion, "revision_incompleta")
 
 
 class Dimensiones(unittest.TestCase):

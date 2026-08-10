@@ -247,6 +247,23 @@ def analizar(raiz, ficheros) -> list:
                 "Retirarlo del control de versiones, rotar lo que contuviera y "
                 "añadirlo a .gitignore."))
 
+        # Un fichero que no se pudo abrir es el caso mas puro de contenido
+        # opaco: no se sabe nada de el, ni siquiera si es texto. Antes se
+        # colaba disfrazado de binario -es_binario devolvia True ante un
+        # OSError-, asi que el paquete acababa acusado de traer un "binario
+        # no documentado", que afirma algo sobre un contenido que nadie ha
+        # visto. El motor tiene que decir lo que le pasa, no inventarse una
+        # categoria que encaje.
+        if not f.legible:
+            salida.append(_h(
+                "SEC-ILEGIBLE-001", "cadena_de_suministro", "cadena_de_suministro",
+                "media", "alta", f.ambito, f.ruta + ":1", nombre,
+                "Fichero que no se ha podido leer",
+                "El análisis no ha podido abrirlo, así que no dice nada sobre su "
+                "contenido. Corregir sus permisos y volver a auditar, o retirarlo "
+                "del paquete."))
+            continue
+
         if f.binario and ext not in EXTENSIONES_ARCHIVO:
             salida.extend(_texto_con_nulos(f))
             if not any(nombre in t or f.ruta in t for t in textos):

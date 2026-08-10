@@ -537,7 +537,13 @@ def auditar_seguridad(raiz, dirs_skill) -> VeredictoSeguridad:
     # vacia: un veredicto sin nada que lo justifique, que es justo lo que
     # prohibe el criterio de aceptacion 9. Un binario que nadie documenta SI
     # produce hallazgo, y por ahi entra en la cuenta.
-    opaco = any(h.id in ("SEC-ARCHIVO-ANIDADO-001", "SEC-BINARIO-NO-DOCUMENTADO-001")
+    #
+    # SEC-ILEGIBLE-001 es la tercera fuente y la mas literal de las tres: un
+    # fichero que no se ha podido abrir es contenido del que no se sabe
+    # nada. Faltaba, y su ausencia era parte de por que `no_evaluable` no
+    # llegaba a significar lo que promete su nombre.
+    opaco = any(h.id in ("SEC-ARCHIVO-ANIDADO-001", "SEC-BINARIO-NO-DOCUMENTADO-001",
+                         "SEC-ILEGIBLE-001")
                 for h in hallazgos)
     return seg_riesgo.evaluar(hallazgos, opaco)
 

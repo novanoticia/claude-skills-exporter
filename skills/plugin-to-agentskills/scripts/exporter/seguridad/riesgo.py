@@ -69,8 +69,19 @@ def evaluar(hallazgos, hay_contenido_opaco: bool) -> VeredictoSeguridad:
         nivel = Nivel.CRITICO
 
     # `no_evaluable` no es un grado peor: es la ausencia de veredicto. Solo
-    # manda cuando no hay ningun otro que dar.
-    if hay_contenido_opaco and nivel == Nivel.BAJO:
+    # manda cuando no hay ningun otro que dar, es decir cuando lo peor que se
+    # ha encontrado es un aviso.
+    #
+    # Antes exigia nivel BAJO, y eso lo hacia inalcanzable por construccion:
+    # toda fuente de opacidad produce un hallazgo -tiene que producirlo, o el
+    # veredicto no se podria justificar- y esos hallazgos son de severidad
+    # media, luego el nivel nunca era BAJO cuando habia opacidad. Un valor
+    # del vocabulario publico que no podia darse jamas.
+    #
+    # MODERADO tambien cede, y ALTO y CRITICO no: si se ha encontrado algo
+    # de verdad malo, ese veredicto informa mas que "no he podido mirarlo
+    # todo". La opacidad domina cuando no hay nada peor que un aviso.
+    if hay_contenido_opaco and nivel in (Nivel.BAJO, Nivel.MODERADO):
         nivel = Nivel.NO_EVALUABLE
 
     dimensiones = {d: _nivel_de([h for h in hallazgos if h.dimension == d])

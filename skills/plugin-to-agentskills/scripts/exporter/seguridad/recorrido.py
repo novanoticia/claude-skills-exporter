@@ -61,15 +61,34 @@ class Fichero:
     absoluta: Path
     ambito: str
     binario: bool
+    # False cuando el fichero no se pudo abrir siquiera. Es distinto de
+    # `binario`: un binario se ha leido y no es texto; un ilegible no se ha
+    # llegado a leer, y de su contenido no se sabe absolutamente nada. Antes
+    # los dos casos se confundian -es_binario devolvia True ante un OSError-,
+    # y un fichero sin permisos se contaba como "binario no documentado",
+    # que dice algo que el motor no ha comprobado.
+    legible: bool = True
+
+
+def _cabecera(ruta: Path):
+    """Los primeros bytes del fichero, o None si no se pudo abrir."""
+    try:
+        with open(str(ruta), "rb") as fh:
+            return fh.read(CABECERA_BYTES)
+    except OSError:
+        return None
 
 
 def es_binario(ruta: Path) -> bool:
-    """Un byte nulo en la cabecera es la senal practica de que no es texto."""
-    try:
-        with open(str(ruta), "rb") as fh:
-            return b"\x00" in fh.read(CABECERA_BYTES)
-    except OSError:
-        return True
+    """Un byte nulo en la cabecera es la senal practica de que no es texto.
+
+    Un fichero que no se puede abrir cuenta como binario para no analizarlo
+    como si fuera texto, pero `recorrer` guarda aparte que era ilegible: son
+    dos cosas distintas y confundirlas hacia que el motor afirmara cosas que
+    no habia comprobado.
+    """
+    cabecera = _cabecera(ruta)
+    return cabecera is None or b"\x00" in cabecera
 
 
 def _ambito(rel: str, dirs_skill) -> str:
@@ -116,7 +135,9 @@ def recorrer(raiz, dirs_skill) -> list:
             if absoluta.is_symlink():
                 continue
             rel = os.path.relpath(str(absoluta), str(raiz)).replace(os.sep, "/")
+            cabecera = _cabecera(absoluta)
             salida.append(Fichero(ruta=rel, absoluta=absoluta,
                                   ambito=_ambito(rel, dirs),
-                                  binario=es_binario(absoluta)))
+                                  binario=cabecera is None or b"\x00" in cabecera,
+                                  legible=cabecera is not None))
     return sorted(salida, key=lambda f: f.ruta)

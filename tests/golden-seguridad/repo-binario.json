@@ -23,8 +23,8 @@
       }
     ],
     "hay_contenido_opaco": true,
-    "nivel_riesgo": "moderado",
-    "recomendacion_instalacion": "revisar_permisos"
+    "nivel_riesgo": "no_evaluable",
+    "recomendacion_instalacion": "revision_incompleta"
   },
   "skills": [
     {
