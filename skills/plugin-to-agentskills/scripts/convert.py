@@ -351,7 +351,14 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     # lineas totales porque sobrevive a las reescrituras de arriba, que
     # cambian texto DENTRO de una linea pero nunca el numero de lineas-.
     offset_skill_md = len(text.splitlines()) - len(body.splitlines())
-    del_arbol, ilegibles_al_leer = detectar_en_arbol(src_dir, excluir={"SKILL.md"})
+    # Se excluye por el nombre REAL del fichero descubierto, no por el
+    # literal "SKILL.md": discover_skills acepta cualquier capitalizacion
+    # (`names = {f.lower(): f ...}`), asi que un `skills/x/skill.md` no casaba
+    # con el literal y acababa auditandose dos veces -una vez el cuerpo ya
+    # adaptado y otra el fichero crudo de disco-. La senal del fichero crudo
+    # senalaba ademas un problema que la adaptacion ya habia corregido.
+    del_arbol, ilegibles_al_leer = detectar_en_arbol(
+        src_dir, excluir={skill_md.name})
     senales = detectar(body, "SKILL.md", offset=offset_skill_md) + del_arbol
     res.senales = senales
     for s in senales:
@@ -376,8 +383,15 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     dest = out_dir / name
     if dest.exists():
         shutil.rmtree(dest)
+    # Igual que arriba: por el nombre real, no por el literal. write_skill_md
+    # escribe siempre el nombre canonico en mayusculas, asi que copiar ademas
+    # el original metia en el paquete una segunda copia SIN adaptar. En un
+    # sistema de ficheros sensible a mayusculas -Linux- el artefacto salia
+    # con `SKILL.md` y `skill.md` a la vez (comprobado sobre un volumen APFS
+    # sensible a mayusculas); en macOS los dos nombres colapsaban en uno y el
+    # paquete se quedaba sin ningun `SKILL.md`.
     enlaces, ilegibles_al_copiar = copiar_skill(
-        src_dir, dest, ignorar=set(IGNORED_DIRS) | {"SKILL.md"})
+        src_dir, dest, ignorar=set(IGNORED_DIRS) | {skill_md.name})
     for s in enlaces:
         res.findings.append(Finding("alta", "enlace-simbolico",
             "Se omitió un enlace simbólico al empaquetar: {} ({}). Copiar su "
