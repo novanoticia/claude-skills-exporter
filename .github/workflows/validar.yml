@@ -40,19 +40,48 @@ jobs:
           # un desconocido: no ejecuta nada de lo que analiza. El unico proceso
           # externo del programa es `git clone`. Hasta ahora eso se comprobaba a
           # mano; aqui lo comprueba el CI.
+          #
+          # Antes solo se miraban las llamadas cuyo `func` era un ast.Attribute,
+          # es decir la forma `modulo.funcion(...)`. Eso dejaba pasar las dos
+          # formas mas obvias de esquivarlo:
+          #
+          #     from os import system; system("...")   # llamada por ast.Name
+          #     exec(codigo)                           # builtin, sin modulo
+          #
+          # El paso daba por tanto una garantia que no estaba dando. Ahora se
+          # comprueban las tres formas en que un nombre prohibido puede llegar a
+          # ejecutarse: como atributo, como nombre simple, y en el import que lo
+          # trae al espacio de nombres -que ademas es lo unico que caza un
+          # `from os import system as s`, donde la llamada ya no se llama igual-.
           PERMITIDO = {("subprocess", "run")}
           PROHIBIDO = {"system", "popen", "Popen", "call", "check_output",
-                       "check_call", "spawnl", "spawnv", "execv", "execve"}
+                       "check_call", "spawnl", "spawnv", "execv", "execve",
+                       "eval", "exec"}
+          # De estos modulos no se importa nada a granel: un `import *` esconde
+          # cualquiera de los nombres de arriba.
+          MODULOS_DE_PROCESO = {"os", "subprocess", "pty", "popen2", "commands"}
           malos = []
-          for p in pathlib.Path("skills/plugin-to-agentskills/scripts").rglob("*.py"):
+          for p in sorted(pathlib.Path("skills/plugin-to-agentskills/scripts").rglob("*.py")):
               arbol = ast.parse(p.read_text(encoding="utf-8"))
               for n in ast.walk(arbol):
-                  if not isinstance(n, ast.Call) or not isinstance(n.func, ast.Attribute):
+                  if isinstance(n, ast.ImportFrom):
+                      for alias in n.names:
+                          if alias.name in PROHIBIDO:
+                              malos.append("{}:{} -> from {} import {}".format(
+                                  p, n.lineno, n.module, alias.name))
+                          elif alias.name == "*" and n.module in MODULOS_DE_PROCESO:
+                              malos.append("{}:{} -> from {} import *".format(
+                                  p, n.lineno, n.module))
                       continue
-                  base = getattr(n.func.value, "id", None)
-                  par = (base, n.func.attr)
-                  if n.func.attr in PROHIBIDO or (base == "subprocess" and par not in PERMITIDO):
-                      malos.append("{}:{} -> {}.{}".format(p, n.lineno, base, n.func.attr))
+                  if not isinstance(n, ast.Call):
+                      continue
+                  if isinstance(n.func, ast.Attribute):
+                      base = getattr(n.func.value, "id", None)
+                      par = (base, n.func.attr)
+                      if n.func.attr in PROHIBIDO or (base == "subprocess" and par not in PERMITIDO):
+                          malos.append("{}:{} -> {}.{}".format(p, n.lineno, base, n.func.attr))
+                  elif isinstance(n.func, ast.Name) and n.func.id in PROHIBIDO:
+                      malos.append("{}:{} -> {}()".format(p, n.lineno, n.func.id))
           if malos:
               print("[error] llamadas a procesos externos no permitidas:", file=sys.stderr)
               [print("  " + m, file=sys.stderr) for m in malos]
