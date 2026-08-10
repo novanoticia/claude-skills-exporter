@@ -16,7 +16,8 @@ CONVERT = RAIZ_SCRIPTS / "convert.py"
 
 FIXTURES_SEG = ["repo-descarga-remota", "repo-postinstall", "repo-secreto",
                 "repo-ofuscado", "repo-inyeccion-prompt", "repo-binario",
-                "repo-red-legitima", "repo-skill-maliciosa", "repo-escalada"]
+                "repo-red-legitima", "repo-skill-maliciosa", "repo-escalada",
+                "repo-sin-extension"]
 
 
 def auditar(fixture, destino):

@@ -79,6 +79,43 @@ def cargar_reglas(ruta=None) -> list:
     return reglas
 
 
+def reglas_aplicables(ext: str, reglas, conocidas) -> list:
+    """Que reglas se aplican a un fichero con esa extension.
+
+    `extensiones` era de facto una LISTA BLANCA: si ninguna regla declaraba
+    la extension, el fichero no se analizaba con ninguna. Como el nombre del
+    fichero lo elige el repositorio auditado, eso dejaba al auditado decidir
+    si se le audita: un `scripts/instalar` -la forma idiomatica de un script
+    ejecutable, sin extension- pasaba entero por delante del motor sin que
+    ninguna regla lo mirase.
+
+    Ahora la lista es un VETO, no un permiso. Se analiza todo texto, y la
+    lista solo sirve para NO aplicar una regla donde no tiene sentido:
+
+      - extension que alguna regla declara -> solo las que la declaran, que
+        es el comportamiento de siempre y lo que evita, por ejemplo, buscar
+        conducta_de_prompt dentro de un .py;
+      - extension ausente o que ninguna regla declara -> TODAS las reglas.
+
+    No hay lista de extensiones "inertes" exentas, y es deliberado: una lista
+    asi seria, por construccion, una lista de evasion. El defecto que esto
+    corrige es exactamente "el atacante elige un nombre que el motor no mira",
+    y reservar un conjunto de extensiones no miradas solo lo hace mas pequeno.
+
+    El coste en falsos positivos es bajo porque los patrones del catalogo son
+    frases muy concretas -un gestor de paquetes instalando desde una URL, una
+    descarga entubada a un interprete, una orden de desatender las
+    instrucciones previas- y no formas genericas. Los literales no se
+    escriben aqui: este fichero viaja dentro de la skill publicada, asi que
+    su ambito es `exportado` y escribirlos en claro haria que el motor se
+    delatase a si mismo (§4 del diseno). Viven en reglas.json, que el motor
+    se salta, y en tests/fixtures/, que esta fuera de toda skill.
+    """
+    if ext in conocidas:
+        return [r for r in reglas if ext in r["extensiones"]]
+    return list(reglas)
+
+
 def analizar(ficheros, reglas) -> list:
     """Un Hallazgo por cada (regla, fichero, linea) que coincida.
 
@@ -86,15 +123,17 @@ def analizar(ficheros, reglas) -> list:
     lector necesita es donde mirar, y la linea ya se lo dice.
     """
     salida = []
+    # La union de lo que el catalogo declara. Distingue "extension que alguna
+    # regla conoce" de "extension que ninguna conoce", que es lo unico que
+    # necesita reglas_aplicables para decidir.
+    conocidas = {e.lower() for r in reglas for e in r["extensiones"]}
     for f in ficheros:
         if f.binario:
             continue
         if _es_el_catalogo(f.ruta):
             continue
         ext = os.path.splitext(f.ruta)[1].lower()
-        aplicables = [r for r in reglas if ext in r["extensiones"]]
-        if not aplicables:
-            continue
+        aplicables = reglas_aplicables(ext, reglas, conocidas)
         try:
             texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
         except OSError:

