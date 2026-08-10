@@ -931,18 +931,28 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
 
         print(f"[info] {len(skill_files)} skill(s) encontradas.")
 
-        # Va aquí, ANTES de crear work_dir y del bucle de audit_and_adapt. Si
-        # se calculara después, el recorrido vería los artefactos recién
-        # escritos cuando `--out` cuelga del origen, y un `out/x.zip` propio
-        # produciría un SEC-ARCHIVO-ANIDADO-001 que ensuciaría el veredicto
-        # de un repositorio limpio.
+        # Va aquí, antes del bucle de audit_and_adapt. Desde que los
+        # artefactos se preparan en un temporal y no en `out`, el recorrido
+        # ya no podría verlos aunque se calculara después; se mantiene el
+        # orden porque sigue siendo el correcto -auditar el origen tal como
+        # está, no como queda después de trabajar sobre él-, pero ha dejado
+        # de ser una condición de la que dependa el veredicto.
         veredicto_seguridad = auditar_seguridad(
             root, [str(sf.parent.relative_to(root)) for sf in skill_files])
 
-        # `inspect` y `audit` no escriben ningún fichero de salida: trabajan
-        # sobre una copia efímera que desaparece con este bloque. `export`
-        # usa `out`, que sí sobrevive fuera de él.
-        work_dir = out if out is not None else Path(tmp) / "_trabajo"
+        # Los TRES subcomandos preparan sus artefactos en un temporal que
+        # desaparece con este bloque. `export` no es una excepción: publica a
+        # `out` despues, y solo lo que el gate haya aprobado.
+        #
+        # Antes `export` usaba `out` directamente como directorio de trabajo,
+        # asi que audit_and_adapt escribia la skill entera en el destino
+        # final antes de que el gate opinara. El gate no podia entonces
+        # limitarse a no escribir: tenia que BORRAR lo ya escrito, y entre
+        # una cosa y otra existia una ventana en la que el artefacto
+        # peligroso estaba en el directorio que el usuario mira -y que puede
+        # estar sincronizado con un servicio en la nube, o vigilado por otro
+        # proceso-.
+        work_dir = Path(tmp) / "_trabajo"
         work_dir.mkdir(parents=True, exist_ok=True)
 
         solo = getattr(args, "only", None)
@@ -1048,20 +1058,22 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         # Un zip por skill, con la carpeta de la skill en la raíz del zip:
         # es la única estructura que Perplexity acepta.
         for r in results:
-            # El `continue` por sí solo no basta: audit_and_adapt ya copió la
-            # skill entera a out/<name>/ antes de que existiera este gate (en
-            # `export`, work_dir ES out), así que sin borrar lo ya escrito el
-            # artefacto peligroso se queda en disco y sólo nos habríamos
-            # ahorrado el .zip — la mitad menos importante de lo que se sube.
+            # Ahora el `continue` basta: no hay nada escrito en `out` que
+            # deshacer. Lo que el gate rechaza sencillamente no se publica, y
+            # se queda en el temporal hasta que este bloque lo borre. Aquí
+            # había un rmtree y un unlink que existían solo para limpiar lo
+            # que audit_and_adapt ya había escrito en el destino final.
             if r.name in bloqueadas and not anulado:
                 b = bloqueos[r.name]
                 print("[bloqueado] {}: {} en {}:{}. No se escriben sus artefactos.".format(
                     r.name, b.regla_id, b.fichero, b.linea), file=sys.stderr)
-                if (out / r.name).exists():
-                    shutil.rmtree(out / r.name)
-                if (out / "{}.zip".format(r.name)).exists():
-                    (out / "{}.zip".format(r.name)).unlink()
                 continue
+
+            # Publicar: del temporal al destino final. `move` renombra cuando
+            # los dos estan en el mismo sistema de ficheros y copia cuando no,
+            # asi que no se paga una segunda copia del arbol sin necesidad.
+            shutil.move(str(work_dir / r.name), str(out / r.name))
+
             if quiere_zip:
                 write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
                 zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
