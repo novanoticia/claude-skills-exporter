@@ -778,7 +778,9 @@ def construir_parser():
                      help="vaciar el directorio de salida aunque no lo haya escrito "
                           "esta herramienta (pierdes lo que hubiera dentro)")
     exp.add_argument("--only", nargs="*", default=None,
-                     help="exportar sólo estas skills")
+                     help="exportar sólo estas skills; vale tanto el nombre de la "
+                          "carpeta como el 'name' del frontmatter, que es el que "
+                          "llevan el informe y los artefactos")
     exp.add_argument("--zip-only", action="store_true",
                      help="dejar sólo los .zip (pierdes la variante de carpeta)")
     exp.add_argument("--keep-description-order", action="store_true",
@@ -906,12 +908,25 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         work_dir.mkdir(parents=True, exist_ok=True)
 
         solo = getattr(args, "only", None)
+        # --only acepta los DOS identificadores que tiene una skill, porque
+        # los dos son visibles y ninguno es mas legitimo que el otro: quien
+        # mira el disco ve la carpeta, y quien lee el informe o los
+        # artefactos ve el nombre del frontmatter. Antes filtraba solo por la
+        # carpeta, mientras que artefactos, evaluaciones y bloqueos se
+        # indexaban por el del frontmatter, asi que `--only <nombre-que-el-
+        # usuario-acaba-de-leer>` podia no encontrar nada.
+        pedidas = {sanitize_name(x) for x in (solo or ())}
         seleccionadas = [
             sf for sf in skill_files
-            if not solo or sanitize_name(sf.parent.name) in {
-                sanitize_name(x) for x in solo}]
+            if not solo or pedidas & {sanitize_name(sf.parent.name),
+                                      nombre_publicado(sf)}]
         if not seleccionadas:
-            sys.exit("[error] --only no coincidió con ninguna skill.")
+            sys.exit(
+                "[error] --only no coincidió con ninguna skill. Se admite tanto el "
+                "nombre de la carpeta como el del frontmatter; disponibles: {}".format(
+                    ", ".join(sorted({
+                        "{} ({})".format(nombre_publicado(sf), sf.parent.name)
+                        for sf in skill_files}))))
 
         # Antes del primer audit_and_adapt, que ya escribe en work_dir. La
         # comprobacion mira solo las skills SELECCIONADAS: si --only deja

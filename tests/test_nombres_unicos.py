@@ -131,6 +131,59 @@ class LoQueSiDebeSeguirFuncionando(Base):
         self.assertEqual(r.stdout.count("## fechas"), 2)
 
 
+class OnlyAceptaLosDosIdentificadores(Base):
+    """Una skill tiene dos nombres visibles y ninguno es mas legitimo.
+
+    `--only` filtraba solo por el de la CARPETA, mientras que artefactos,
+    evaluaciones y bloqueos se indexan por el del frontmatter. Es decir: el
+    nombre que el usuario acababa de leer en el informe y en el .zip era
+    justamente el que no funcionaba.
+    """
+
+    ARBOL = {"skills/carpeta-interna/SKILL.md": skill_md("nombre-publicado")}
+
+    def test_por_el_nombre_publicado(self):
+        raiz, salida = self.montar(self.ARBOL)
+        r = self.correr("export", raiz, salida, "--only", "nombre-publicado")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((salida / "nombre-publicado.zip").exists())
+
+    def test_por_el_nombre_de_la_carpeta(self):
+        raiz, salida = self.montar(self.ARBOL)
+        r = self.correr("export", raiz, salida, "--only", "carpeta-interna")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((salida / "nombre-publicado.zip").exists())
+
+    def test_uno_de_cada_en_la_misma_invocacion(self):
+        raiz, salida = self.montar({
+            "skills/uno/SKILL.md": skill_md("fechas"),
+            "skills/dos/SKILL.md": skill_md("horas"),
+        })
+        r = self.correr("export", raiz, salida, "--only", "fechas", "dos")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((salida / "fechas.zip").exists())
+        self.assertTrue((salida / "horas.zip").exists())
+
+    def test_lo_que_no_existe_sigue_sin_casar_y_el_error_ayuda(self):
+        raiz, salida = self.montar(self.ARBOL)
+        r = self.correr("export", raiz, salida, "--only", "inventada")
+        texto = r.stderr + r.stdout
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("nombre-publicado", texto)
+        self.assertIn("carpeta-interna", texto)
+
+    def test_only_sigue_restringiendo_de_verdad(self):
+        """Aceptar dos nombres no puede convertirse en aceptarlos todos."""
+        raiz, salida = self.montar({
+            "skills/uno/SKILL.md": skill_md("fechas"),
+            "skills/dos/SKILL.md": skill_md("horas"),
+        })
+        r = self.correr("export", raiz, salida, "--only", "fechas")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((salida / "fechas.zip").exists())
+        self.assertFalse((salida / "horas.zip").exists())
+
+
 class LaAtribucionCruzada(Base):
     """El motivo de fondo, con el caso que lo hacia visible."""
 
