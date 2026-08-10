@@ -515,6 +515,95 @@ def comprobar_tamano(raiz: Path) -> None:
                          "análisis.".format(MAX_BYTES_REPO // (1024 * 1024)))
 
 
+# Marca de propiedad del directorio de salida. `export` la escribe nada mas
+# crear <out>, no al terminar: si una ejecucion se interrumpe a la mitad, el
+# directorio sigue siendo reconocible como propio y la siguiente ejecucion
+# puede limpiarlo sin exigir --force. Escribirla solo al final dejaria al
+# usuario un destino a medio escribir que la herramienta ya no se atreve a
+# tocar, es decir, un roto que ella misma ha causado.
+NOMBRE_CENTINELA = ".cse-salida"
+
+TEXTO_CENTINELA = (
+    "Directorio de salida de claude-skills-exporter (convert.py export --out).\n"
+    "Su contenido se borra y se regenera entero en cada exportación.\n"
+    "Si borras este fichero, la herramienta dejará de reconocer el directorio\n"
+    "como suyo y se negará a sobrescribirlo sin --force.\n"
+)
+
+
+def _cuelga_de(hijo: Path, padre: Path) -> bool:
+    """True si `hijo` esta dentro de `padre`, o es el mismo `padre`.
+
+    Path.is_relative_to no existe hasta Python 3.9 y aqui el minimo es 3.8.
+    """
+    try:
+        hijo.relative_to(padre)
+    except ValueError:
+        return False
+    return True
+
+
+def es_salida_propia(out: Path) -> bool:
+    """True si <out> puede vaciarse sin preguntar.
+
+    Lo es si no existe, si esta vacio, o si lleva la marca que escribe esta
+    herramienta. Un fichero suelto donde se esperaba un directorio no lo es.
+    """
+    if not out.exists():
+        return True
+    if not out.is_dir():
+        return False
+    if (out / NOMBRE_CENTINELA).exists():
+        return True
+    return not any(out.iterdir())
+
+
+def comprobar_salida_segura(out: Path, src: str, forzar: bool) -> None:
+    """Aborta antes de que `export` vacie un <out> que no ha escrito el.
+
+    Se ejecuta ANTES del rmtree y ANTES de resolve_source: el fallo mas caro
+    de esta herramienta consistia en borrar el destino y descubrir despues
+    que el origen no servia para nada.
+    """
+    p_origen = Path(src).expanduser()
+    # Un origen que no existe como ruta es una URL: se clonara en un temporal
+    # y no hay ningun arbol del usuario con el que <out> pueda solaparse.
+    origen = p_origen.resolve() if p_origen.exists() else None
+
+    if origen is not None:
+        # Estos dos casos no los salta ni --force. No son "borrar algo
+        # valioso" sino "borrar la propia entrada": aunque dejaramos hacerlo,
+        # el export destruiria el arbol que iba a leer y terminaria sin
+        # encontrar ningun SKILL.md. Ofrecer --force ahi seria mentir.
+        #
+        # El caso simetrico -<out> DENTRO del origen- si esta permitido, y a
+        # proposito: `export . --out ./salida` solo borra ./salida, el origen
+        # sobrevive entero y el export funciona. Es ademas la forma del --out
+        # por defecto y la que usan varias pruebas. La version peligrosa de
+        # esa misma forma (`--out ./scripts`, sobre un directorio del propio
+        # repositorio) ya la para la comprobacion de propiedad de abajo, que
+        # no mira donde esta <out> sino si lo escribimos nosotros.
+        if out == origen:
+            sys.exit(
+                "[error] --out apunta al propio origen ({}). Exportar ahí borraría el "
+                "repositorio que se va a leer, y el export terminaría sin nada que "
+                "empaquetar. Elige un directorio de salida fuera del origen.".format(out))
+        if _cuelga_de(origen, out):
+            sys.exit(
+                "[error] el origen ({}) está dentro de --out ({}). Vaciar la salida "
+                "borraría el repositorio que se va a leer. Elige un directorio de "
+                "salida que no contenga al origen.".format(origen, out))
+
+    if not forzar and not es_salida_propia(out):
+        motivo = ("no está vacío" if out.is_dir()
+                  else "ya existe y no es un directorio")
+        sys.exit(
+            "[error] --out ({}) {} y no lo ha escrito esta herramienta: no lleva la "
+            "marca «{}». Se aborta sin borrar nada. Usa un directorio vacío o "
+            "inexistente, o pasa --force si aceptas perder su contenido.".format(
+                out, motivo, NOMBRE_CENTINELA))
+
+
 def resolve_source(src: str, workdir: Path) -> Path:
     p = Path(src).expanduser()
     if p.exists():
@@ -589,7 +678,11 @@ def construir_parser():
     exp.add_argument("--target", nargs="*", default=None,
                      help="restringe qué artefactos se producen; la auditoría "
                           "sigue cubriendo todos los destinos")
-    exp.add_argument("--out", default="./dist-agentskills", help="directorio de salida")
+    exp.add_argument("--out", default="./dist-agentskills",
+                     help="directorio de salida; SE BORRA ENTERO antes de escribir")
+    exp.add_argument("--force", action="store_true",
+                     help="vaciar el directorio de salida aunque no lo haya escrito "
+                          "esta herramienta (pierdes lo que hubiera dentro)")
     exp.add_argument("--only", nargs="*", default=None,
                      help="exportar sólo estas skills")
     exp.add_argument("--zip-only", action="store_true",
@@ -681,11 +774,18 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
     out = None
     if args.comando == "export":
         out = Path(args.out).expanduser().resolve()
-        if out.exists():
+        # Lo primero de todo, antes del rmtree y antes de resolve_source.
+        comprobar_salida_segura(out, args.source, getattr(args, "force", False))
+        if out.is_dir():
             shutil.rmtree(out)
+        elif out.exists():
+            # Solo se llega aqui con --force: sin el, un fichero donde se
+            # esperaba un directorio ya habria abortado la comprobacion.
+            out.unlink()
         # Las carpetas de skill cuelgan directamente de <out>, al lado de su
         # zip: mismos ficheros, distinta descripción.
         out.mkdir(parents=True)
+        (out / NOMBRE_CENTINELA).write_text(TEXTO_CENTINELA, encoding="utf-8")
 
     with tempfile.TemporaryDirectory() as tmp:
         root = resolve_source(args.source, Path(tmp))
