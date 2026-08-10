@@ -30,9 +30,30 @@ NOMBRES_SECRETO = {".env", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
                    "credentials.json", ".npmrc", ".pypirc"}
 SUFIJOS_SECRETO = (".pem", ".p12", ".pfx", ".keystore")
 
-RANGO_NPM = re.compile(r"^\s*[\^~*]|^\s*$|latest|^\s*(git\+|https?://)|\|\||\s-\s|[<>]")
+# Sufijos de `.env.<algo>` que son PLANTILLA y no secreto. La lista es corta
+# a proposito: marcar un `.env.example` es el falso positivo que ensena a la
+# gente a ignorar los avisos, y ese coste es peor que el hallazgo que se
+# gana. Todo lo demas -.env.local, .env.production- se trata como un .env,
+# porque eso es lo que es: un fichero de entorno con valores de verdad.
+ENV_PLANTILLA = {"example", "sample", "template", "dist", "defaults", "tpl"}
+
+# Un valor de dependencia npm que NO fija una version. Ademas de los rangos
+# clasicos, cualquier especificador con protocolo -github:, file:, link:,
+# workspace:, npm:...- y la forma corta `usuario/repo`: todos ellos traen lo
+# que haya en el otro extremo en el momento de instalar, que es exactamente
+# lo que "sin fijar" significa. Ni `:` ni `/` aparecen nunca en un semver,
+# asi que las dos alternativas nuevas no pueden tocar una version fijada.
+RANGO_NPM = re.compile(r"^\s*[\^~*]|^\s*$|latest|^\s*(git\+|https?://)|\|\||\s-\s|[<>]"
+                       r"|^\s*[a-z][\w+.-]*:|^\s*[\w.-]+/[\w.-]+")
+
 PIN_PYTHON = re.compile(r"==\s*[0-9]")
-LINEA_PYTHON = re.compile(r"^\s*[A-Za-z0-9._-]+\s*[<>=!~]")
+
+# Una linea de dependencia de Python: el nombre del paquete, sus extras
+# opcionales, y despues un operador de version, un marcador de entorno, o
+# NADA EN ABSOLUTO. Antes se exigia el operador, asi que `requests` a secas
+# -el caso mas suelto que existe, porque acepta cualquier version publicada
+# hoy y manana- era el unico que se escapaba limpio.
+LINEA_PYTHON = re.compile(r"^\s*[A-Za-z0-9._-]+\s*(\[[^\]]*\]\s*)?([<>=!~;].*)?$")
 
 # `pyproject.toml` se analiza por lineas y no con un parser TOML: Python 3.8
 # no trae `tomllib` y la restriccion de solo-stdlib es innegociable. Es un
@@ -62,6 +83,20 @@ def _h(hid, familia, dimension, severidad, confianza, ambito,
                     severidad=severidad, confianza=confianza, ambito=ambito,
                     ubicacion=ubicacion, muestra=muestra,
                     titulo=titulo, mitigacion=mitigacion)
+
+
+def _es_env_con_valores(nombre: str) -> bool:
+    """True para `.env` y sus variantes reales, False para las plantillas.
+
+    NOMBRES_SECRETO comparaba por igualdad exacta, asi que `.env.local` y
+    `.env.production` -que son justo los que llevan valores de verdad, no
+    los huecos- no contaban como credencial.
+    """
+    if nombre == ".env":
+        return True
+    if not nombre.startswith(".env."):
+        return False
+    return nombre.rsplit(".", 1)[-1].lower() not in ENV_PLANTILLA
 
 
 def _leer_json(f):
@@ -109,7 +144,12 @@ def _python(f) -> list:
         return []
     sueltas = []
     for numero, linea in enumerate(texto.splitlines(), start=1):
-        if not linea.strip() or linea.lstrip().startswith("#"):
+        # Las lineas que empiezan por `-` no son dependencias sino opciones
+        # del propio fichero (`-r otro.txt`, `--index-url ...`, `-e .`).
+        # Hay que saltarlas explicitamente desde que LINEA_PYTHON acepta un
+        # nombre suelto: `-` esta en su clase de caracteres, asi que un
+        # `--index-url` casaria y se reportaria como dependencia sin fijar.
+        if not linea.strip() or linea.lstrip().startswith(("#", "-")):
             continue
         if LINEA_PYTHON.match(linea) and not PIN_PYTHON.search(linea):
             sueltas.append((numero, linea.strip()))
@@ -239,7 +279,8 @@ def analizar(raiz, ficheros) -> list:
                 "No se abre: su contenido no se ha analizado. Descomprimirlo y "
                 "versionar los ficheros, o justificar por qué viaja comprimido."))
 
-        if nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO):
+        if (nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO)
+                or _es_env_con_valores(nombre)):
             salida.append(_h(
                 "SEC-SECRETO-EN-REPO-001", "permisos_y_acciones", "tecnico",
                 "alta", "alta", f.ambito, f.ruta + ":1", nombre,

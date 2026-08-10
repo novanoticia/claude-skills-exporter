@@ -124,6 +124,74 @@ class ArchivosYSecretos(Base):
     def test_un_env_de_ejemplo_no_dispara(self):
         self.assertNotIn("SEC-SECRETO-EN-REPO-001", self.ids({".env.example": "A=\n"}))
 
+    def test_las_variantes_reales_de_env_si_cuentan(self):
+        """NOMBRES_SECRETO comparaba por igualdad exacta con `.env`.
+
+        `.env.local` y `.env.production` son justo los que llevan valores de
+        verdad, no los huecos, y no contaban como credencial.
+        """
+        for nombre in (".env.local", ".env.production", ".env.development"):
+            self.assertIn("SEC-SECRETO-EN-REPO-001", self.ids({nombre: "A=1\n"}), nombre)
+
+    def test_pero_las_plantillas_siguen_fuera(self):
+        """Marcarlas es el falso positivo que ensena a ignorar los avisos."""
+        for nombre in (".env.example", ".env.sample", ".env.template", ".env.dist"):
+            self.assertNotIn("SEC-SECRETO-EN-REPO-001", self.ids({nombre: "A=\n"}), nombre)
+
+
+class DependenciasPythonSinFijar(Base):
+
+    def test_un_paquete_a_secas_es_el_caso_mas_suelto_que_hay(self):
+        """LINEA_PYTHON exigia un operador, asi que `requests` pasaba limpio.
+
+        Es el caso mas suelto que existe: acepta cualquier version publicada
+        hoy y cualquiera que se publique manana.
+        """
+        self.assertIn("SEC-DEP-SIN-FIJAR-002", self.ids({"requirements.txt": "requests\n"}))
+
+    def test_tambien_con_extras(self):
+        self.assertIn("SEC-DEP-SIN-FIJAR-002",
+                      self.ids({"requirements.txt": "requests[security]\n"}))
+
+    def test_una_version_fijada_no_dispara(self):
+        self.assertNotIn("SEC-DEP-SIN-FIJAR-002",
+                         self.ids({"requirements.txt": "requests==2.31.0\n"}))
+
+    def test_las_opciones_del_fichero_no_son_dependencias(self):
+        """`-` esta en la clase de caracteres del nombre de paquete: sin la
+        guarda, `--index-url` se reportaria como dependencia sin fijar."""
+        for linea in ("-r otro.txt", "--index-url https://x.invalid/simple", "-e ."):
+            self.assertNotIn("SEC-DEP-SIN-FIJAR-002",
+                             self.ids({"requirements.txt": linea + "\n"}), linea)
+
+    def test_los_comentarios_siguen_ignorandose(self):
+        self.assertNotIn("SEC-DEP-SIN-FIJAR-002",
+                         self.ids({"requirements.txt": "# requests\n"}))
+
+
+class DependenciasNpmSinFijar(Base):
+
+    def paquete(self, valor):
+        return self.ids({"package.json":
+                         '{"dependencies": {"x": "%s"}}' % valor})
+
+    def test_los_especificadores_con_protocolo_no_fijan_nada(self):
+        """Traen lo que haya al otro extremo en el momento de instalar."""
+        for valor in ("github:usuario/repo", "file:../local", "link:../paq",
+                      "workspace:*", "npm:otro@^1"):
+            self.assertIn("SEC-DEP-SIN-FIJAR-001", self.paquete(valor), valor)
+
+    def test_la_forma_corta_de_github_tampoco(self):
+        self.assertIn("SEC-DEP-SIN-FIJAR-001", self.paquete("usuario/repo"))
+
+    def test_una_version_exacta_sigue_sin_disparar(self):
+        for valor in ("1.0.0", "1.0.0-beta.1", "2.3.4"):
+            self.assertNotIn("SEC-DEP-SIN-FIJAR-001", self.paquete(valor), valor)
+
+    def test_los_rangos_de_siempre_siguen_disparando(self):
+        for valor in ("^1.0.0", "~1.0", "*", "latest", ">=1.0"):
+            self.assertIn("SEC-DEP-SIN-FIJAR-001", self.paquete(valor), valor)
+
 
 class TextoConBytesNulos(Base):
     """Un fichero de texto con bytes nulos no tiene explicacion inocente.
