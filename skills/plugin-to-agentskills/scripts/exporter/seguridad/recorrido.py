@@ -32,6 +32,28 @@ EXCLUIDOS_SIEMPRE = {".git", "__pycache__"}
 
 CABECERA_BYTES = 8192
 
+# Tope de lectura para analizar un fichero marcado como binario. Desde que
+# "parece binario" dejo de significar "no lo mires", el motor puede toparse
+# con una imagen o un ejecutable de cientos de MB, y leerlo entero para
+# pasarle once expresiones regulares no compensa. Un payload en texto plano
+# escondido tras un byte nulo vive, en la practica, en el primer tramo del
+# fichero: el caso real es un script pequeno con un nulo en un comentario,
+# no un ISO. El tope acota el coste; el precio que se paga es que un payload
+# situado mas alla de 1 MiB dentro de un fichero binario no se ve.
+#
+# A los ficheros de texto NO se les aplica: se leian enteros desde siempre y
+# recortarlos ahora perderia deteccion que hoy si funciona.
+MAX_BYTES_ANALISIS = 1024 * 1024
+
+
+def leer_para_analisis(ruta, tope: int = MAX_BYTES_ANALISIS):
+    """Los primeros `tope` bytes del fichero, o None si no se puede leer."""
+    try:
+        with open(str(ruta), "rb") as fh:
+            return fh.read(tope)
+    except OSError:
+        return None
+
 
 @dataclass(frozen=True)
 class Fichero:

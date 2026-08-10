@@ -18,6 +18,7 @@ import re
 from pathlib import Path
 
 from exporter.modelo import Hallazgo
+from exporter.seguridad.recorrido import leer_para_analisis
 
 RUTA_REGLAS = Path(__file__).resolve().parent / "reglas.json"
 
@@ -128,16 +129,27 @@ def analizar(ficheros, reglas) -> list:
     # necesita reglas_aplicables para decidir.
     conocidas = {e.lower() for r in reglas for e in r["extensiones"]}
     for f in ficheros:
-        if f.binario:
-            continue
         if _es_el_catalogo(f.ruta):
             continue
         ext = os.path.splitext(f.ruta)[1].lower()
         aplicables = reglas_aplicables(ext, reglas, conocidas)
-        try:
-            texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
+        # Los marcados como binarios TAMBIEN se analizan. `es_binario` solo
+        # mira si hay un byte nulo en los primeros 8 KB, asi que un .sh
+        # perfectamente ejecutable con un \x00 dentro de un comentario
+        # quedaba fuera del motor entero: un unico byte bastaba para que
+        # ninguna regla lo mirase. Decodificando con errors="replace", un
+        # payload en texto plano sigue casando; lo que de verdad sea binario
+        # produce caracteres de reemplazo que no casan con nada.
+        if f.binario:
+            datos = leer_para_analisis(f.absoluta)
+            if datos is None:
+                continue
+            texto = datos.decode("utf-8", errors="replace")
+        else:
+            try:
+                texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
         for numero, linea in enumerate(texto.splitlines(), start=1):
             for r in aplicables:
                 m = r["_rx"].search(linea)

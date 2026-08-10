@@ -18,6 +18,7 @@ import re
 from pathlib import Path
 
 from exporter.modelo import Hallazgo
+from exporter.seguridad.recorrido import leer_para_analisis
 
 HOOKS_NPM = ("preinstall", "install", "postinstall")
 
@@ -157,6 +158,57 @@ def _pyproject(f) -> list:
     return []
 
 
+# Proporcion maxima de caracteres "no texto" que se tolera antes de dejar de
+# considerar que el contenido decodificado es texto. Se mide sobre el texto
+# YA sin bytes nulos: lo que cuenta como no-texto es el caracter de
+# reemplazo -es decir, bytes que no son UTF-8 valido- y los de control que no
+# sean tabulador ni salto de linea.
+UMBRAL_NO_TEXTO = 0.05
+
+
+def _texto_con_nulos(f) -> list:
+    """Un fichero marcado binario cuyo contenido es casi todo texto.
+
+    `es_binario` decide por un unico byte nulo en los primeros 8 KB. Eso
+    convierte a un `.sh` perfectamente ejecutable con un \\x00 dentro de un
+    comentario en "binario", y antes eso lo sacaba del motor entero. Un
+    fichero de TEXTO con bytes nulos no tiene explicacion inocente: o esta
+    ofuscado para esquivar el analisis, o esta en una codificacion (UTF-16)
+    que impide leerlo. En los dos casos el motor no ha podido analizarlo
+    como lo que es, y eso hay que decirlo.
+
+    La medida NO puede ser `str.isprintable()` sobre el texto decodificado:
+    con errors="replace" cada byte indecodificable se convierte en U+FFFD, y
+    U+FFFD ES imprimible, asi que un ELF puntuaria como "casi todo texto".
+    Se cuenta al reves: los caracteres de reemplazo son la evidencia de que
+    era binario de verdad. Un texto con nulos decodifica limpio -el nulo es
+    un punto de codigo valido- y un binario de verdad produce una avalancha
+    de U+FFFD.
+    """
+    datos = leer_para_analisis(f.absoluta)
+    if not datos or b"\x00" not in datos:
+        return []
+    sin_nulos = datos.replace(b"\x00", b"")
+    if not sin_nulos:
+        return []
+    texto = sin_nulos.decode("utf-8", errors="replace")
+    if not texto:
+        return []
+    no_texto = sum(1 for c in texto
+                   if c == "�" or (not c.isprintable() and c not in "\t\n\r"))
+    if no_texto / len(texto) > UMBRAL_NO_TEXTO:
+        return []
+
+    muestra = next((l.strip() for l in texto.splitlines() if l.strip()), "")
+    return [_h("SEC-OFUSCA-NULOS-001", "ofuscacion", "tecnico", "alta", "alta",
+               f.ambito, f.ruta + ":1", muestra[:120],
+               "Fichero de texto con bytes nulos",
+               "Un fichero de texto no debería contener bytes nulos: o se han "
+               "puesto para que el análisis lo tome por binario y no lo mire, o "
+               "está en una codificación como UTF-16 que impide leerlo. Guardarlo "
+               "en UTF-8 sin bytes nulos y volver a auditarlo.")]
+
+
 def analizar(raiz, ficheros) -> list:
     raiz = Path(raiz)
     salida = []
@@ -196,6 +248,7 @@ def analizar(raiz, ficheros) -> list:
                 "añadirlo a .gitignore."))
 
         if f.binario and ext not in EXTENSIONES_ARCHIVO:
+            salida.extend(_texto_con_nulos(f))
             if not any(nombre in t or f.ruta in t for t in textos):
                 salida.append(_h(
                     "SEC-BINARIO-NO-DOCUMENTADO-001", "cadena_de_suministro",
