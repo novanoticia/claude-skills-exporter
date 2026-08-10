@@ -118,6 +118,44 @@ def _celda(evaluaciones) -> str:
     return "{} {}".format(ICONO[estado], ETIQUETA[estado])
 
 
+# De peor a mejor. `Finding.severity` usa el vocabulario de portabilidad,
+# que no tiene `critica`: esa solo existe en el de seguridad.
+ORDEN_SEVERIDAD = ("alta", "media", "baja")
+
+
+def _hallazgos_de_portabilidad(r) -> list:
+    """Los Finding de una skill, que hasta ahora solo veia resumen.json.
+
+    El informe renderizaba origen, descripcion, adaptaciones y evaluaciones
+    por destino, pero nunca recorria `r.findings`. El CLI remite al informe,
+    asi que quien lo leia no llegaba a ver ni la descripcion sin criterio de
+    activacion, ni el enlace simbolico omitido, ni el fichero que no se pudo
+    leer: existian solo en el JSON.
+
+    Se dicen "de portabilidad" a proposito. El informe ya trae una lista de
+    hallazgos mas arriba, la de seguridad, con otro vocabulario -ids SEC-,
+    ambito, confianza-, y llamar igual a las dos cosas en el mismo documento
+    invitaria a confundirlas.
+
+    Se ordenan de peor a mejor, de forma estable: quien abre el informe por
+    una skill con veinte hallazgos necesita los graves arriba, y dentro de
+    cada severidad el orden en que el pipeline los encontro sigue siendo
+    informativo (primero el frontmatter, luego las senales, luego el
+    empaquetado).
+    """
+    if not r.findings:
+        return []
+    orden = {s: i for i, s in enumerate(ORDEN_SEVERIDAD)}
+    ordenados = sorted(r.findings,
+                       key=lambda f: orden.get(f.severity, len(ORDEN_SEVERIDAD)))
+    L = ["**Hallazgos de portabilidad ({}):**".format(len(ordenados)), ""]
+    for f in ordenados:
+        L.append("- {} `{}` · severidad **{}** — {}".format(
+            ICONO_SEVERIDAD.get(f.severity, "•"), f.code, f.severity, f.message))
+    L.append("")
+    return L
+
+
 def informe_markdown(resultados, evaluaciones, origen, perfiles,
                      seguridad=None, anulado: bool = False) -> str:
     ids = sorted(perfiles)
@@ -166,6 +204,7 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
             L += ["**Adaptado automáticamente:**", ""]
             L += ["- {}".format(a) for a in r.adaptations]
             L.append("")
+        L += _hallazgos_de_portabilidad(r)
         for i in ids:
             for ev in evaluaciones.get(r.name, {}).get(i, []):
                 if ev.estado == Estado.COMPATIBLE:
