@@ -106,12 +106,21 @@ es una URL de repositorio, no si ya tienes la carpeta descargada.
 
 | Opción | Qué hace |
 |---|---|
-| `--out DIR` | Directorio de salida (por defecto `./dist-agentskills`) |
+| `--out DIR` | Directorio de salida (por defecto `./dist-agentskills`). **Se borra entero** antes de escribir |
+| `--force` | Vaciar `--out` aunque no lo haya escrito esta herramienta. Pierdes lo que hubiera dentro |
 | `--only a b c` | Exporta sólo esas skills |
 | `--zip-only` | Deja sólo los `.zip` — se pierde la variante para Mistral. Con un destino que sólo instala carpeta (`--target mistral-vibe-work`) es **error** y aborta: no quedaría ningún artefacto de skill |
 | `--target a b` | En `audit`, qué destinos evaluar; en `export`, qué artefactos producir — la auditoría sigue cubriendo los cinco |
 | `--fail-on {ninguno,degradado,no_compatible}` | Devuelve código 2 si algún estado alcanza ese umbral. Útil en CI |
 | `--keep-description-order` | No reordena la descripción — y con ello desactiva también la compactación: sólo queda el recorte duro por el final |
+
+> ⚠️ **`--out` se borra entero** antes de cada exportación: lo que haya dentro se pierde.
+> Para que no pueda llevarse por delante nada tuyo, `export` se niega a vaciar un
+> directorio que tenga contenido y no lleve la marca `.cse-salida` que esta herramienta
+> escribe. Un directorio vacío, inexistente o ya usado como salida se reutiliza sin
+> preguntar; para cualquier otro hace falta `--force`. Y nunca acepta un `--out` que sea
+> el propio origen o que lo contenga, ni siquiera con `--force`: eso borraría el
+> repositorio que iba a leer.
 
 ## Los tres modos
 
@@ -123,10 +132,27 @@ es una URL de repositorio, no si ya tienes la carpeta descargada.
 
 `convert.py <origen>` sin subcomando sigue exportando, como siempre.
 
+### Códigos de salida
+
+| Código | Cuándo |
+|---|---|
+| `0` | Nada que reportar. También `inspect`, que no evalúa destinos y siempre sale con 0 |
+| `1` | Error de uso o de entrada: el origen no existe, no contiene ningún `SKILL.md`, `--target` desconocido, `--only` sin coincidencias, dos skills que reclaman el mismo nombre, o un `--out` que la herramienta se niega a borrar |
+| `2` | Se ha alcanzado el umbral de `--fail-on`, **o** el nivel de riesgo de seguridad no es `bajo` |
+| `3` | Sólo en `export`: el *gate* de seguridad ha impedido escribir los artefactos de al menos una skill |
+
+Dos matices que cuestan un rato descubrir a base de pruebas:
+
+- El **2 por riesgo de seguridad** no depende de `--fail-on`. `audit` y `export` lo
+  devuelven en cuanto el nivel deja de ser `bajo`, aunque no hayas pedido ningún umbral.
+- `--anular-revision-seguridad` **suprime** ese 2, además de evitar el 3. Es deliberado:
+  la anulación ya queda escrita en el informe, y devolver además ≠ 0 después de habértela
+  pedido sólo enseña a ignorar el código de salida. Con la anulación sólo sobrevive el
+  código de `--fail-on`.
+
 **Usarlo en CI.** `--fail-on degradado` devuelve código 2 si alguna skill queda en
 `degradado`, `no verificable` o `no compatible` en algún destino; `--fail-on no_compatible`
-sólo con el peor estado. Sin la opción, el conversor siempre sale con 0 aunque todo esté
-rojo. Combínalo con `audit`, que no escribe ficheros:
+sólo con el peor estado. Combínalo con `audit`, que no escribe ficheros:
 
 ```bash
 python3 convert.py audit . --target perplexity-computer --fail-on no_compatible
@@ -240,7 +266,7 @@ Cada hallazgo nace con un **ámbito**, y de ahí cuelga lo que ocurre:
 | Ámbito | Qué significa | Qué provoca |
 |---|---|---|
 | `exportado` | El fichero viaja dentro del `.zip` o la carpeta | Se **bloquea** la escritura de ese artefacto |
-| `paquete` | Se queda en el repositorio | Sale en cabecera del informe; código de salida ≠ 0 |
+| `paquete` | Se queda en el repositorio | Sale en cabecera del informe; código de salida 2, pero los artefactos se escriben |
 
 El bloqueo es **por skill**: una skill limpia se exporta aunque su vecina esté bloqueada. Y
 `--anular-revision-seguridad` permite exportar igualmente, dejando constancia escrita en el
