@@ -70,7 +70,7 @@ from exporter.modelo import (
     VeredictoSeguridad,
     capacidades_de,
 )
-from exporter.perfiles import PerfilInvalido, cargar_perfiles, presupuesto_por_modo
+from exporter.perfiles import PerfilInvalido, cargar_perfiles
 from exporter.seguridad import estructural as seg_estructural
 from exporter.seguridad import patrones as seg_patrones
 from exporter.seguridad import riesgo as seg_riesgo
@@ -87,8 +87,10 @@ MAX_DESCRIPTION_CHARS = 1024
 # Los presupuestos POR DESTINO (en BYTES UTF-8, no en caracteres: en español un
 # acento ocupa dos y una raya tres, así que contar letras engaña por un 2-3%) ya
 # no son constantes de este fichero: se derivan de los perfiles de exporter/targets/
-# con presupuesto_por_modo(), el más restrictivo de los destinos que aceptan ese
-# modo de instalación. Añadir un destino es escribir un JSON, no tocar esta lista.
+# con presupuesto_de(), el más restrictivo de los destinos que van a usar ese
+# artefacto. Añadir un destino es escribir un JSON, no tocar esta lista, y añadir
+# un MODO de instalación nuevo tampoco: perfiles_por_artefacto() reparte por lo
+# que el perfil declara, no por una lista de modos escrita a mano.
 # ChatGPT y claude.ai no necesitan presupuesto propio: su tope es el del estándar
 # (1024 caracteres) y el zip ya viaja con la descripción de 850 bytes, que cabe de
 # sobra. Por eso el mismo .zip de Perplexity sirve para los tres sin reexportar.
@@ -860,12 +862,48 @@ def obtener_fecha_hoy() -> datetime.date:
             "[error] CSE_FECHA='{}' no es una fecha ISO válida (AAAA-MM-DD).".format(bruta))
 
 
+# El unico modo que no necesita ningun artefacto propio: el destino se
+# instala apuntando a la URL del repositorio.
+MODOS_SIN_ARTEFACTO = {"url_repositorio"}
+
+
+def perfiles_por_artefacto(perfiles, elegidos):
+    """Que destinos se sirven de cada uno de los dos artefactos.
+
+    Devuelve `(ids_del_zip, ids_de_la_carpeta)`, ya restringidos a los
+    destinos elegidos. `carpeta` es cualquier modo que produzca un
+    directorio en disco, sea cual sea su nombre: `carpeta` en Mistral,
+    `directorio_local` en Claude Code, y el que venga despues.
+    """
+    ids = sorted(elegidos) if elegidos else sorted(perfiles)
+    del_zip = [i for i in ids if "zip" in perfiles[i].modos()]
+    de_carpeta = [i for i in ids
+                  if set(perfiles[i].modos()) - {"zip"} - MODOS_SIN_ARTEFACTO]
+    return del_zip, de_carpeta
+
+
+def presupuesto_de(perfiles, ids) -> int:
+    """El presupuesto mas restrictivo de esos destinos.
+
+    Un artefacto es uno solo y tiene que valer para todos los destinos que lo
+    usen, asi que manda el mas estrecho. Sin ninguno, el tope del estandar.
+    """
+    return min([perfiles[i].presupuesto() for i in ids],
+               default=MAX_DESCRIPTION_CHARS)
+
+
 def ejecutar(args, perfiles, elegidos, hoy) -> int:
-    # Los perfiles ya están cargados: de ellos salen los presupuestos de
-    # descripción (el más restrictivo por modo de instalación), con
-    # independencia del subcomando y de qué destinos se hayan elegido.
-    presupuesto_carpeta = presupuesto_por_modo(perfiles, "carpeta")   # Mistral: 490
-    presupuesto_zip = presupuesto_por_modo(perfiles, "zip")           # el resto: 850
+    # Los presupuestos salen de los modos que REALMENTE declaran los perfiles
+    # elegidos, no de las dos constantes "carpeta" y "zip". Con esas dos, un
+    # modo nuevo caia en el cajon de `carpeta` sin decirlo: `--target
+    # claude-code` -que instala en modo `directorio_local`, con un tope
+    # propio de 1024 B- recibia el presupuesto de Mistral, 490, y se le
+    # rotulaba «Mistral» en los mensajes finales. Era el punto donde el
+    # codigo contradecia su propio comentario, que promete que todo se deriva
+    # de los perfiles.
+    ids_zip, ids_carpeta = perfiles_por_artefacto(perfiles, elegidos)
+    presupuesto_carpeta = presupuesto_de(perfiles, ids_carpeta)
+    presupuesto_zip = presupuesto_de(perfiles, ids_zip)
 
     out = None
     if args.comando == "export":
@@ -983,17 +1021,12 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
                 0 if veredicto_seguridad.nivel == Nivel.BAJO else 2)
 
         # -------- export --------
-        # Qué artefactos hacen falta: la unión de los modos de instalación
-        # de los destinos elegidos (todos, si no se restringió con
-        # --target). `carpeta` es el único modo no-zip que este conversor
-        # sabe producir, así que cualquier modo que no sea `zip` ni
-        # `url_repositorio` (que no necesita ningún artefacto propio)
-        # implica querer la carpeta.
-        modos_deseados = set()
-        for pid in (elegidos if elegidos else perfiles):
-            modos_deseados.update(perfiles[pid].modos())
-        quiere_zip = "zip" in modos_deseados
-        quiere_carpeta = bool(modos_deseados - {"zip", "url_repositorio"})
+        # Qué artefactos hacen falta: los mismos destinos de los que ya
+        # salieron los presupuestos, arriba. Se derivan una sola vez para que
+        # el presupuesto con el que se recorta una descripción y el rótulo
+        # con el que se anuncia no puedan discrepar nunca.
+        quiere_zip = bool(ids_zip)
+        quiere_carpeta = bool(ids_carpeta)
 
         # El gate va aquí, DENTRO de `export`: `audit` no escribe nada, así
         # que no hay nada que bloquear, y sus evaluaciones deben conservar
@@ -1057,18 +1090,25 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
                        ensure_ascii=False, indent=2),
             encoding="utf-8")
 
+    # Los rótulos salen de los perfiles que de verdad usan cada artefacto, no
+    # de dos nombres escritos a mano. Antes decian siempre «Perplexity» y
+    # «Mistral», asi que un `--target claude-code` anunciaba un artefacto de
+    # Mistral que Mistral no iba a recibir.
+    etiquetas = lambda ids: ", ".join(perfiles[i].label for i in ids)   # noqa: E731
     print(f"\n[ok] Salida en: {out}")
     if quiere_zip:
-        print(f"     Perplexity → <skill>.zip   ({len(results)} zip(s), uno por skill; "
+        print(f"     <skill>.zip → {etiquetas(ids_zip)}")
+        print(f"                   ({len(results)} zip(s), uno por skill; "
               f"descripción ≤{presupuesto_zip} B)")
     if quiere_carpeta:
         if args.zip_only:
-            print(f"     Mistral    → no disponible: --zip-only ha borrado la variante de "
-                  f"{presupuesto_carpeta} B")
+            print(f"     <skill>/    → no disponible: --zip-only ha borrado la variante "
+                  f"de {presupuesto_carpeta} B que necesita {etiquetas(ids_carpeta)}")
         else:
-            print(f"     Mistral    → <skill>/      (descripción ≤{presupuesto_carpeta} B — NO es el "
+            print(f"     <skill>/    → {etiquetas(ids_carpeta)}")
+            print(f"                   (descripción ≤{presupuesto_carpeta} B — NO es el "
                   f"zip descomprimido)")
-    print(f"     Informe    → INFORME-PORTABILIDAD.md")
+    print(f"     Informe     → INFORME-PORTABILIDAD.md")
     riesgo = [r.name for r in results if r.worst == "alta"]
     if riesgo:
         print(f"\n[aviso] Riesgo alto en: {', '.join(riesgo)}. Lee el informe antes de subirlas.")
