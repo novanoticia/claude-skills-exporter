@@ -78,19 +78,17 @@ ChatGPT»* o *«¿es portable esta skill?»*. La skill se activa sola porque su
 
 ### Actualizar
 
-Los manifiestos de este plugin **no fijan `version`**: Claude Code usa entonces el hash
-del commit como identificador, de modo que cada publicación cuenta como versión nueva.
-Con «Sincronizar automáticamente» activado en el marketplace, las actualizaciones llegan
-solas. Para forzarlas:
+Los manifiestos fijan `version` (hoy `1.0.0`). Claude Code sólo ofrece una
+actualización cuando ese número cambia, así que **cada publicación debe subirla** en
+`.claude-plugin/plugin.json` y en `plugin.json`: `1.0.1` para correcciones, `1.1.0` para
+funciones nuevas. Los commits intermedios no llegan a quien ya lo tiene instalado.
+Para forzar la actualización:
 
 ```
 /plugin marketplace update pablo-skills-tools
 /plugin update claude-skills-exporter
 /reload-plugins
 ```
-
-La contrapartida de no fijar versión: llegan todos los commits, no sólo los que alguien
-haya marcado como release.
 
 ## Uso
 

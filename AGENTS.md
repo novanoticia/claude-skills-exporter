@@ -24,7 +24,7 @@ python3 -m unittest discover -s tests -t tests > /tmp/suite.log 2>&1; echo "codi
 grep -E "^(OK|FAILED|Ran )" /tmp/suite.log
 ```
 
-Hoy son **349 pruebas** y salen todas en verde. Si ves menos, algo no se está
+Hoy son **355 pruebas** y salen todas en verde. Si ves menos, algo no se está
 descubriendo.
 
 ### Los cuatro validadores del CI
@@ -169,5 +169,9 @@ Dos cosas que conviene saber de entrada:
 
 - **`export` prepara los artefactos en un temporal y publica a `--out` sólo después de que
   el gate haya decidido.** No escribas nada directamente en `out` antes de ese punto.
+- **La rama `plugin` no se edita a mano.** La regenera el CI en cada push a `main` con
+  `.github/construir_distribucion.py`: solo lleva lo instalable (lista blanca en
+  `INCLUIR`). Es la rama que se envía al directorio de plugins de Claude, porque su
+  validador analiza el repositorio entero y el banco de pruebas lo retiene.
 - **`--out` se borra entero** antes de escribir, y por eso el conversor se niega a vaciar un
   directorio con contenido que no lleve su marca `.cse-salida`. `--force` lo salta.
