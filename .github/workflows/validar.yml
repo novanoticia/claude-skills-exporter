@@ -75,3 +75,50 @@ jobs:
           test -f /tmp/salida/INFORME-PORTABILIDAD.md
           test -n "$(ls /tmp/salida/*.zip)"
           echo "El conversor se ejecuta y produce salida."
+
+  # Publica en la rama `plugin` solo lo que se instala. El directorio de plugins
+  # de Claude analiza el repositorio entero, y aqui viven el banco de pruebas
+  # malicioso a proposito (tests/fixtures/) y la documentacion de sus patrones
+  # (docs/): retienen la publicacion aunque nada de eso se instale. La rama
+  # `plugin` es la que se envia al directorio. No se toca a mano: se regenera
+  # en cada push a main, y solo si la validacion anterior ha pasado.
+  publicar-distribucion:
+    needs: validar
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Construir y verificar la distribucion
+        run: python3 .github/construir_distribucion.py /tmp/dist .
+
+      - name: Publicar en la rama plugin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd /tmp/dist
+          git init -q -b plugin
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # Si la rama ya existe, el commit nuevo cuelga del anterior: historia
+          # lineal y sin force-push. El indice arranca vacio, asi que lo que se
+          # borre en main desaparece tambien de la rama.
+          if git fetch -q origin plugin; then
+            git reset -q --soft FETCH_HEAD
+          fi
+          git add -A
+          if git rev-parse -q --verify HEAD >/dev/null && git diff --cached --quiet HEAD; then
+            echo "La distribucion no ha cambiado; nada que publicar."
+            exit 0
+          fi
+          git commit -q -m "Publica la distribucion desde ${GITHUB_SHA::7}" \
+            -m "Generada por el CI a partir de main. No se edita a mano."
+          git push -q origin HEAD:plugin
+          echo "Rama plugin actualizada."
