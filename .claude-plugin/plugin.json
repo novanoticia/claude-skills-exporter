@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "claude-skills-exporter",
+  "version": "1.0.0",
+  "displayName": "Claude Skills Exporter",
+  "description": "Extrae las skills de un repositorio con un plugin de Claude, audita su portabilidad y las empaqueta para ChatGPT, Perplexity Computer y Mistral Vibe Work. Conforme a Agent Plugins 1.0.0.",
+  "author": {
+    "name": "Pablo Rodríguez López",
+    "email": "novanoticia@icloud.com"
+  },
+  "homepage": "https://github.com/novanoticia/claude-skills-exporter",
+  "repository": "https://github.com/novanoticia/claude-skills-exporter",
+  "license": "MIT",
+  "keywords": [
+    "agent-skills",
+    "agent-plugins",
+    "chatgpt",
+    "perplexity",
+    "mistral",
+    "portabilidad",
+    "exportar",
+    "skills"
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "mistral-vibe-work",
+  "label": "Mistral Vibe Work",
+  "instalacion": {
+    "modos": ["carpeta"],
+    "ruta_ui": "chat.mistral.ai/work → Context → Skills → New Skill",
+    "una_skill_por_subida": true
+  },
+  "formato": {
+    "acepta": ["agent-skills"],
+    "frontmatter_cerrado": true,
+    "presupuesto_description_bytes": 490,
+    "tope_duro_description": { "valor": 1024, "unidad": "caracteres" },
+    "conserva_arbol": true
+  },
+  "limites_paquete": {
+    "zip_max_bytes": null,
+    "ficheros_max": null,
+    "fichero_max_bytes": null
+  },
+  "capacidades": {
+    "scripts.ejecutar": "no",
+    "shell.ejecutar": "parcial",
+    "filesystem.leer": "si",
+    "filesystem.escribir": "si",
+    "red.fetch": "desconocido",
+    "mcp.cliente": "no",
+    "applescript": "no",
+    "subagentes": "no",
+    "hooks": "no",
+    "comandos.namespace": "no",
+    "skills.anidadas": "no",
+    "home.resolver": "no"
+  },
+  "peligros": [
+    {
+      "id": "mistral-estado-no-persiste",
+      "dispara_con": ["estado-persistente"],
+      "severidad": "alta",
+      "titulo": "La escritura reporta éxito y el fichero puede no estar después",
+      "detalle": "Reproducido en dos ejecuciones independientes: el anexado (>> fichero) devolvió éxito y luego el fichero tenía una sola línea, o no existía. Lo grave no es la pérdida: el agente reconstruye el registro de memoria y continúa como si nada, con un historial inventado que parece real.",
+      "mitigacion": "Escribir el fichero entero de una vez en lugar de anexar, y releerlo para confirmar. Si falta, decirlo — nunca reconstruirlo de memoria.",
+      "evidencia": { "confianza": "observado", "verificado_el": "2026-07-27" }
+    },
+    {
+      "id": "mistral-home-es-raiz",
+      "dispara_con": ["home-tilde"],
+      "severidad": "alta",
+      "titulo": "$HOME vale «/», así que ~/ escribe en la raíz",
+      "detalle": "Comprobado en ejecución: la variable de entorno del home vale «/», de modo que ~/.mi-skill/ termina creando //.mi-skill/.",
+      "mitigacion": "Usar rutas relativas a la carpeta de la skill, o pedir al usuario una ruta absoluta explícita.",
+      "evidencia": { "confianza": "observado", "verificado_el": "2026-07-27" }
+    }
+  ],
+  "evidencia": {
+    "verificado_el": "2026-07-27",
+    "revisar_tras": "2026-10-27",
+    "confianza": "observado",
+    "fuentes": [
+      {
+        "titulo": "Mistral Docs — Create your first Skill",
+        "url": "https://docs.mistral.ai/getting-started/quickstarts/vibe-work/create-first-skill"
+      }
+    ]
+  }
+}

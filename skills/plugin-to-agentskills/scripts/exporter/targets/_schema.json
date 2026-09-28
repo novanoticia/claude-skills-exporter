@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Perfil de destino",
+  "type": "object",
+  "required": ["schema_version", "id", "label", "instalacion", "formato",
+               "capacidades", "peligros", "evidencia"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "label": { "type": "string", "minLength": 1 },
+    "instalacion": {
+      "type": "object",
+      "required": ["modos", "ruta_ui", "una_skill_por_subida"],
+      "additionalProperties": false,
+      "properties": {
+        "modos": {
+          "type": "array", "minItems": 1,
+          "items": { "enum": ["zip", "carpeta", "directorio_local", "url_repositorio"] }
+        },
+        "ruta_ui": { "type": "string" },
+        "una_skill_por_subida": { "type": "boolean" }
+      }
+    },
+    "formato": {
+      "type": "object",
+      "required": ["acepta", "frontmatter_cerrado", "presupuesto_description_bytes",
+                   "tope_duro_description", "conserva_arbol"],
+      "additionalProperties": false,
+      "properties": {
+        "acepta": { "type": "array", "items": { "type": "string" } },
+        "frontmatter_cerrado": { "type": "boolean" },
+        "presupuesto_description_bytes": { "type": "integer", "minimum": 1 },
+        "tope_duro_description": {
+          "type": "object",
+          "required": ["valor", "unidad"],
+          "additionalProperties": false,
+          "properties": {
+            "valor": { "type": "integer", "minimum": 1 },
+            "unidad": { "enum": ["bytes", "caracteres"] }
+          }
+        },
+        "conserva_arbol": { "type": "boolean" }
+      }
+    },
+    "limites_paquete": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "zip_max_bytes": { "type": ["integer", "null"], "minimum": 1 },
+        "ficheros_max": { "type": ["integer", "null"], "minimum": 1 },
+        "fichero_max_bytes": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "capacidades": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": ["si", "si_con_confirmacion", "parcial", "no", "desconocido"]
+      }
+    },
+    "peligros": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "dispara_con", "severidad", "titulo", "detalle",
+                     "mitigacion", "evidencia"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "dispara_con": { "type": "array",
+                           "items": { "type": "string" } },
+          "severidad": { "enum": ["alta", "media", "baja"] },
+          "titulo": { "type": "string" },
+          "detalle": { "type": "string" },
+          "mitigacion": { "type": "string" },
+          "evidencia": { "$ref": "#/$defs/evidencia_breve" }
+        }
+      }
+    },
+    "evidencia": {
+      "type": "object",
+      "required": ["verificado_el", "revisar_tras", "confianza", "fuentes"],
+      "additionalProperties": false,
+      "properties": {
+        "verificado_el": { "type": "string", "format": "date" },
+        "revisar_tras": { "type": "string", "format": "date" },
+        "confianza": { "$ref": "#/$defs/confianza" },
+        "fuentes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["titulo", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "titulo": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "seccion": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "confianza": {
+      "enum": ["oficial", "oficial-incompleto", "observado", "comunidad", "no-verificado"]
+    },
+    "evidencia_breve": {
+      "type": "object",
+      "required": ["confianza", "verificado_el"],
+      "additionalProperties": false,
+      "properties": {
+        "confianza": { "$ref": "#/$defs/confianza" },
+        "verificado_el": { "type": "string", "format": "date" }
+      }
+    }
+  }
+}

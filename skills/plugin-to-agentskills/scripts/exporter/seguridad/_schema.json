@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reglas de seguridad",
+  "type": "object",
+  "required": ["schema_version", "reglas"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "reglas": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "familia", "dimension", "severidad", "confianza",
+                     "patron", "titulo", "detalle", "mitigacion", "extensiones"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^SEC-[A-Z0-9-]+-[0-9]{3}$" },
+          "familia": {
+            "enum": ["permisos_y_acciones", "cadena_de_suministro",
+                     "ofuscacion", "conducta_de_prompt"]
+          },
+          "dimension": { "enum": ["tecnico", "cadena_de_suministro", "comportamiento"] },
+          "severidad": { "enum": ["critica", "alta", "media", "baja"] },
+          "confianza": { "enum": ["alta", "media", "baja"] },
+          "patron": { "type": "string", "minLength": 3 },
+          "titulo": { "type": "string", "minLength": 1 },
+          "detalle": { "type": "string", "minLength": 1 },
+          "mitigacion": { "type": "string", "minLength": 1 },
+          "extensiones": {
+            "type": "array", "minItems": 1,
+            "items": { "type": "string", "pattern": "^\\.[a-z0-9]+$" }
+          }
+        }
+      }
+    }
+  }
+}

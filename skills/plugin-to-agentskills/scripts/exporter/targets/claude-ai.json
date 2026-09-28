@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "claude-ai",
+  "label": "claude.ai",
+  "instalacion": {
+    "modos": ["zip"],
+    "ruta_ui": "Ajustes → Capacidades → Skills → Subir skill",
+    "una_skill_por_subida": true
+  },
+  "formato": {
+    "acepta": ["agent-skills"],
+    "frontmatter_cerrado": true,
+    "presupuesto_description_bytes": 850,
+    "tope_duro_description": { "valor": 1024, "unidad": "caracteres" },
+    "conserva_arbol": true
+  },
+  "limites_paquete": {
+    "zip_max_bytes": null,
+    "ficheros_max": null,
+    "fichero_max_bytes": null
+  },
+  "capacidades": {
+    "scripts.ejecutar": "si",
+    "shell.ejecutar": "si",
+    "filesystem.leer": "si",
+    "filesystem.escribir": "si",
+    "red.fetch": "desconocido",
+    "mcp.cliente": "no",
+    "applescript": "no",
+    "subagentes": "no",
+    "hooks": "no",
+    "comandos.namespace": "no",
+    "skills.anidadas": "no",
+    "home.resolver": "desconocido"
+  },
+  "peligros": [],
+  "evidencia": {
+    "verificado_el": "2026-08-07",
+    "revisar_tras": "2026-11-07",
+    "confianza": "oficial-incompleto",
+    "fuentes": [
+      {
+        "titulo": "Agent Skills — Especificación",
+        "url": "https://agentskills.io/specification"
+      }
+    ]
+  }
+}

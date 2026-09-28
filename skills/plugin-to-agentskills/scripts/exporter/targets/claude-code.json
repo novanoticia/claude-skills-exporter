@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "claude-code",
+  "label": "Claude Code",
+  "instalacion": {
+    "modos": ["directorio_local"],
+    "ruta_ui": "Copiar la carpeta a ~/.claude/skills/, o instalar el plugin con /plugin install",
+    "una_skill_por_subida": false
+  },
+  "formato": {
+    "acepta": ["agent-skills", "claude-plugin"],
+    "frontmatter_cerrado": false,
+    "presupuesto_description_bytes": 1024,
+    "tope_duro_description": { "valor": 1024, "unidad": "caracteres" },
+    "conserva_arbol": true
+  },
+  "limites_paquete": {
+    "zip_max_bytes": null,
+    "ficheros_max": null,
+    "fichero_max_bytes": null
+  },
+  "capacidades": {
+    "scripts.ejecutar": "si",
+    "shell.ejecutar": "si_con_confirmacion",
+    "filesystem.leer": "si",
+    "filesystem.escribir": "si_con_confirmacion",
+    "red.fetch": "si",
+    "mcp.cliente": "si",
+    "applescript": "si_con_confirmacion",
+    "subagentes": "si",
+    "hooks": "si",
+    "comandos.namespace": "si",
+    "skills.anidadas": "si",
+    "home.resolver": "si"
+  },
+  "peligros": [],
+  "evidencia": {
+    "verificado_el": "2026-08-07",
+    "revisar_tras": "2026-11-07",
+    "confianza": "oficial",
+    "fuentes": [
+      {
+        "titulo": "Claude Code — Plugins reference",
+        "url": "https://docs.claude.com/en/docs/claude-code/plugins-reference"
+      }
+    ]
+  }
+}
