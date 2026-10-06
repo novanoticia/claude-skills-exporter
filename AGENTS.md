@@ -24,7 +24,7 @@ python3 -m unittest discover -s tests -t tests > /tmp/suite.log 2>&1; echo "codi
 grep -E "^(OK|FAILED|Ran )" /tmp/suite.log
 ```
 
-Hoy son **437 pruebas** y salen todas en verde. Si ves menos, algo no se está
+Hoy son **442 pruebas** y salen todas en verde. Si ves menos, algo no se está
 descubriendo.
 
 ### Los cinco validadores del CI

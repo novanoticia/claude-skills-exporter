@@ -71,7 +71,7 @@
   "portabilidad.description-densa": "Description of {bytes} bytes: it fits in the Perplexity zip but not in the Mistral folder ({presupuesto} B), where it is trimmed. The target's index pays this cost in every session, so the shorter the better.",
   "portabilidad.herramientas-claude": "It names Claude's own tools: {herramientas}. Outside Claude they do not exist under that name.",
   "portabilidad.cuerpo-largo": "Body of ~{tokens} tokens (recommended <{limite}). Move conditional material to references/ so that it is loaded only when needed.",
-  "portabilidad.enlace-simbolico": "A symbolic link was skipped when packaging: {ubicacion} ({destino}). Copying its content would have put a file from outside the skill into the package.",
+  "portabilidad.enlace-simbolico": "A symbolic link was skipped when packaging: {ubicacion} (link to {destino}). Copying its content would have put a file from outside the skill into the package.",
   "portabilidad.fichero-ilegible": "Could not read {ruta}: {motivo}. Its content was not audited and it was not copied to the artifact either. Fix its permissions and export again, or review it by hand before uploading the skill.",
   "portabilidad.scripts": "Includes scripts/. Perplexity Computer can run them in its sandbox; Mistral Vibe Work stores them but does NOT have Python (verified), so they do not run there. If the logic lives in the script, SKILL.md must carry an equivalent manual procedure to fall back on.",
   "adaptacion.nombre": "Name normalized: '{original}' → '{nuevo}'.",
@@ -211,5 +211,6 @@
   "notas.cambios": "**Changes applied on export:**",
   "notas.no_funcionara": "**It probably will not work in this environment:**",
   "notas.limitaciones": "**It will work, but with limitations:**",
-  "notas.pie": "If an instruction in this skill depends on a tool you do not have available, say so explicitly and propose an alternative. Do not simulate the result or make it up."
+  "notas.pie": "If an instruction in this skill depends on a tool you do not have available, say so explicitly and propose an alternative. Do not simulate the result or make it up.",
+  "portabilidad.enlace-ilegible": "(unreadable)"
 }

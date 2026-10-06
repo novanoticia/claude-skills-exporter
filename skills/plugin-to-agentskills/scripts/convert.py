@@ -379,7 +379,8 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         src_dir, dest, ignorar=set(IGNORED_DIRS) | {skill_md.name})
     for s in enlaces:
         res.findings.append(Finding("alta", "enlace-simbolico",
-            t("portabilidad.enlace-simbolico", ubicacion=s.ubicacion, destino=s.muestra)))
+            t("portabilidad.enlace-simbolico", ubicacion=s.ubicacion,
+              destino=s.muestra or t("portabilidad.enlace-ilegible"))))
 
     # Un fichero que no se pudo abrir no es un fichero limpio: nadie ha
     # mirado lo que contiene y, al no poder copiarlo, tampoco esta en el

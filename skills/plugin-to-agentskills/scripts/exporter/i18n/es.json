@@ -71,7 +71,7 @@
   "portabilidad.description-densa": "Descripción de {bytes} bytes: cabe en el zip de Perplexity pero no en la carpeta de Mistral ({presupuesto} B), donde va recortada. El índice del destino paga este coste en cada sesión, así que cuanto más breve, mejor.",
   "portabilidad.herramientas-claude": "Nombra herramientas propias de Claude: {herramientas}. Fuera de Claude no existen con ese nombre.",
   "portabilidad.cuerpo-largo": "Cuerpo de ~{tokens} tokens (recomendado <{limite}). Mueve el material condicional a references/ para que se cargue sólo cuando haga falta.",
-  "portabilidad.enlace-simbolico": "Se omitió un enlace simbólico al empaquetar: {ubicacion} ({destino}). Copiar su contenido habría metido en el paquete un fichero de fuera de la skill.",
+  "portabilidad.enlace-simbolico": "Se omitió un enlace simbólico al empaquetar: {ubicacion} (enlace a {destino}). Copiar su contenido habría metido en el paquete un fichero de fuera de la skill.",
   "portabilidad.fichero-ilegible": "No se pudo leer {ruta}: {motivo}. No se ha auditado su contenido y tampoco se ha copiado al artefacto. Corrige sus permisos y vuelve a exportar, o revísalo a mano antes de subir la skill.",
   "portabilidad.scripts": "Incluye scripts/. Perplexity Computer puede ejecutarlos en su sandbox; Mistral Vibe Work los guarda pero NO tiene Python (comprobado), así que allí no se ejecutan. Si la lógica vive en el script, el SKILL.md debe traer un procedimiento manual equivalente al que caer.",
   "adaptacion.nombre": "Nombre normalizado: '{original}' → '{nuevo}'.",
@@ -166,5 +166,6 @@
   "notas.cambios": "**Cambios aplicados al exportar:**",
   "notas.no_funcionara": "**Probablemente no funcione en este entorno:**",
   "notas.limitaciones": "**Funcionará, pero con limitaciones:**",
-  "notas.pie": "Si una instrucción de esta skill depende de una herramienta que no tienes disponible, dilo explícitamente y propón una alternativa. No simules el resultado ni lo inventes."
+  "notas.pie": "Si una instrucción de esta skill depende de una herramienta que no tienes disponible, dilo explícitamente y propón una alternativa. No simules el resultado ni lo inventes.",
+  "portabilidad.enlace-ilegible": "(ilegible)"
 }

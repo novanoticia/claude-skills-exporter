@@ -71,7 +71,7 @@
   "portabilidad.description-densa": "Description de {bytes} octets : elle tient dans le zip de Perplexity mais pas dans le dossier de Mistral ({presupuesto} o), où elle est tronquée. L'index de la cible paie ce coût à chaque session, donc plus elle est courte, mieux c'est.",
   "portabilidad.herramientas-claude": "Elle nomme des outils propres à Claude : {herramientas}. En dehors de Claude, ils n'existent pas sous ce nom.",
   "portabilidad.cuerpo-largo": "Corps d'environ {tokens} tokens (recommandé <{limite}). Déplacez le contenu conditionnel vers references/ pour qu'il ne soit chargé qu'en cas de besoin.",
-  "portabilidad.enlace-simbolico": "Un lien symbolique a été ignoré lors de l'empaquetage : {ubicacion} ({destino}). Copier son contenu aurait placé dans le paquet un fichier extérieur à la skill.",
+  "portabilidad.enlace-simbolico": "Un lien symbolique a été ignoré lors de l'empaquetage : {ubicacion} (lien vers {destino}). Copier son contenu aurait placé dans le paquet un fichier extérieur à la skill.",
   "portabilidad.fichero-ilegible": "Impossible de lire {ruta} : {motivo}. Son contenu n'a pas été audité et il n'a pas non plus été copié dans l'artefact. Corrigez ses permissions et exportez de nouveau, ou examinez-le à la main avant de téléverser la skill.",
   "portabilidad.scripts": "Inclut scripts/. Perplexity Computer peut les exécuter dans son bac à sable ; Mistral Vibe Work les stocke mais n'a PAS Python (vérifié), donc ils n'y sont pas exécutés. Si la logique réside dans le script, SKILL.md doit fournir une procédure manuelle équivalente de repli.",
   "adaptacion.nombre": "Nom normalisé : '{original}' → '{nuevo}'.",
@@ -211,5 +211,6 @@
   "notas.cambios": "**Modifications appliquées à l'export :**",
   "notas.no_funcionara": "**Elle ne fonctionnera probablement pas dans cet environnement :**",
   "notas.limitaciones": "**Elle fonctionnera, mais avec des limites :**",
-  "notas.pie": "Si une instruction de cette skill dépend d'un outil dont vous ne disposez pas, dites-le explicitement et proposez une alternative. Ne simulez pas le résultat et ne l'inventez pas."
+  "notas.pie": "Si une instruction de cette skill dépend d'un outil dont vous ne disposez pas, dites-le explicitement et proposez une alternative. Ne simulez pas le résultat et ne l'inventez pas.",
+  "portabilidad.enlace-ilegible": "(illisible)"
 }

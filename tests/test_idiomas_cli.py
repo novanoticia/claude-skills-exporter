@@ -235,5 +235,38 @@ class NotasEnElArtefacto(unittest.TestCase):
             self.assertNotIn(espanol, md)
 
 
+class EnlaceSimbolico(unittest.TestCase):
+    """Codex: el destino del enlace no puede arrastrar palabras en espanol."""
+
+    def informe(self, idioma):
+        raiz = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, raiz)
+        skill = raiz / "skills" / "con-enlace"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(
+            "---\nname: con-enlace\ndescription: Cargala cuando el usuario pida fechas.\n---\nHola.\n",
+            encoding="utf-8")
+        os.symlink("/etc/hosts", str(skill / "externo"))
+        out = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, out)
+        r = correr("export", str(raiz), "--out", out, "--anular-revision-seguridad",
+                   "--lang", idioma)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return (Path(out) / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
+
+    def test_en_espanol_dice_enlace_a(self):
+        self.assertIn("(enlace a /etc/hosts)", self.informe("es"))
+
+    def test_en_ingles_dice_link_to_y_no_enlace_a(self):
+        informe = self.informe("en")
+        self.assertIn("(link to /etc/hosts)", informe)
+        self.assertNotIn("enlace a", informe)
+
+    def test_en_frances_dice_lien_vers_y_no_enlace_a(self):
+        informe = self.informe("fr")
+        self.assertIn("(lien vers /etc/hosts)", informe)
+        self.assertNotIn("enlace a", informe)
+
+
 if __name__ == "__main__":
     unittest.main()

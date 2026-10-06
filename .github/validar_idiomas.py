@@ -74,6 +74,9 @@ def comprobar(raiz: Path) -> list:
             errores.append("es.json: lleva la clave {} (el español de reglas y "
                            "peligros vive en reglas.json y en targets/)".format(k))
             continue
+        if not isinstance(base[k], str) or not base[k].strip():
+            errores.append("es.json: la plantilla {} está vacía o no es texto".format(k))
+            continue
         try:
             malos = _marcadores_invalidos(base[k])
         except ValueError as e:
@@ -116,7 +119,7 @@ def comprobar(raiz: Path) -> list:
                                "{}: solo se admiten campos con nombre".format(
                                    codigo, k, malos))
                 continue
-            if k in base and m_prop != _marcadores(base[k]):
+            if k in base and isinstance(base[k], str) and m_prop != _marcadores(base[k]):
                 errores.append("{}.json: los marcadores de {} no coinciden con es "
                                "({} frente a {})".format(
                                    codigo, k, sorted(m_prop),

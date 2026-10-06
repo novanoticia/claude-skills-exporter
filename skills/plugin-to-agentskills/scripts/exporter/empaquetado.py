@@ -71,13 +71,14 @@ def copiar_skill(src: Path, dest: Path, ignorar: set) -> tuple:
 
 def _senal_enlace(ruta: str, raiz: Path) -> Senal:
     relativa = os.path.relpath(ruta, str(raiz))
+    # `muestra` es solo el destino del enlace, sin palabras: el texto que lo
+    # rodea ("enlace a ...") vive en el catalogo de idioma. Un destino que no
+    # se puede leer queda vacio y el informe lo dice con su propia palabra.
     try:
         apunta = os.readlink(ruta)
     except OSError:
-        apunta = "(ilegible)"
-    return Senal(
-        "enlace-simbolico", relativa,
-        "enlace a {}".format(apunta), "alta")
+        apunta = ""
+    return Senal("enlace-simbolico", relativa, apunta, "alta")
 
 
 def zip_dir(src: Path, dest_zip: Path, arc_prefix: str = "") -> None:

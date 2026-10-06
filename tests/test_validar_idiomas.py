@@ -151,6 +151,22 @@ class Validador(unittest.TestCase):
         self.assertTrue(any("informe.origen" in e and "marcador" in e
                             for e in self.errores()), self.errores())
 
+    def test_plantilla_vacia_en_es(self):
+        # Codex: en es.json una plantilla vacia dejaba el idioma por defecto
+        # sin ese texto y el validador seguia en verde.
+        es = leer(self.dir / "es.json")
+        es["informe.titulo"] = "   "
+        escribir(self.dir / "es.json", es)
+        self.assertTrue(any(e.startswith("es.json") and "vacía" in e
+                            for e in self.errores()), self.errores())
+
+    def test_valor_que_no_es_texto_en_es(self):
+        es = leer(self.dir / "es.json")
+        es["informe.titulo"] = 3
+        escribir(self.dir / "es.json", es)
+        self.assertTrue(any(e.startswith("es.json") and "informe.titulo" in e
+                            for e in self.errores()), self.errores())
+
     def test_es_no_lleva_claves_de_regla(self):
         es = leer(self.dir / "es.json")
         es["regla.SEC-EXEC-REMOTO-001.titulo"] = "x"
