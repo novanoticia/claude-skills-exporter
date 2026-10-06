@@ -6,8 +6,8 @@ a buscar: no «cuanto riesgo tiene esta skill», sino «donde puedo subirla».
 
 from __future__ import annotations
 
+from exporter.i18n import t
 from exporter.modelo import Estado, Nivel
-from exporter.seguridad.riesgo import TEXTO_RECOMENDACION
 
 ICONO_SEG = {
     Nivel.BAJO: "🟢",
@@ -19,15 +19,14 @@ ICONO_SEG = {
 
 ICONO_SEVERIDAD = {"critica": "🔴", "alta": "🟠", "media": "🟡", "baja": "🔵"}
 
-NOTA_ANULACION = (
-    "> **Exportación realizada con anulación manual de advertencias de seguridad.**\n"
-    "> Se escribieron artefactos de skills con hallazgos que normalmente lo impedirían.\n")
 
-ETIQUETA_DIMENSION = {
-    "tecnico": "Riesgo técnico",
-    "cadena_de_suministro": "Cadena de suministro",
-    "comportamiento": "Comportamiento",
-}
+def etiqueta_dimension(d: str) -> str:
+    return t("dimension." + d)
+
+
+def etiqueta_nivel(nivel: str) -> str:
+    return t("nivel." + nivel)
+
 
 ICONO = {
     Estado.COMPATIBLE: "🟢",
@@ -37,13 +36,9 @@ ICONO = {
     Estado.NO_COMPATIBLE: "🔴",
 }
 
-ETIQUETA = {
-    Estado.COMPATIBLE: "compatible",
-    Estado.COMPATIBLE_CON_ADAPTACION: "adaptación",
-    Estado.DEGRADADO: "degradado",
-    Estado.NO_VERIFICABLE: "no verificable",
-    Estado.NO_COMPATIBLE: "no compatible",
-}
+
+def etiqueta_estado(estado: str) -> str:
+    return t("estado." + estado)
 
 
 def seccion_seguridad(veredicto) -> str:
@@ -54,53 +49,51 @@ def seccion_seguridad(veredicto) -> str:
     repositorio le va a robar las claves — y por eso no se le puede pedir que
     la pida.
     """
-    L = ["## Seguridad del paquete", "",
+    L = [t("informe.seguridad.titulo"), "",
          # Sin icono interpuesto: el spec §8 fija `**Nivel de riesgo:** alto`
          # y la prueba busca esa subcadena literal. Los iconos viven en la
          # tabla de dimensiones y en la lista de hallazgos, donde sirven para
          # barrer con la vista; aqui solo estorbarian al grep.
-         "**Nivel de riesgo:** " + veredicto.nivel.replace("_", " "),
+         t("informe.seguridad.nivel", nivel=etiqueta_nivel(veredicto.nivel)),
          "",
-         "**Recomendación:** " + TEXTO_RECOMENDACION[veredicto.recomendacion],
+         t("informe.seguridad.recomendacion",
+           texto=t("recomendacion." + veredicto.recomendacion)),
          ""]
 
     if veredicto.escalada_por_combinacion:
         dims = sorted({h.dimension for h in veredicto.hallazgos
                        if h.severidad == "alta" and h.confianza == "alta"})
-        L += ["> Escalado a crítico **por combinación**: hay hallazgos graves en más de una "
-              "dimensión a la vez ({}). Cada uno por separado sería alto; juntos se "
-              "refuerzan.".format(", ".join(ETIQUETA_DIMENSION[d].lower() for d in dims)),
+        L += [t("informe.seguridad.escalada",
+                dims=", ".join(etiqueta_dimension(d).lower() for d in dims)),
               ""]
 
-    L += ["| Dimensión | Nivel |", "|---|---|"]
+    L += [t("informe.seguridad.tabla.cabecera"), "|---|---|"]
     for d in ("tecnico", "cadena_de_suministro", "comportamiento"):
         nivel = veredicto.dimensiones.get(d, Nivel.BAJO)
         L.append("| {} | {} {} |".format(
-            ETIQUETA_DIMENSION[d], ICONO_SEG[nivel], nivel.replace("_", " ")))
+            etiqueta_dimension(d), ICONO_SEG[nivel], etiqueta_nivel(nivel)))
     L.append("")
 
     if veredicto.hay_contenido_opaco:
-        L += ["> El paquete contiene material que **no se ha podido analizar** —binarios o "
-              "ficheros comprimidos, que no se abren—. Lo que sigue describe el resto.",
-              ""]
+        L += [t("informe.seguridad.opaco"), ""]
 
     if not veredicto.hallazgos:
-        L += ["No se han detectado indicadores estáticos relevantes.", ""]
+        L += [t("informe.seguridad.sin_hallazgos"), ""]
         return "\n".join(L)
 
-    L += ["### Hallazgos", ""]
+    L += [t("informe.seguridad.hallazgos"), ""]
     for i, h in enumerate(veredicto.hallazgos, start=1):
-        L += ["{}. {} `{}` · `{}` · ámbito: **{}**".format(
-                  i, ICONO_SEVERIDAD[h.severidad], h.id, h.ubicacion, h.ambito),
+        L += [t("informe.seguridad.hallazgo.linea1",
+                i=i, icono=ICONO_SEVERIDAD[h.severidad], id=h.id,
+                ubicacion=h.ubicacion, ambito=t("ambito." + h.ambito)),
               "   {}".format(h.titulo),
-              "   *Mitigación:* {}".format(h.mitigacion),
-              "   *Confianza:* {}.".format(h.confianza),
+              t("informe.seguridad.hallazgo.mitigacion", texto=h.mitigacion),
+              t("informe.seguridad.hallazgo.confianza",
+                texto=t("confianza." + h.confianza)),
               ""]
 
     if any(h.familia == "conducta_de_prompt" for h in veredicto.hallazgos):
-        L += ["> Los hallazgos de conducta de prompt cubren **formulaciones conocidas**. "
-              "Reconocer una inyección reformulada exige un juicio semántico que esta "
-              "herramienta no hace y no pretende hacer.", ""]
+        L += [t("informe.seguridad.nota_prompt"), ""]
 
     return "\n".join(L)
 
@@ -120,9 +113,9 @@ def _celda(evaluaciones, anulado: bool = False) -> str:
         # el estado real que le corresponde, marcado con el aviso de que
         # arrastra un bloqueo que alguien decidio saltarse.
         if not anulado:
-            return "🚫 bloqueado"
-        return "⚠️ {} (con bloqueo)".format(ETIQUETA[estado])
-    return "{} {}".format(ICONO[estado], ETIQUETA[estado])
+            return t("informe.matriz.bloqueado")
+        return t("informe.matriz.con_bloqueo", estado=etiqueta_estado(estado))
+    return "{} {}".format(ICONO[estado], etiqueta_estado(estado))
 
 
 # De peor a mejor. `Finding.severity` usa el vocabulario de portabilidad,
@@ -155,10 +148,11 @@ def _hallazgos_de_portabilidad(r) -> list:
     orden = {s: i for i, s in enumerate(ORDEN_SEVERIDAD)}
     ordenados = sorted(r.findings,
                        key=lambda f: orden.get(f.severity, len(ORDEN_SEVERIDAD)))
-    L = ["**Hallazgos de portabilidad ({}):**".format(len(ordenados)), ""]
+    L = [t("informe.portabilidad.titulo", n=len(ordenados)), ""]
     for f in ordenados:
-        L.append("- {} `{}` · severidad **{}** — {}".format(
-            ICONO_SEVERIDAD.get(f.severity, "•"), f.code, f.severity, f.message))
+        L.append(t("informe.portabilidad.linea",
+                   icono=ICONO_SEVERIDAD.get(f.severity, "•"), codigo=f.code,
+                   severidad=t("severidad." + f.severity), mensaje=f.message))
     L.append("")
     return L
 
@@ -166,18 +160,19 @@ def _hallazgos_de_portabilidad(r) -> list:
 def informe_markdown(resultados, evaluaciones, origen, perfiles,
                      seguridad=None, anulado: bool = False) -> str:
     ids = sorted(perfiles)
-    L = ["# Informe de portabilidad y seguridad", ""]
+    L = [t("informe.titulo"), ""]
     if seguridad is not None:
         L += [seccion_seguridad(seguridad), ""]
     if anulado:
-        L += [NOTA_ANULACION, ""]
+        L += [t("informe.nota_anulacion"), ""]
     L += [
-        "- **Origen:** `{}`".format(origen),
-        "- **Skills analizadas:** {}".format(len(resultados)),
+        t("informe.origen", origen=origen),
+        t("informe.skills_analizadas", n=len(resultados)),
         "",
-        "## Matriz de compatibilidad",
+        t("informe.matriz.titulo"),
         "",
-        "| Skill | " + " | ".join(perfiles[i].label for i in ids) + " |",
+        "| " + t("informe.matriz.skill") + " | "
+        + " | ".join(perfiles[i].label for i in ids) + " |",
         "|---" * (len(ids) + 1) + "|",
     ]
     for r in resultados:
@@ -186,9 +181,9 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
         L.append("| `{}` | {} |".format(r.name, " | ".join(celdas)))
     L += [
         "",
-        "> Ningún veredicto sustituye a probar la skill en el destino.",
+        t("informe.matriz.aviso"),
         "",
-        "## Detalle por skill",
+        t("informe.detalle.titulo"),
         "",
     ]
     for r in resultados:
@@ -209,20 +204,19 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
             # de el: lo que cambia es el verbo, de "no se escribieron" a "se
             # escribieron de todos modos, y fue una decision".
             if anulado:
-                L += ["> ⚠️ **Exportada pese a un bloqueo de seguridad, por decisión "
-                      "explícita:** `{}` (severidad {}) en `{}:{}`. Los artefactos "
-                      "de esta skill **sí se han escrito**.".format(
-                          bloqueo.regla_id, bloqueo.severidad,
-                          bloqueo.fichero, bloqueo.linea), ""]
+                L += [t("informe.detalle.bloqueo_anulado",
+                        regla=bloqueo.regla_id,
+                        severidad=t("severidad." + bloqueo.severidad),
+                        fichero=bloqueo.fichero, linea=bloqueo.linea), ""]
             else:
-                L += ["> 🚫 **Artefactos no escritos por seguridad:** `{}` "
-                      "(severidad {}) en `{}:{}`.".format(
-                          bloqueo.regla_id, bloqueo.severidad,
-                          bloqueo.fichero, bloqueo.linea), ""]
-        L += ["- Origen: `{}`".format(r.src_dir),
-              "- Descripción: {}".format(r.description[:300]), ""]
+                L += [t("informe.detalle.bloqueo",
+                        regla=bloqueo.regla_id,
+                        severidad=t("severidad." + bloqueo.severidad),
+                        fichero=bloqueo.fichero, linea=bloqueo.linea), ""]
+        L += [t("informe.detalle.origen", origen=r.src_dir),
+              t("informe.detalle.descripcion", texto=r.description[:300]), ""]
         if r.adaptations:
-            L += ["**Adaptado automáticamente:**", ""]
+            L += [t("informe.detalle.adaptado"), ""]
             L += ["- {}".format(a) for a in r.adaptations]
             L.append("")
         L += _hallazgos_de_portabilidad(r)
@@ -230,15 +224,17 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
             for ev in evaluaciones.get(r.name, {}).get(i, []):
                 if ev.estado == Estado.COMPATIBLE:
                     continue
-                L.append("**{} · {} ({})** — {}".format(
-                    ICONO[ev.estado], perfiles[i].label, ev.modo_instalacion,
-                    ETIQUETA[ev.estado]))
+                L.append(t("informe.destino.cabecera",
+                           icono=ICONO[ev.estado], destino=perfiles[i].label,
+                           modo=ev.modo_instalacion,
+                           estado=etiqueta_estado(ev.estado)))
                 L.append("")
                 L += ["- {}".format(m) for m in ev.motivos]
                 for p in ev.peligros:
-                    L.append("- *Mitigación:* {}".format(p["mitigacion"]))
-                    L.append("  Evidencia: {} · verificado el {}.".format(
-                        p["evidencia"]["confianza"], p["evidencia"]["verificado_el"]))
+                    L.append(t("informe.destino.mitigacion", texto=p["mitigacion"]))
+                    L.append(t("informe.destino.evidencia",
+                               confianza=p["evidencia"]["confianza"],
+                               fecha=p["evidencia"]["verificado_el"]))
                 # Las capacidades no tienen evidencia propia -no son un
                 # peligro observado, son una casilla que el perfil declara o
                 # no-, así que la cita es la del perfil entero: es la fuente
@@ -247,8 +243,9 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
                 # vienen del canal de capacidades) no citaban evidencia
                 # ninguna, incumpliendo el criterio de aceptación 4.
                 ev_perfil = perfiles[i].datos["evidencia"]
-                L.append("  Evidencia del perfil: {} · verificado el {}.".format(
-                    ev_perfil["confianza"], ev_perfil["verificado_el"]))
+                L.append(t("informe.destino.evidencia_perfil",
+                           confianza=ev_perfil["confianza"],
+                           fecha=ev_perfil["verificado_el"]))
                 L.append("")
     return "\n".join(L) + "\n"
 
