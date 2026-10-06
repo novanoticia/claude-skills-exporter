@@ -6,6 +6,7 @@ a buscar: no «cuanto riesgo tiene esta skill», sino «donde puedo subirla».
 
 from __future__ import annotations
 
+from exporter.compatibilidad import texto_de_peligro
 from exporter.i18n import t
 from exporter.modelo import Estado, Nivel
 
@@ -231,7 +232,8 @@ def informe_markdown(resultados, evaluaciones, origen, perfiles,
                 L.append("")
                 L += ["- {}".format(m) for m in ev.motivos]
                 for p in ev.peligros:
-                    L.append(t("informe.destino.mitigacion", texto=p["mitigacion"]))
+                    L.append(t("informe.destino.mitigacion",
+                             texto=texto_de_peligro(p, "mitigacion")))
                     L.append(t("informe.destino.evidencia",
                                confianza=p["evidencia"]["confianza"],
                                fecha=p["evidencia"]["verificado_el"]))

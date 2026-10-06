@@ -97,5 +97,53 @@ class Consola(unittest.TestCase):
         self.assertEqual(len(sueltos), 1, sueltos)
 
 
+class Seguridad(unittest.TestCase):
+
+    def test_es_json_no_lleva_claves_de_regla_ni_de_peligro(self):
+        # El espanol de reglas y peligros vive en reglas.json y en
+        # targets/*.json; duplicarlo aqui lo haria divergir.
+        malas = [k for k in claves("es") if k.startswith(("regla.", "peligro."))]
+        self.assertEqual(malas, [])
+
+    def test_los_hallazgos_estructurales_tienen_texto_en_es(self):
+        origen = (RAIZ_SCRIPTS / "exporter" / "seguridad" / "estructural.py"
+                  ).read_text(encoding="utf-8")
+        usadas = set(re.findall(r't\("(estructural\.[A-Za-z0-9_.\-]+)"', origen))
+        self.assertTrue(usadas, "estructural.py no usa t()")
+        self.assertEqual(usadas - set(claves("es")), set())
+
+    def _con_catalogo_en(self, datos_en):
+        import tempfile
+        from exporter import i18n
+        tmp = Path(tempfile.mkdtemp())
+        (tmp / "es.json").write_text(json.dumps(
+            {"_meta": {"idioma": "es", "nombre": "x"}}), encoding="utf-8")
+        en = {"_meta": {"idioma": "en", "nombre": "x"}}
+        en.update(datos_en)
+        (tmp / "en.json").write_text(json.dumps(en), encoding="utf-8")
+        anterior = i18n.DIRECTORIO
+        self.addCleanup(lambda: (setattr(i18n, "DIRECTORIO", anterior),
+                                 i18n._cache.clear(), i18n.fijar_idioma("es")))
+        i18n.DIRECTORIO = tmp
+        i18n._cache.clear()
+        i18n.fijar_idioma("en")
+
+    def test_t_opcional_aplica_a_titulo_y_mitigacion_de_las_reglas(self):
+        from exporter.seguridad import patrones
+        regla = patrones.cargar_reglas()[0]
+        self._con_catalogo_en({"regla." + regla["id"] + ".titulo": "TITLE-EN"})
+        self.assertEqual(patrones.titulo_de(regla), "TITLE-EN")
+        # Sin sobrescritura para la mitigacion: queda el espanol de origen.
+        self.assertEqual(patrones.mitigacion_de(regla), regla["mitigacion"])
+
+    def test_los_peligros_de_los_perfiles_se_sobrescriben_por_clave(self):
+        from exporter.compatibilidad import texto_de_peligro
+        peligro = {"id": "mistral-home-es-raiz", "titulo": "TITULO-ES",
+                   "mitigacion": "MITIGACION-ES"}
+        self._con_catalogo_en({"peligro.mistral-home-es-raiz.titulo": "TITLE-EN"})
+        self.assertEqual(texto_de_peligro(peligro, "titulo"), "TITLE-EN")
+        self.assertEqual(texto_de_peligro(peligro, "mitigacion"), "MITIGACION-ES")
+
+
 if __name__ == "__main__":
     unittest.main()

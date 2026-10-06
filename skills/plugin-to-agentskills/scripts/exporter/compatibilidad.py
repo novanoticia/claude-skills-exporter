@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import datetime
 
-from exporter.i18n import t
+from exporter.i18n import t, t_opcional
 from exporter.modelo import Estado, Evaluacion
 
 # Niveles con los que damos la capacidad por disponible. `parcial` no basta
@@ -37,6 +37,15 @@ ESTADO_POR_SEVERIDAD = {
     "media": Estado.DEGRADADO,
     "baja": Estado.COMPATIBLE,
 }
+
+
+def texto_de_peligro(peligro, campo: str) -> str:
+    """`titulo`, `detalle` o `mitigacion` de un peligro, en el idioma activo.
+
+    El espanol vive en el perfil de destino; los catalogos de otros idiomas
+    lo sobrescriben con la clave `peligro.<id>.<campo>`.
+    """
+    return t_opcional("peligro.{}.{}".format(peligro["id"], campo), peligro[campo])
 
 
 def evaluar(skill, perfil, hoy: datetime.date) -> list:
@@ -69,7 +78,7 @@ def evaluar(skill, perfil, hoy: datetime.date) -> list:
             vistos.add(peligro["id"])
             peligros.append(peligro)
             estados.append(ESTADO_POR_SEVERIDAD[peligro["severidad"]])
-            motivos.append(t("compat.peligro.visto", titulo=peligro["titulo"],
+            motivos.append(t("compat.peligro.visto", titulo=texto_de_peligro(peligro, "titulo"),
                              ubicacion=senal.ubicacion))
 
     # --- Caducidad de la evidencia ---
