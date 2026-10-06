@@ -54,22 +54,9 @@ PATRONES = [
     ("claude-brand", re.compile(r"\bClaude Code\b|\bCowork\b"), "baja"),
 ]
 
-# Explicacion generica, valida sin destino. La especifica de cada plataforma
+# Las explicaciones genericas de cada senal viven en el catalogo de idioma
+# (exporter/i18n/*.json, claves `senal.<id>`). La especifica de cada plataforma
 # la aporta el perfil en `peligros[].detalle`.
-EXPLICACIONES = {
-    "plugin-root": "Ruta ${CLAUDE_PLUGIN_ROOT}: solo existe dentro de un plugin de Claude Code.",
-    "mcp-tool": "Invoca herramientas MCP por nombre; esos servidores no estaran conectados.",
-    "skill-tool": "Invoca otras skills mediante la herramienta Skill de Claude.",
-    "subagent": "Delega en subagentes via la herramienta Task, que no existe fuera de Claude Code.",
-    "slash-plugin": "Referencia a comandos con namespace de plugin (/plugin:comando).",
-    "hooks": "Depende de hooks del plugin, que no se exportan.",
-    "applescript": "Usa AppleScript para llegar a aplicaciones del Mac.",
-    "lote-destructivo": "Modifica o mueve elementos en bloque a partir de un filtro.",
-    "home-tilde": "Lee o escribe en rutas con ~ o $HOME.",
-    "estado-persistente": "Acumula estado con anexado (>>).",
-    "claude-md": "Referencia a CLAUDE.md, convencion especifica de Claude Code.",
-    "claude-brand": "Menciona el producto Claude por su nombre; conviene neutralizarlo.",
-}
 
 
 def detectar(texto: str, ruta: str, offset: int = 0) -> list:

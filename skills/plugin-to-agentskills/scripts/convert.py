@@ -54,12 +54,13 @@ from exporter.descripcion import (
 )
 from exporter.deteccion import (
     CLAUDE_TOOL_NAMES,
-    EXPLICACIONES,
     IGNORED_DIRS,
     detectar,
     detectar_en_arbol,
 )
 from exporter.empaquetado import comprobar_limites, copiar_skill, zip_dir
+from exporter import i18n
+from exporter.i18n import t
 from exporter.frontmatter import split_frontmatter, yaml_escape
 from exporter.informes import informe_markdown, resumen_json
 from exporter.modelo import (
@@ -231,15 +232,12 @@ def comprobar_nombres_unicos(skill_files, raiz: Path) -> None:
     if not colisiones:
         return
 
-    lineas = ["[error] hay skills distintas que reclaman el mismo nombre publicado. "
-              "Se aborta sin escribir nada:"]
+    lineas = [t("error.nombres_duplicados.cabecera")]
     for nombre, dirs in sorted(colisiones.items()):
-        lineas.append("  · «{}» ← {}".format(
-            nombre, ", ".join(sorted(_relativa(d, raiz) for d in dirs))))
+        lineas.append(t("error.nombres_duplicados.linea", nombre=nombre,
+                        directorios=", ".join(sorted(_relativa(d, raiz) for d in dirs))))
     lineas.append(
-        "Ese nombre sale del campo 'name' del frontmatter -no del de la carpeta- y se "
-        "normaliza, así que 'My Skill' y 'my-skill' acaban siendo el mismo. Cambia el "
-        "'name' de una de ellas y vuelve a exportar.")
+        t("error.nombres_duplicados.pie"))
     sys.exit("\n".join(lineas))
 
 
@@ -260,19 +258,16 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
 
     if not fm:
         res.findings.append(Finding("alta", "sin-frontmatter",
-            "SKILL.md no tiene bloque frontmatter YAML. Se generará uno mínimo; "
-            "revisa el nombre y la descripción a mano."))
+            t("portabilidad.sin-frontmatter")))
     if not res.description:
         res.findings.append(Finding("alta", "sin-description",
-            "Falta 'description'. Es el campo que decide cuándo se activa la skill: "
-            "sin él, Perplexity y Mistral casi nunca la cargarán."))
-        res.description = f"Skill importada de {src_dir.name}. PENDIENTE: escribir descripción de activación."
+            t("portabilidad.sin-description")))
+        res.description = t("portabilidad.descripcion-pendiente", carpeta=src_dir.name)
     if name != orig_name:
-        res.adaptations.append(f"Nombre normalizado: '{orig_name}' → '{name}'.")
+        res.adaptations.append(t("adaptacion.nombre", original=orig_name, nuevo=name))
     if sanitize_name(src_dir.name) != name:
         res.findings.append(Finding("media", "nombre-vs-carpeta",
-            f"El nombre del frontmatter ('{name}') no coincidía con la carpeta "
-            f"('{src_dir.name}'). Se exporta la carpeta con el nombre del frontmatter."))
+            t("portabilidad.nombre-vs-carpeta", nombre=name, carpeta=src_dir.name)))
 
     # Orden de la descripción: primero CUÁNDO cargarla, después qué hace.
     # Va ANTES del recorte a propósito: si hay que cortar, se pierde lo prescindible.
@@ -281,16 +276,10 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         if moved:
             res.description = reordered
             res.adaptations.append(
-                "Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han "
-                "puesto delante de las que describen qué hace. Es lo único que el destino lee "
-                "para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.")
+                t("adaptacion.descripcion-reordenada"))
     if not tiene_activacion(res.description):
         res.findings.append(Finding("alta", "description-sin-activacion",
-            "La descripción no dice en ningún momento CUÁNDO cargar la skill: no hay ni un "
-            "'Cárgala cuando…', ni un 'cuando el usuario…', ni ejemplos de frases reales. "
-            "Describe el contenido, no el disparador. El destino casi nunca la activará. "
-            "Esto no se puede arreglar automáticamente sin inventar: reescríbela empezando "
-            "por los disparadores."))
+            t("portabilidad.description-sin-activacion")))
 
     # Una descripción por destino: no comparten presupuesto, así que no comparten texto.
     origen_bytes = nbytes(res.description)
@@ -306,34 +295,28 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
 
     if origen_bytes > presupuesto_carpeta:
         res.adaptations.append(
-            f"Descripción ajustada a cada destino: {origen_bytes} bytes de origen → "
-            f"{nbytes(res.desc_zip)} B en el `.zip` (Perplexity, tope {presupuesto_zip}) y "
-            f"{nbytes(res.desc_folder)} B en la carpeta (Mistral, tope {presupuesto_carpeta}). "
-            "Se podan primero los ejemplos entrecomillados y después las frases que sólo "
-            "cuentan qué hace la skill; el criterio de activación se conserva.")
+            t("adaptacion.descripcion-ajustada", origen_bytes=origen_bytes,
+              zip_bytes=nbytes(res.desc_zip), tope_zip=presupuesto_zip,
+              carpeta_bytes=nbytes(res.desc_folder), tope_carpeta=presupuesto_carpeta))
     if origen_bytes > presupuesto_zip:
         res.findings.append(Finding("media", "description-larga",
-            f"La descripción de origen medía {origen_bytes} bytes UTF-8 y no cabe entera en "
-            "ningún destino. El recorte automático mantiene frases completas, pero no puede "
-            "reescribir: revisa el resultado y, si ha perdido matiz, redáctala a mano en un "
-            "solo párrafo que diga primero cuándo activarse y luego para qué sirve."))
+            t("portabilidad.description-larga", bytes=origen_bytes)))
     elif origen_bytes > presupuesto_carpeta:
         res.findings.append(Finding("baja", "description-densa",
-            f"Descripción de {origen_bytes} bytes: cabe en el zip de Perplexity pero no en la "
-            f"carpeta de Mistral ({presupuesto_carpeta} B), donde va recortada. El índice del "
-            "destino paga este coste en cada sesión, así que cuanto más breve, mejor."))
+            t("portabilidad.description-densa", bytes=origen_bytes,
+              presupuesto=presupuesto_carpeta)))
 
     # Claves no portables
     dropped = [k for k in fm if k in CLAUDE_ONLY_KEYS]
     if dropped:
-        res.adaptations.append("Claves de frontmatter retiradas (no existen fuera de Claude): "
-                               + ", ".join(sorted(dropped)) + ".")
+        res.adaptations.append(t("adaptacion.claves-retiradas",
+                                 claves=", ".join(sorted(dropped))))
 
     # Adaptación de rutas ANTES de auditar, para no avisar de lo que ya se arregló.
     new_body = re.sub(r"\$\{?CLAUDE_PLUGIN_ROOT\}?/skills/[a-zA-Z0-9_\-]+/", "", body)
     new_body = re.sub(r"\$\{?CLAUDE_PLUGIN_ROOT\}?/", "", new_body)
     if new_body != body:
-        res.adaptations.append("Rutas ${CLAUDE_PLUGIN_ROOT}/... convertidas en rutas relativas a la skill.")
+        res.adaptations.append(t("adaptacion.rutas-plugin-root"))
         body = new_body
 
     # Patrones problemáticos en todo el árbol de la skill (SKILL.md, references/,
@@ -365,21 +348,21 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     res.senales = senales
     for s in senales:
         res.findings.append(Finding(s.severidad_base, s.id,
-                                    "{} Visto en {}: {}".format(
-                                        EXPLICACIONES[s.id], s.ubicacion, s.muestra)))
+                                    t("portabilidad.senal",
+                                      explicacion=t("senal." + s.id),
+                                      ubicacion=s.ubicacion, muestra=s.muestra)))
 
-    tools_used = sorted({t for t in CLAUDE_TOOL_NAMES if re.search(rf"\b{t}\b", body)})
+    tools_used = sorted({tool for tool in CLAUDE_TOOL_NAMES
+                        if re.search(rf"\b{tool}\b", body)})
     if tools_used:
         res.findings.append(Finding("media", "herramientas-claude",
-            "Nombra herramientas propias de Claude: " + ", ".join(tools_used) +
-            ". Fuera de Claude no existen con ese nombre."))
+            t("portabilidad.herramientas-claude", herramientas=", ".join(tools_used))))
 
     # Tamaño del cuerpo
     est_tokens = len(body) // CHARS_PER_TOKEN
     if est_tokens > SOFT_BODY_TOKENS:
         res.findings.append(Finding("baja", "cuerpo-largo",
-            f"Cuerpo de ~{est_tokens} tokens (recomendado <{SOFT_BODY_TOKENS}). "
-            "Mueve el material condicional a references/ para que se cargue sólo cuando haga falta."))
+            t("portabilidad.cuerpo-largo", tokens=est_tokens, limite=SOFT_BODY_TOKENS)))
 
     # ---- Escritura ----
     dest = out_dir / name
@@ -396,9 +379,8 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         src_dir, dest, ignorar=set(IGNORED_DIRS) | {skill_md.name})
     for s in enlaces:
         res.findings.append(Finding("alta", "enlace-simbolico",
-            "Se omitió un enlace simbólico al empaquetar: {} ({}). Copiar su "
-            "contenido habría metido en el paquete un fichero de fuera de la "
-            "skill.".format(s.ubicacion, s.muestra)))
+            t("portabilidad.enlace-simbolico", ubicacion=s.ubicacion,
+              destino=s.muestra or t("portabilidad.enlace-ilegible"))))
 
     # Un fichero que no se pudo abrir no es un fichero limpio: nadie ha
     # mirado lo que contiene y, al no poder copiarlo, tampoco esta en el
@@ -415,19 +397,14 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         ilegibles.setdefault(str(ruta_ileg).replace(os.sep, "/"), motivo)
     for ruta_ileg, motivo in sorted(ilegibles.items()):
         res.findings.append(Finding("media", "fichero-ilegible",
-            "No se pudo leer {}: {}. No se ha auditado su contenido y tampoco se "
-            "ha copiado al artefacto. Corrige sus permisos y vuelve a exportar, o "
-            "revísalo a mano antes de subir la skill.".format(ruta_ileg, motivo)))
+            t("portabilidad.fichero-ilegible", ruta=ruta_ileg, motivo=motivo)))
 
     for p in sorted(dest.rglob("*")):
         if p.is_file():
             res.extra_files.append(str(p.relative_to(dest)))
     if any(f.startswith("scripts/") for f in res.extra_files):
         res.findings.append(Finding("media", "scripts",
-            "Incluye scripts/. Perplexity Computer puede ejecutarlos en su sandbox; "
-            "Mistral Vibe Work los guarda pero NO tiene Python (comprobado), así que allí "
-            "no se ejecutan. Si la lógica vive en el script, el SKILL.md debe traer un "
-            "procedimiento manual equivalente al que caer."))
+            t("portabilidad.scripts")))
 
     res.body = body
     res.fm_extra = {k: fm[k] for k in PORTABLE_KEYS
@@ -453,9 +430,7 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         res.fm_meta = meta
     if bajadas:
         res.adaptations.append(
-            "Claves movidas a `metadata` (el frontmatter del estándar es un "
-            "conjunto cerrado y al nivel superior el destino las rechaza): "
-            + ", ".join(bajadas) + ".")
+            t("adaptacion.claves-a-metadata", claves=", ".join(bajadas)))
     # La carpeta en disco es la variante de Mistral; el zip se reescribe al empaquetar.
     write_skill_md(res, dest, res.desc_folder)
     return res
@@ -489,24 +464,22 @@ def render_notes(res: SkillResult) -> str:
     if not (res.adaptations or blocking or degraded):
         return "\n"
 
-    out = ["\n\n---\n", "## Notas de portabilidad (añadidas automáticamente)\n",
-           "Esta skill se exportó desde un plugin de Claude al estándar abierto Agent Skills.\n"]
+    out = ["\n\n---\n", t("notas.titulo") + "\n",
+           t("notas.intro") + "\n"]
     if res.adaptations:
-        out.append("**Cambios aplicados al exportar:**\n")
+        out.append(t("notas.cambios") + "\n")
         out += [f"- {a}" for a in res.adaptations]
         out.append("")
     if blocking:
-        out.append("**Probablemente no funcione en este entorno:**\n")
+        out.append(t("notas.no_funcionara") + "\n")
         out += [f"- {f.message}" for f in blocking]
         out.append("")
     if degraded:
-        out.append("**Funcionará, pero con limitaciones:**\n")
+        out.append(t("notas.limitaciones") + "\n")
         out += [f"- {f.message}" for f in degraded]
         out.append("")
     if blocking or degraded:
-        out.append("Si una instrucción de esta skill depende de una herramienta que no tienes "
-                   "disponible, dilo explícitamente y propón una alternativa. No simules el "
-                   "resultado ni lo inventes.\n")
+        out.append(t("notas.pie") + "\n")
     return "\n".join(out) + "\n"
 
 
@@ -604,11 +577,10 @@ def comprobar_tamano(raiz: Path) -> None:
             n += 1
             total += os.path.getsize(ruta)
             if n > MAX_FICHEROS_REPO:
-                sys.exit("[error] El origen supera los {} ficheros. Se aborta el "
-                         "análisis.".format(MAX_FICHEROS_REPO))
+                sys.exit(t("error.origen_demasiados_ficheros", limite=MAX_FICHEROS_REPO))
             if total > MAX_BYTES_REPO:
-                sys.exit("[error] El origen supera los {} MB. Se aborta el "
-                         "análisis.".format(MAX_BYTES_REPO // (1024 * 1024)))
+                sys.exit(t("error.origen_demasiado_grande",
+                           limite=MAX_BYTES_REPO // (1024 * 1024)))
 
 
 # Marca de propiedad del directorio de salida. `export` la escribe nada mas
@@ -681,23 +653,15 @@ def comprobar_salida_segura(out: Path, src: str, forzar: bool) -> None:
         # no mira donde esta <out> sino si lo escribimos nosotros.
         if out == origen:
             sys.exit(
-                "[error] --out apunta al propio origen ({}). Exportar ahí borraría el "
-                "repositorio que se va a leer, y el export terminaría sin nada que "
-                "empaquetar. Elige un directorio de salida fuera del origen.".format(out))
+                t("error.out_es_origen", ruta=out))
         if _cuelga_de(origen, out):
             sys.exit(
-                "[error] el origen ({}) está dentro de --out ({}). Vaciar la salida "
-                "borraría el repositorio que se va a leer. Elige un directorio de "
-                "salida que no contenga al origen.".format(origen, out))
+                t("error.origen_dentro_de_out", origen=origen, ruta=out))
 
     if not forzar and not es_salida_propia(out):
-        motivo = ("no está vacío" if out.is_dir()
-                  else "ya existe y no es un directorio")
+        motivo = t("error.out_no_vacio" if out.is_dir() else "error.out_no_directorio")
         sys.exit(
-            "[error] --out ({}) {} y no lo ha escrito esta herramienta: no lleva la "
-            "marca «{}». Se aborta sin borrar nada. Usa un directorio vacío o "
-            "inexistente, o pasa --force si aceptas perder su contenido.".format(
-                out, motivo, NOMBRE_CENTINELA))
+            t("error.out_no_propio", ruta=out, motivo=motivo, marca=NOMBRE_CENTINELA))
 
 
 def resolve_source(src: str, workdir: Path) -> Path:
@@ -706,10 +670,9 @@ def resolve_source(src: str, workdir: Path) -> Path:
         comprobar_tamano(p.resolve())
         return p.resolve()
     if not re.match(r"^(https?://|git@)", src):
-        sys.exit("[error] '{}' no existe como ruta ni parece una URL de "
-                 "repositorio.".format(src))
+        sys.exit(t("error.origen_invalido", origen=src))
     target = workdir / "repo"
-    print("[info] clonando {} ...".format(src))
+    print(t("consola.clonando", origen=src))
     entorno = dict(os.environ)
     # Sin esto, un repositorio privado deja el proceso colgado esperando
     # credenciales que nadie va a teclear.
@@ -719,11 +682,9 @@ def resolve_source(src: str, workdir: Path) -> Path:
             ["git", "clone", "--depth", "1", "--no-recurse-submodules", src, str(target)],
             capture_output=True, text=True, env=entorno, timeout=TIMEOUT_CLON)
     except subprocess.TimeoutExpired:
-        sys.exit("[error] el clon superó los {} s y se ha cancelado.".format(TIMEOUT_CLON))
+        sys.exit(t("error.clon_timeout", segundos=TIMEOUT_CLON))
     if r.returncode != 0:
-        sys.exit("[error] git clone falló:\n{}\n\nSi el repositorio es privado, "
-                 "necesitas git ya autenticado, o descárgalo a mano y pasa la "
-                 "ruta local.".format(r.stderr.strip()))
+        sys.exit(t("error.clon_fallo", salida=r.stderr.strip()))
     comprobar_tamano(target)
     return target
 
@@ -756,6 +717,10 @@ def construir_parser():
         p.add_argument("--fail-on", dest="fail_on", default="ninguno",
                        choices=["ninguno", "degradado", "no_compatible"],
                        help="devolver código 2 si algún estado alcanza este umbral")
+        p.add_argument("--lang", dest="lang", default=None, metavar="CODIGO",
+                       help="idioma de los informes y mensajes: es (por defecto), en, fr, "
+                            "o auto para usar el del sistema. También se lee de la "
+                            "variable CSE_LANG")
         return p
 
     ins = comun(subs.add_parser(
@@ -813,32 +778,30 @@ def imprimir_inspect(skill) -> None:
     """Vuelca el modelo intermedio: lo que la skill es y exige, sin destino."""
     print("\n## {}".format(skill.nombre))
     if skill.nombre != skill.nombre_original:
-        print("   nombre original: {}".format(skill.nombre_original))
-    print("   descripción: {} bytes{}".format(
-        skill.descripcion_bytes,
-        "" if skill.tiene_activacion else "  ⚠ SIN criterio de activación"))
-    print("   cuerpo: ~{} tokens".format(skill.cuerpo_tokens))
-    print("   ficheros: {}{}".format(
-        len(skill.ficheros), " (incluye scripts/)" if skill.tiene_scripts else ""))
+        print(t("consola.inspect.nombre_original", nombre=skill.nombre_original))
+    print(t("consola.inspect.descripcion", bytes=skill.descripcion_bytes,
+            aviso="" if skill.tiene_activacion else t("consola.inspect.sin_activacion")))
+    print(t("consola.inspect.cuerpo", tokens=skill.cuerpo_tokens))
+    print(t("consola.inspect.ficheros", n=len(skill.ficheros),
+            extra=t("consola.inspect.incluye_scripts") if skill.tiene_scripts else ""))
 
     if skill.capacidades:
-        print("   capacidades exigidas:")
+        print(t("consola.inspect.capacidades"))
         for c in skill.capacidades:
             print("     · {:<24} {}".format(c.nombre, c.nivel))
     else:
-        print("   capacidades exigidas: ninguna")
+        print(t("consola.inspect.capacidades_ninguna"))
 
     if skill.senales:
-        print("   señales:")
+        print(t("consola.inspect.senales"))
         for s in skill.senales:
             print("     · {:<20} {}  {}".format(s.id, s.ubicacion, s.muestra))
     else:
-        print("   señales: ninguna")
+        print(t("consola.inspect.senales_ninguna"))
 
     ambiguo = [c.nombre for c in skill.capacidades if c.nivel == "requerida"]
     if ambiguo and not skill.tiene_activacion:
-        print("   ⚠ Exige capacidades y no dice cuándo cargarse: revisa la "
-              "descripción antes de auditar contra ningún destino.")
+        print(t("consola.inspect.ambiguo"))
 
 
 def obtener_fecha_hoy() -> datetime.date:
@@ -859,7 +822,7 @@ def obtener_fecha_hoy() -> datetime.date:
         return datetime.date.fromisoformat(bruta)
     except ValueError:
         sys.exit(
-            "[error] CSE_FECHA='{}' no es una fecha ISO válida (AAAA-MM-DD).".format(bruta))
+            t("error.fecha_invalida", valor=bruta))
 
 
 # El unico modo que no necesita ningun artefacto propio: el destino se
@@ -926,10 +889,9 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
 
         skill_files = discover_skills(root)
         if not skill_files:
-            sys.exit("[error] No se encontró ningún SKILL.md. ¿Seguro que el repo contiene "
-                     "skills? Un plugin sin carpeta skills/ no tiene nada portable.")
+            sys.exit(t("error.sin_skills"))
 
-        print(f"[info] {len(skill_files)} skill(s) encontradas.")
+        print(t("consola.skills_encontradas", n=len(skill_files)))
 
         # Va aquí, antes del bucle de audit_and_adapt. Desde que los
         # artefactos se preparan en un temporal y no en `out`, el recorrido
@@ -970,11 +932,9 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
                                       nombre_publicado(sf)}]
         if not seleccionadas:
             sys.exit(
-                "[error] --only no coincidió con ninguna skill. Se admite tanto el "
-                "nombre de la carpeta como el del frontmatter; disponibles: {}".format(
-                    ", ".join(sorted({
-                        "{} ({})".format(nombre_publicado(sf), sf.parent.name)
-                        for sf in skill_files}))))
+                t("error.only_sin_coincidencia", disponibles=", ".join(sorted({
+                    "{} ({})".format(nombre_publicado(sf), sf.parent.name)
+                    for sf in skill_files}))))
 
         # Antes del primer audit_and_adapt, que ya escribe en work_dir. La
         # comprobacion mira solo las skills SELECCIONADAS: si --only deja
@@ -993,7 +953,8 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
             r = audit_and_adapt(sf, work_dir, presupuesto_carpeta, presupuesto_zip,
                                 reorder=not args.keep_description_order)
             results.append(r)
-            print(f"  · {r.name:<40} riesgo={r.worst}")
+            print(t("consola.skill_riesgo", nombre="{:<40}".format(r.name),
+                    riesgo=r.worst))
 
         if args.comando == "inspect":
             for r in results:
@@ -1065,8 +1026,8 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
             # que audit_and_adapt ya había escrito en el destino final.
             if r.name in bloqueadas and not anulado:
                 b = bloqueos[r.name]
-                print("[bloqueado] {}: {} en {}:{}. No se escriben sus artefactos.".format(
-                    r.name, b.regla_id, b.fichero, b.linea), file=sys.stderr)
+                print(t("consola.bloqueado", skill=r.name, regla=b.regla_id,
+                        fichero=b.fichero, linea=b.linea), file=sys.stderr)
                 continue
 
             # Publicar: del temporal al destino final. `move` renombra cuando
@@ -1107,23 +1068,21 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
     # «Mistral», asi que un `--target claude-code` anunciaba un artefacto de
     # Mistral que Mistral no iba a recibir.
     etiquetas = lambda ids: ", ".join(perfiles[i].label for i in ids)   # noqa: E731
-    print(f"\n[ok] Salida en: {out}")
+    print(t("consola.ok_salida", ruta=out))
     if quiere_zip:
-        print(f"     <skill>.zip → {etiquetas(ids_zip)}")
-        print(f"                   ({len(results)} zip(s), uno por skill; "
-              f"descripción ≤{presupuesto_zip} B)")
+        print(t("consola.ok.zip", destinos=etiquetas(ids_zip)))
+        print(t("consola.ok.zip_detalle", n=len(results), presupuesto=presupuesto_zip))
     if quiere_carpeta:
         if args.zip_only:
-            print(f"     <skill>/    → no disponible: --zip-only ha borrado la variante "
-                  f"de {presupuesto_carpeta} B que necesita {etiquetas(ids_carpeta)}")
+            print(t("consola.ok.carpeta_borrada", presupuesto=presupuesto_carpeta,
+                    destinos=etiquetas(ids_carpeta)))
         else:
-            print(f"     <skill>/    → {etiquetas(ids_carpeta)}")
-            print(f"                   (descripción ≤{presupuesto_carpeta} B — NO es el "
-                  f"zip descomprimido)")
-    print(f"     Informe     → INFORME-PORTABILIDAD.md")
+            print(t("consola.ok.carpeta", destinos=etiquetas(ids_carpeta)))
+            print(t("consola.ok.carpeta_detalle", presupuesto=presupuesto_carpeta))
+    print(t("consola.ok.informe", archivo="INFORME-PORTABILIDAD.md"))
     riesgo = [r.name for r in results if r.worst == "alta"]
     if riesgo:
-        print(f"\n[aviso] Riesgo alto en: {', '.join(riesgo)}. Lee el informe antes de subirlas.")
+        print(t("consola.aviso_riesgo_alto", skills=", ".join(riesgo)))
 
     if bloqueadas and not anulado:
         return 3
@@ -1143,6 +1102,19 @@ def main(argv=None) -> int:
     args = construir_parser().parse_args(normalizar_argv(
         sys.argv[1:] if argv is None else argv))
 
+    # El idioma se fija antes que cualquier otra cosa: todo mensaje posterior,
+    # incluidos los de error, ya sale en el idioma pedido. El error de idioma
+    # desconocido es la excepcion: se da en espanol fijo, porque no hay
+    # ningun idioma al que traducirlo.
+    try:
+        i18n.fijar_idioma(i18n.idioma_pedido(args.lang))
+    except i18n.IdiomaDesconocido as e:
+        print("[error] idioma desconocido: {}. Disponibles: {}".format(
+            e.codigo, ", ".join("{} — {}".format(c, n)
+                                for c, n in sorted(e.disponibles.items()))),
+            file=sys.stderr)
+        return 1
+
     # Se valida cuanto antes, antes de tocar disco: un CSE_FECHA invalido
     # debe abortar limpio, sin dejar un directorio de salida a medias.
     hoy = obtener_fecha_hoy()
@@ -1150,15 +1122,15 @@ def main(argv=None) -> int:
     try:
         perfiles = cargar_perfiles()
     except PerfilInvalido as e:
-        print("[error] perfil de destino inválido: {}".format(e), file=sys.stderr)
+        print(t("error.perfil_invalido", detalle=e), file=sys.stderr)
         return 1
 
     elegidos = getattr(args, "target", None)
     if elegidos:
-        desconocidos = [t for t in elegidos if t not in perfiles]
+        desconocidos = [d for d in elegidos if d not in perfiles]
         if desconocidos:
-            print("[error] destino desconocido: {}. Disponibles: {}".format(
-                ", ".join(desconocidos), ", ".join(sorted(perfiles))), file=sys.stderr)
+            print(t("error.destino_desconocido", desconocidos=", ".join(desconocidos),
+                    disponibles=", ".join(sorted(perfiles))), file=sys.stderr)
             return 1
 
     if args.comando == "export" and getattr(args, "zip_only", False):
@@ -1173,10 +1145,7 @@ def main(argv=None) -> int:
         if "zip" not in modos:
             objetivo = ", ".join(sorted(elegidos)) if elegidos else "los destinos elegidos"
             print(
-                "[error] --zip-only no tiene sentido con --target {}: ese destino solo "
-                "instala en modo 'carpeta', nunca 'zip'. Con --zip-only no quedaría ningún "
-                "artefacto de skill: se borraría la carpeta y no hay zip que la sustituya. "
-                "Quita --zip-only o añade un destino que sí acepte zip.".format(objetivo),
+                t("error.zip_only_sin_zip", objetivo=objetivo),
                 file=sys.stderr)
             return 1
 

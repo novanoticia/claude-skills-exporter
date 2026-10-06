@@ -1,0 +1,93 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "bajo",
+      "tecnico": "bajo"
+    },
+    "escalada_por_combinacion": false,
+    "hallazgos": [],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "bajo",
+    "recomendacion_instalacion": "instalacion_razonable"
+  },
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "no_compatible",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [
+              "mcp.cliente: required by the skill, and the target declares it “no”."
+            ],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "no_compatible",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "mcp.cliente: required by the skill, and the target declares it “no”."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "no_compatible",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "mcp.cliente: required by the skill, and the target declares it “no”."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "no_compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [
+              "mcp.cliente: required by the skill, and the target declares it “no”."
+            ],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "no_compatible",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "mcp.cliente: required by the skill, and the target declares it “no”."
+            ],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [
+        {
+          "codigo": "mcp-tool",
+          "mensaje": "Calls MCP tools by name; those servers will not be connected. Seen in SKILL.md:8: mcp__gmail__buscar",
+          "severidad": "alta"
+        }
+      ],
+      "name": "con-mcp"
+    }
+  ]
+}

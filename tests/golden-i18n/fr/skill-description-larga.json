@@ -1,0 +1,104 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "bajo",
+      "tecnico": "bajo"
+    },
+    "escalada_por_combinacion": false,
+    "hallazgos": [],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "bajo",
+    "recomendacion_instalacion": "instalacion_razonable"
+  },
+  "skills": [
+    {
+      "adaptaciones": [
+        "Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
+        "Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+      ],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [
+              "Adaptation appliquée : Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
+              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+            ],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptation appliquée : Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
+              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptation appliquée : Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
+              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "directorio_local",
+            "motivos": [
+              "Adaptation appliquée : Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
+              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+            ],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "carpeta",
+            "motivos": [
+              "Adaptation appliquée : Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
+              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+            ],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptation appliquée : Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
+              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+            ],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [
+        {
+          "codigo": "description-densa",
+          "mensaje": "Description de 523 octets : elle tient dans le zip de Perplexity mais pas dans le dossier de Mistral (490 o), où elle est tronquée. L'index de la cible paie ce coût à chaque session, donc plus elle est courte, mieux c'est.",
+          "severidad": "baja"
+        }
+      ],
+      "name": "description-larga"
+    }
+  ]
+}

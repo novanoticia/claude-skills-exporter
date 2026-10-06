@@ -71,6 +71,28 @@ class DeteccionDeActivacion(unittest.TestCase):
         self.assertTrue(tiene_activacion("Cárgala cuando el usuario pida algo."))
         self.assertTrue(tiene_activacion("Use this skill when the user asks."))
 
+    def test_reconoce_las_frases_que_el_informe_aconseja_en_ingles(self):
+        # El informe en ingles dice "Load it when..." y "when the user...":
+        # quien las escriba no debe recibir el mismo hallazgo otra vez.
+        self.assertTrue(tiene_activacion("Load it when you need dates."))
+        self.assertTrue(tiene_activacion("Use it when the report is due."))
+        self.assertTrue(tiene_activacion("Activate it when the user asks."))
+
+    def test_reconoce_los_disparadores_en_frances(self):
+        for frase in ("Charge-la quand tu as besoin de dates.",
+                      "Utilise-la quand l'utilisateur demande un rapport.",
+                      "Active-la quand quelqu'un parle de factures.",
+                      "À utiliser quand l'utilisateur pose une question.",
+                      "Se déclenche lorsque l'utilisateur écrit « facture ».",
+                      "Si l'utilisateur demande un résumé, charge cette skill.",
+                      "Quand l’utilisateur dit bonjour."):
+            with self.subTest(frase=frase):
+                self.assertTrue(tiene_activacion(frase))
+
+    def test_una_descripcion_francesa_que_solo_describe_no_tiene_activacion(self):
+        self.assertFalse(tiene_activacion("Cette skill génère des rapports financiers."))
+        self.assertFalse(tiene_activacion("Elle charge des fichiers CSV."))
+
     def test_una_descripcion_que_solo_describe_no_tiene_activacion(self):
         self.assertFalse(tiene_activacion("Esta skill genera informes financieros."))
 

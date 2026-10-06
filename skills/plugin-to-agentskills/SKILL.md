@@ -1,6 +1,6 @@
 ---
 name: plugin-to-agentskills
-description: Cárgala cuando el usuario dé una URL o ruta de un repositorio con un plugin o skills de Claude y quiera exportarlas, convertirlas o empaquetarlas para otra plataforma — Perplexity Computer, Mistral Vibe Work, ChatGPT u otro agente compatible con Agent Skills. Se activa con "exporta este plugin", "conviértelo para Perplexity", "hazme el zip para Mistral", "¿es portable esta skill?", "/exportar-skills".
+description: Cárgala cuando el usuario dé una URL o ruta de un repositorio con un plugin o skills de Claude y quiera exportarlas, convertirlas o empaquetarlas para otra plataforma — Perplexity Computer, Mistral Vibe Work, ChatGPT u otro agente compatible con Agent Skills. Se activa con "exporta este plugin", "conviértelo para Perplexity", "hazme el zip para Mistral", "¿es portable esta skill?", "export this plugin", "exporte ce plugin", "/exportar-skills".
 license: MIT
 ---
 
@@ -66,6 +66,20 @@ El segundo camino no es un apaño. Si el origen es una URL, la herramienta neces
 de todas formas para clonarla, así que sin `git` no hay trabajo posible por ninguna vía;
 si el usuario da una ruta local, el conversor la lee tal cual y `git` sólo hace falta
 para traerse el propio plugin.
+
+## Idioma de la respuesta
+
+Si el usuario pide un idioma, o te escribe en uno distinto del español, **respóndele en
+ese idioma** durante toda la conversación y pasa al conversor el flag `--lang <código>`.
+Los códigos disponibles son `es`, `en` y `fr`, más los que se hayan añadido en
+`exporter/i18n/`; `--lang auto` usa el idioma del sistema.
+
+- El conversor traduce el informe, la consola y los mensajes de error. **Tú traduces tu
+  conversación**, y citas tal cual los nombres de artefactos (`INFORME-PORTABILIDAD.md`,
+  `resumen.json`, `<skill>.zip`) y los valores de `resumen.json`, que siguen en español.
+- Si el idioma pedido no está entre los disponibles, dilo, ofrece el español o el más
+  cercano y **no inventes una traducción del informe**: el conversor sólo ofrece los
+  idiomas que tiene.
 
 ## Flujo
 

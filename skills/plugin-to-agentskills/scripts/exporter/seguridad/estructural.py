@@ -17,6 +17,7 @@ import os
 import re
 from pathlib import Path
 
+from exporter.i18n import t
 from exporter.modelo import Hallazgo
 from exporter.seguridad.recorrido import leer_para_analisis
 
@@ -119,8 +120,8 @@ def _npm(f) -> list:
                 "SEC-POSTINSTALL-001", "cadena_de_suministro", "cadena_de_suministro",
                 "alta", "alta", f.ambito, f.ruta + ":1",
                 ", ".join(presentes),
-                "Ejecuta código con solo instalar la dependencia",
-                "Retirar el hook. Lo que deba correr, que lo lance el usuario a conciencia."))
+                t("estructural.SEC-POSTINSTALL-001.titulo"),
+                t("estructural.SEC-POSTINSTALL-001.mitigacion")))
     for clave in ("dependencies", "devDependencies", "optionalDependencies"):
         deps = datos.get(clave)
         if not isinstance(deps, dict):
@@ -132,8 +133,8 @@ def _npm(f) -> list:
                 "SEC-DEP-SIN-FIJAR-001", "cadena_de_suministro", "cadena_de_suministro",
                 "media", "alta", f.ambito, f.ruta + ":1",
                 ", ".join(sueltas[:6]),
-                "Dependencias npm sin versión fijada",
-                "Fijar la versión exacta, y acompañarla de un lockfile versionado."))
+                t("estructural.SEC-DEP-SIN-FIJAR-001.titulo"),
+                t("estructural.SEC-DEP-SIN-FIJAR-001.mitigacion")))
     return salida
 
 
@@ -159,8 +160,8 @@ def _python(f) -> list:
     return [_h("SEC-DEP-SIN-FIJAR-002", "cadena_de_suministro", "cadena_de_suministro",
                "media", "alta", f.ambito, "{}:{}".format(f.ruta, numero),
                muestra[:120],
-               "Dependencias de Python sin versión fijada",
-               "Fijar con `==` y, si se puede, con hash.")]
+               t("estructural.SEC-DEP-SIN-FIJAR-002.titulo"),
+               t("estructural.SEC-DEP-SIN-FIJAR-002.mitigacion"))]
 
 
 def _pyproject(f) -> list:
@@ -191,8 +192,8 @@ def _pyproject(f) -> list:
             return [_h("SEC-DEP-SIN-FIJAR-002", "cadena_de_suministro",
                        "cadena_de_suministro", "media", "media", f.ambito,
                        "{}:{}".format(f.ruta, numero), cruda[:120],
-                       "Dependencias de Python sin versión fijada",
-                       "Fijar con `==` y, si se puede, con hash.")]
+                       t("estructural.SEC-DEP-SIN-FIJAR-002.titulo"),
+                       t("estructural.SEC-DEP-SIN-FIJAR-002.mitigacion"))]
         if en_array and cruda.endswith("]"):
             en_array = False
     return []
@@ -242,11 +243,8 @@ def _texto_con_nulos(f) -> list:
     muestra = next((l.strip() for l in texto.splitlines() if l.strip()), "")
     return [_h("SEC-OFUSCA-NULOS-001", "ofuscacion", "tecnico", "alta", "alta",
                f.ambito, f.ruta + ":1", muestra[:120],
-               "Fichero de texto con bytes nulos",
-               "Un fichero de texto no debería contener bytes nulos: o se han "
-               "puesto para que el análisis lo tome por binario y no lo mire, o "
-               "está en una codificación como UTF-16 que impide leerlo. Guardarlo "
-               "en UTF-8 sin bytes nulos y volver a auditarlo.")]
+               t("estructural.SEC-OFUSCA-NULOS-001.titulo"),
+               t("estructural.SEC-OFUSCA-NULOS-001.mitigacion"))]
 
 
 # Cualquier secuencia que pueda ser un nombre de fichero o una ruta.
@@ -315,18 +313,16 @@ def analizar(raiz, ficheros) -> list:
             salida.append(_h(
                 "SEC-ARCHIVO-ANIDADO-001", "cadena_de_suministro", "cadena_de_suministro",
                 "media", "alta", f.ambito, f.ruta + ":1", nombre,
-                "Archivo comprimido dentro del repositorio",
-                "No se abre: su contenido no se ha analizado. Descomprimirlo y "
-                "versionar los ficheros, o justificar por qué viaja comprimido."))
+                t("estructural.SEC-ARCHIVO-ANIDADO-001.titulo"),
+                t("estructural.SEC-ARCHIVO-ANIDADO-001.mitigacion")))
 
         if (nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO)
                 or _es_env_con_valores(nombre)):
             salida.append(_h(
                 "SEC-SECRETO-EN-REPO-001", "permisos_y_acciones", "tecnico",
                 "alta", "alta", f.ambito, f.ruta + ":1", nombre,
-                "Fichero con nombre de credencial versionado en el repositorio",
-                "Retirarlo del control de versiones, rotar lo que contuviera y "
-                "añadirlo a .gitignore."))
+                t("estructural.SEC-SECRETO-EN-REPO-001.titulo"),
+                t("estructural.SEC-SECRETO-EN-REPO-001.mitigacion")))
 
         # Un fichero que no se pudo abrir es el caso mas puro de contenido
         # opaco: no se sabe nada de el, ni siquiera si es texto. Antes se
@@ -339,10 +335,8 @@ def analizar(raiz, ficheros) -> list:
             salida.append(_h(
                 "SEC-ILEGIBLE-001", "cadena_de_suministro", "cadena_de_suministro",
                 "media", "alta", f.ambito, f.ruta + ":1", nombre,
-                "Fichero que no se ha podido leer",
-                "El análisis no ha podido abrirlo, así que no dice nada sobre su "
-                "contenido. Corregir sus permisos y volver a auditar, o retirarlo "
-                "del paquete."))
+                t("estructural.SEC-ILEGIBLE-001.titulo"),
+                t("estructural.SEC-ILEGIBLE-001.mitigacion")))
             continue
 
         if f.binario and ext not in EXTENSIONES_ARCHIVO:
@@ -354,7 +348,7 @@ def analizar(raiz, ficheros) -> list:
                     "SEC-BINARIO-NO-DOCUMENTADO-001", "cadena_de_suministro",
                     "cadena_de_suministro", "media", "media", f.ambito,
                     f.ruta + ":1", nombre,
-                    "Fichero binario que ningún texto del repositorio menciona",
-                    "Documentar qué es, de dónde sale y cómo reproducirlo; o retirarlo."))
+                    t("estructural.SEC-BINARIO-NO-DOCUMENTADO-001.titulo"),
+                    t("estructural.SEC-BINARIO-NO-DOCUMENTADO-001.mitigacion")))
 
     return salida
