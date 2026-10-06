@@ -1,6 +1,6 @@
 ---
 description: Audita la portabilidad de las skills de un repositorio de Claude hacia cinco destinos (ChatGPT, claude.ai, Claude Code, Mistral Vibe Work y Perplexity Computer) y las empaqueta
-argument-hint: <url-del-repo-o-ruta-local>
+argument-hint: <url-del-repo-o-ruta-local> [--lang es|en|fr]
 ---
 
 Exporta las skills del repositorio `$1` al estándar abierto Agent Skills.
@@ -38,3 +38,6 @@ Después:
    hacer—. Si el código de salida fue `3`, dilo explícitamente: alguna skill no se exportó
    por un hallazgo grave dentro de lo que se iba a empaquetar, y `--anular-revision-
    seguridad` no es el primer recurso — lee antes el hallazgo, el fichero y la línea.
+8. Responde al usuario en el idioma en que te escribió, o en el que pida, y pasa
+   `--lang <código>` al conversor (`es`, `en`, `fr` o `auto`). Los nombres de artefactos y
+   los valores de `resumen.json` se citan tal cual.

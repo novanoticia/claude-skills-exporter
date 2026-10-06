@@ -111,6 +111,7 @@ es una URL de repositorio, no si ya tienes la carpeta descargada.
 | `--target a b` | En `audit`, qué destinos evaluar; en `export`, qué artefactos producir — la auditoría sigue cubriendo los cinco |
 | `--fail-on {ninguno,degradado,no_compatible}` | Devuelve código 2 si algún estado alcanza ese umbral. Útil en CI |
 | `--keep-description-order` | No reordena la descripción — y con ello desactiva también la compactación: sólo queda el recorte duro por el final |
+| `--lang {es,en,fr,auto}` | Idioma del informe, la consola y los mensajes de error. Por defecto `es`; `auto` usa el del sistema. También se lee de la variable `CSE_LANG` |
 
 > ⚠️ **`--out` se borra entero** antes de cada exportación: lo que haya dentro se pierde.
 > Para que no pueda llevarse por delante nada tuyo, `export` se niega a vaciar un
@@ -135,7 +136,7 @@ es una URL de repositorio, no si ya tienes la carpeta descargada.
 | Código | Cuándo |
 |---|---|
 | `0` | Nada que reportar. También `inspect`, que no evalúa destinos y siempre sale con 0 |
-| `1` | Error de uso o de entrada: el origen no existe, no contiene ningún `SKILL.md`, `--target` desconocido, `--only` sin coincidencias, dos skills que reclaman el mismo nombre, o un `--out` que la herramienta se niega a borrar |
+| `1` | Error de uso o de entrada: el origen no existe, no contiene ningún `SKILL.md`, `--target` desconocido, `--only` sin coincidencias, dos skills que reclaman el mismo nombre, un `--out` que la herramienta se niega a borrar, o un `--lang` desconocido |
 | `2` | Se ha alcanzado el umbral de `--fail-on`, **o** el nivel de riesgo de seguridad no es `bajo` |
 | `3` | Sólo en `export`: el *gate* de seguridad ha impedido escribir los artefactos de al menos una skill |
 
@@ -155,6 +156,38 @@ sólo con el peor estado. Combínalo con `audit`, que no escribe ficheros:
 ```bash
 python3 convert.py audit . --target perplexity-computer --fail-on no_compatible
 ```
+
+## Idiomas
+
+`--lang` elige el idioma del informe (`INFORME-PORTABILIDAD.md`), de la consola, de los
+hallazgos de seguridad y de los mensajes de error: `es` (por defecto), `en` y `fr`.
+
+```bash
+python3 convert.py export ./mi-plugin --lang en
+CSE_LANG=fr python3 convert.py audit ./mi-plugin      # la variable vale igual
+```
+
+- Qué **no** se traduce: los nombres de los artefactos (`INFORME-PORTABILIDAD.md`,
+  `resumen.json`, `<skill>.zip`) y los valores de `resumen.json` (`alta`, `critico`,
+  `permisos_y_acciones`…), para que quien lo lea desde otro programa no tenga que conocer
+  el idioma. Dentro del informe, esos mismos valores sí salen traducidos.
+- `--lang auto` toma el idioma de `LC_ALL`, `LC_MESSAGES` o `LANG`, y cae a español si no
+  hay catálogo para él. No es el valor por defecto a propósito: en macOS `LANG` suele ser
+  `en_US.UTF-8` aunque trabajes en español.
+- `--help` sigue en español.
+- Las traducciones al inglés y al francés las ha redactado una IA. Si vas a apoyarte en
+  ellas —sobre todo en los textos de seguridad—, pide que las revise una persona nativa.
+
+**Añadir un idioma** es soltar un fichero `xx.json` en
+`skills/plugin-to-agentskills/scripts/exporter/i18n/`, con las mismas claves que `es.json`
+más la traducción de cada regla (`regla.<ID>.titulo|detalle|mitigacion`) y de cada peligro
+de los perfiles (`peligro.<id>.…`). El validador dice qué falta:
+
+```bash
+python3 .github/validar_idiomas.py .
+```
+
+Cuando se lo pides en la conversación, Claude también te responde en ese idioma.
 
 ## Qué genera
 

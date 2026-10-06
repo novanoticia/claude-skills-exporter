@@ -24,14 +24,15 @@ python3 -m unittest discover -s tests -t tests > /tmp/suite.log 2>&1; echo "codi
 grep -E "^(OK|FAILED|Ran )" /tmp/suite.log
 ```
 
-Hoy son **355 pruebas** y salen todas en verde. Si ves menos, algo no se está
+Hoy son **425 pruebas** y salen todas en verde. Si ves menos, algo no se está
 descubriendo.
 
-### Los cuatro validadores del CI
+### Los cinco validadores del CI
 
 ```bash
 python3 .github/validate_plugin.py .      # manifiestos, skills y comandos
 python3 .github/validar_estatico.py .     # que el conversor no ejecuta nada de lo que analiza
+python3 .github/validar_idiomas.py .      # catálogos de idioma: mismas claves y marcadores que es.json
 ```
 
 Los otros dos necesitan `jsonschema`, que **no** se puede instalar con `pip install` a
@@ -73,7 +74,7 @@ Vienen del diseño. Romper cualquiera rompe el CI.
 9. **Mensajes de commit en español**, sujeto imperativo en tercera persona («Anade…», no
    «Anadir»), cuerpo explicando el **porqué**.
 
-## Las cuatro trampas
+## Las cinco trampas
 
 Cuestan horas si no se saben.
 
@@ -133,6 +134,27 @@ Añadir un fixture de seguridad exige apuntarlo en `FIXTURES_SEG`, en
 `tests/test_seg_golden.py`: de esa lista tiran tanto el generador de golden como
 `validar_reglas.py`.
 
+### 5 · Los textos visibles viven en catálogos de idioma
+
+Todo lo que el usuario lee —informe, consola, errores, hallazgos— sale de
+`exporter/i18n/*.json` mediante `t("clave", campo=valor)`. **No escribas un literal en
+español nuevo en un `.py`**: añade la clave a `es.json` (y a `en.json` y `fr.json`, o
+`validar_idiomas.py` romperá el CI).
+
+- Las llaves de una plantilla son campos de `str.format`: una llave literal se duplica
+  (`${{CLAUDE_PLUGIN_ROOT}}`), y el dato interpolado nunca se reinterpreta.
+- **Excepción:** el español de las reglas (`reglas.json`) y de los peligros de los perfiles
+  (`targets/*.json`) se queda donde está; `en.json` y `fr.json` lo sobrescriben con
+  `regla.<ID>.*` y `peligro.<id>.*`. `es.json` **no** lleva esas claves.
+- `i18n/*.json` vive dentro de la skill: es ámbito `exportado`. Una traducción que cite
+  literalmente un patrón peligroso —una frase de inyección de prompt, por ejemplo—
+  dispara el *gate* sobre la propia herramienta (lo caza
+  `tests/test_seg_golden.EsteRepositorio`). Descríbelo con palabras. **No amplíes la
+  exención de `_es_el_catalogo`** para arreglarlo: es una decisión de seguridad.
+- Los golden de `tests/golden-i18n/` se regeneran con `tests/generar_golden.py`, igual que
+  los demás. Los de `tests/golden/` y `tests/golden-seguridad/` (español) **no deben
+  cambiar** por tocar traducciones.
+
 ## Dónde está lo demás
 
 | Documento | Qué contiene |
@@ -157,6 +179,7 @@ skills/plugin-to-agentskills/scripts/
     perfiles.py           carga de exporter/targets/*.json
     empaquetado.py        copia, zip y límites de paquete
     informes.py           INFORME-PORTABILIDAD.md y resumen.json
+    i18n/                 t(), idioma activo y un catálogo JSON por idioma (es, en, fr)
     seguridad/
       recorrido.py        recorre el árbol y pone el ámbito a cada fichero
       patrones.py         aplica reglas.json
