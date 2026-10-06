@@ -78,7 +78,7 @@ ChatGPT»* o *«¿es portable esta skill?»*. La skill se activa sola porque su
 
 ### Actualizar
 
-Los manifiestos fijan `version` (hoy `1.0.0`). Claude Code sólo ofrece una
+Los manifiestos fijan `version` (hoy `1.1.0`). Claude Code sólo ofrece una
 actualización cuando ese número cambia, así que **cada publicación debe subirla** en
 `.claude-plugin/plugin.json` y en `plugin.json`: `1.0.1` para correcciones, `1.1.0` para
 funciones nuevas. Los commits intermedios no llegan a quien ya lo tiene instalado.
