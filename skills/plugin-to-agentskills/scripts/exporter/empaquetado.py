@@ -14,6 +14,7 @@ import os
 import zipfile
 from pathlib import Path
 
+from exporter.i18n import t
 from exporter.modelo import Senal
 
 
@@ -105,16 +106,17 @@ def comprobar_limites(zip_path: Path, perfil) -> list:
 
     tam = Path(zip_path).stat().st_size
     if tam_max is not None and tam > tam_max:
-        avisos.append("El zip ocupa {} bytes y {} admite {}.".format(
-            tam, perfil.label, tam_max))
+        avisos.append(t("empaquetado.limite_zip_bytes", tam=tam,
+                        destino=perfil.label, limite=tam_max))
     with zipfile.ZipFile(zip_path) as z:
         info = z.infolist()
     if n_max is not None and len(info) > n_max:
-        avisos.append("El zip lleva {} ficheros y {} admite {}.".format(
-            len(info), perfil.label, n_max))
+        avisos.append(t("empaquetado.limite_zip_ficheros", n=len(info),
+                        destino=perfil.label, limite=n_max))
     if f_max is not None:
         for i in info:
             if i.file_size > f_max:
-                avisos.append("«{}» ocupa {} bytes descomprimido y {} admite {}.".format(
-                    i.filename, i.file_size, perfil.label, f_max))
+                avisos.append(t("empaquetado.limite_fichero", fichero=i.filename,
+                                tam=i.file_size, destino=perfil.label,
+                                limite=f_max))
     return avisos

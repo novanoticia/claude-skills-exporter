@@ -54,13 +54,13 @@ from exporter.descripcion import (
 )
 from exporter.deteccion import (
     CLAUDE_TOOL_NAMES,
-    EXPLICACIONES,
     IGNORED_DIRS,
     detectar,
     detectar_en_arbol,
 )
 from exporter.empaquetado import comprobar_limites, copiar_skill, zip_dir
 from exporter import i18n
+from exporter.i18n import t
 from exporter.frontmatter import split_frontmatter, yaml_escape
 from exporter.informes import informe_markdown, resumen_json
 from exporter.modelo import (
@@ -261,19 +261,16 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
 
     if not fm:
         res.findings.append(Finding("alta", "sin-frontmatter",
-            "SKILL.md no tiene bloque frontmatter YAML. Se generará uno mínimo; "
-            "revisa el nombre y la descripción a mano."))
+            t("portabilidad.sin-frontmatter")))
     if not res.description:
         res.findings.append(Finding("alta", "sin-description",
-            "Falta 'description'. Es el campo que decide cuándo se activa la skill: "
-            "sin él, Perplexity y Mistral casi nunca la cargarán."))
-        res.description = f"Skill importada de {src_dir.name}. PENDIENTE: escribir descripción de activación."
+            t("portabilidad.sin-description")))
+        res.description = t("portabilidad.descripcion-pendiente", carpeta=src_dir.name)
     if name != orig_name:
-        res.adaptations.append(f"Nombre normalizado: '{orig_name}' → '{name}'.")
+        res.adaptations.append(t("adaptacion.nombre", original=orig_name, nuevo=name))
     if sanitize_name(src_dir.name) != name:
         res.findings.append(Finding("media", "nombre-vs-carpeta",
-            f"El nombre del frontmatter ('{name}') no coincidía con la carpeta "
-            f"('{src_dir.name}'). Se exporta la carpeta con el nombre del frontmatter."))
+            t("portabilidad.nombre-vs-carpeta", nombre=name, carpeta=src_dir.name)))
 
     # Orden de la descripción: primero CUÁNDO cargarla, después qué hace.
     # Va ANTES del recorte a propósito: si hay que cortar, se pierde lo prescindible.
@@ -282,16 +279,10 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         if moved:
             res.description = reordered
             res.adaptations.append(
-                "Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han "
-                "puesto delante de las que describen qué hace. Es lo único que el destino lee "
-                "para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.")
+                t("adaptacion.descripcion-reordenada"))
     if not tiene_activacion(res.description):
         res.findings.append(Finding("alta", "description-sin-activacion",
-            "La descripción no dice en ningún momento CUÁNDO cargar la skill: no hay ni un "
-            "'Cárgala cuando…', ni un 'cuando el usuario…', ni ejemplos de frases reales. "
-            "Describe el contenido, no el disparador. El destino casi nunca la activará. "
-            "Esto no se puede arreglar automáticamente sin inventar: reescríbela empezando "
-            "por los disparadores."))
+            t("portabilidad.description-sin-activacion")))
 
     # Una descripción por destino: no comparten presupuesto, así que no comparten texto.
     origen_bytes = nbytes(res.description)
@@ -307,34 +298,28 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
 
     if origen_bytes > presupuesto_carpeta:
         res.adaptations.append(
-            f"Descripción ajustada a cada destino: {origen_bytes} bytes de origen → "
-            f"{nbytes(res.desc_zip)} B en el `.zip` (Perplexity, tope {presupuesto_zip}) y "
-            f"{nbytes(res.desc_folder)} B en la carpeta (Mistral, tope {presupuesto_carpeta}). "
-            "Se podan primero los ejemplos entrecomillados y después las frases que sólo "
-            "cuentan qué hace la skill; el criterio de activación se conserva.")
+            t("adaptacion.descripcion-ajustada", origen_bytes=origen_bytes,
+              zip_bytes=nbytes(res.desc_zip), tope_zip=presupuesto_zip,
+              carpeta_bytes=nbytes(res.desc_folder), tope_carpeta=presupuesto_carpeta))
     if origen_bytes > presupuesto_zip:
         res.findings.append(Finding("media", "description-larga",
-            f"La descripción de origen medía {origen_bytes} bytes UTF-8 y no cabe entera en "
-            "ningún destino. El recorte automático mantiene frases completas, pero no puede "
-            "reescribir: revisa el resultado y, si ha perdido matiz, redáctala a mano en un "
-            "solo párrafo que diga primero cuándo activarse y luego para qué sirve."))
+            t("portabilidad.description-larga", bytes=origen_bytes)))
     elif origen_bytes > presupuesto_carpeta:
         res.findings.append(Finding("baja", "description-densa",
-            f"Descripción de {origen_bytes} bytes: cabe en el zip de Perplexity pero no en la "
-            f"carpeta de Mistral ({presupuesto_carpeta} B), donde va recortada. El índice del "
-            "destino paga este coste en cada sesión, así que cuanto más breve, mejor."))
+            t("portabilidad.description-densa", bytes=origen_bytes,
+              presupuesto=presupuesto_carpeta)))
 
     # Claves no portables
     dropped = [k for k in fm if k in CLAUDE_ONLY_KEYS]
     if dropped:
-        res.adaptations.append("Claves de frontmatter retiradas (no existen fuera de Claude): "
-                               + ", ".join(sorted(dropped)) + ".")
+        res.adaptations.append(t("adaptacion.claves-retiradas",
+                                 claves=", ".join(sorted(dropped))))
 
     # Adaptación de rutas ANTES de auditar, para no avisar de lo que ya se arregló.
     new_body = re.sub(r"\$\{?CLAUDE_PLUGIN_ROOT\}?/skills/[a-zA-Z0-9_\-]+/", "", body)
     new_body = re.sub(r"\$\{?CLAUDE_PLUGIN_ROOT\}?/", "", new_body)
     if new_body != body:
-        res.adaptations.append("Rutas ${CLAUDE_PLUGIN_ROOT}/... convertidas en rutas relativas a la skill.")
+        res.adaptations.append(t("adaptacion.rutas-plugin-root"))
         body = new_body
 
     # Patrones problemáticos en todo el árbol de la skill (SKILL.md, references/,
@@ -366,21 +351,21 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     res.senales = senales
     for s in senales:
         res.findings.append(Finding(s.severidad_base, s.id,
-                                    "{} Visto en {}: {}".format(
-                                        EXPLICACIONES[s.id], s.ubicacion, s.muestra)))
+                                    t("portabilidad.senal",
+                                      explicacion=t("senal." + s.id),
+                                      ubicacion=s.ubicacion, muestra=s.muestra)))
 
-    tools_used = sorted({t for t in CLAUDE_TOOL_NAMES if re.search(rf"\b{t}\b", body)})
+    tools_used = sorted({tool for tool in CLAUDE_TOOL_NAMES
+                        if re.search(rf"\b{tool}\b", body)})
     if tools_used:
         res.findings.append(Finding("media", "herramientas-claude",
-            "Nombra herramientas propias de Claude: " + ", ".join(tools_used) +
-            ". Fuera de Claude no existen con ese nombre."))
+            t("portabilidad.herramientas-claude", herramientas=", ".join(tools_used))))
 
     # Tamaño del cuerpo
     est_tokens = len(body) // CHARS_PER_TOKEN
     if est_tokens > SOFT_BODY_TOKENS:
         res.findings.append(Finding("baja", "cuerpo-largo",
-            f"Cuerpo de ~{est_tokens} tokens (recomendado <{SOFT_BODY_TOKENS}). "
-            "Mueve el material condicional a references/ para que se cargue sólo cuando haga falta."))
+            t("portabilidad.cuerpo-largo", tokens=est_tokens, limite=SOFT_BODY_TOKENS)))
 
     # ---- Escritura ----
     dest = out_dir / name
@@ -397,9 +382,7 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         src_dir, dest, ignorar=set(IGNORED_DIRS) | {skill_md.name})
     for s in enlaces:
         res.findings.append(Finding("alta", "enlace-simbolico",
-            "Se omitió un enlace simbólico al empaquetar: {} ({}). Copiar su "
-            "contenido habría metido en el paquete un fichero de fuera de la "
-            "skill.".format(s.ubicacion, s.muestra)))
+            t("portabilidad.enlace-simbolico", ubicacion=s.ubicacion, destino=s.muestra)))
 
     # Un fichero que no se pudo abrir no es un fichero limpio: nadie ha
     # mirado lo que contiene y, al no poder copiarlo, tampoco esta en el
@@ -416,19 +399,14 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         ilegibles.setdefault(str(ruta_ileg).replace(os.sep, "/"), motivo)
     for ruta_ileg, motivo in sorted(ilegibles.items()):
         res.findings.append(Finding("media", "fichero-ilegible",
-            "No se pudo leer {}: {}. No se ha auditado su contenido y tampoco se "
-            "ha copiado al artefacto. Corrige sus permisos y vuelve a exportar, o "
-            "revísalo a mano antes de subir la skill.".format(ruta_ileg, motivo)))
+            t("portabilidad.fichero-ilegible", ruta=ruta_ileg, motivo=motivo)))
 
     for p in sorted(dest.rglob("*")):
         if p.is_file():
             res.extra_files.append(str(p.relative_to(dest)))
     if any(f.startswith("scripts/") for f in res.extra_files):
         res.findings.append(Finding("media", "scripts",
-            "Incluye scripts/. Perplexity Computer puede ejecutarlos en su sandbox; "
-            "Mistral Vibe Work los guarda pero NO tiene Python (comprobado), así que allí "
-            "no se ejecutan. Si la lógica vive en el script, el SKILL.md debe traer un "
-            "procedimiento manual equivalente al que caer."))
+            t("portabilidad.scripts")))
 
     res.body = body
     res.fm_extra = {k: fm[k] for k in PORTABLE_KEYS
@@ -454,9 +432,7 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
         res.fm_meta = meta
     if bajadas:
         res.adaptations.append(
-            "Claves movidas a `metadata` (el frontmatter del estándar es un "
-            "conjunto cerrado y al nivel superior el destino las rechaza): "
-            + ", ".join(bajadas) + ".")
+            t("adaptacion.claves-a-metadata", claves=", ".join(bajadas)))
     # La carpeta en disco es la variante de Mistral; el zip se reescribe al empaquetar.
     write_skill_md(res, dest, res.desc_folder)
     return res
@@ -1172,7 +1148,7 @@ def main(argv=None) -> int:
 
     elegidos = getattr(args, "target", None)
     if elegidos:
-        desconocidos = [t for t in elegidos if t not in perfiles]
+        desconocidos = [d for d in elegidos if d not in perfiles]
         if desconocidos:
             print("[error] destino desconocido: {}. Disponibles: {}".format(
                 ", ".join(desconocidos), ", ".join(sorted(perfiles))), file=sys.stderr)
