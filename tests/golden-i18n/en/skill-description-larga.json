@@ -1,0 +1,104 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "bajo",
+      "comportamiento": "bajo",
+      "tecnico": "bajo"
+    },
+    "escalada_por_combinacion": false,
+    "hallazgos": [],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "bajo",
+    "recomendacion_instalacion": "instalacion_razonable"
+  },
+  "skills": [
+    {
+      "adaptaciones": [
+        "Description reordered: the sentences that say WHEN to load the skill were moved ahead of the ones that describe what it does. It is the only thing the target reads to decide whether to activate it, and it is now the first thing to survive trimming.",
+        "Description adjusted for each target: 523 source bytes → 523 B in the `.zip` (Perplexity, limit 850) and 476 B in the folder (Mistral, limit 490). Quoted examples are pruned first, then the sentences that only say what the skill does; the activation criterion is kept."
+      ],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [
+              "Adaptation applied: Description reordered: the sentences that say WHEN to load the skill were moved ahead of the ones that describe what it does. It is the only thing the target reads to decide whether to activate it, and it is now the first thing to survive trimming.",
+              "Adaptation applied: Description adjusted for each target: 523 source bytes → 523 B in the `.zip` (Perplexity, limit 850) and 476 B in the folder (Mistral, limit 490). Quoted examples are pruned first, then the sentences that only say what the skill does; the activation criterion is kept."
+            ],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptation applied: Description reordered: the sentences that say WHEN to load the skill were moved ahead of the ones that describe what it does. It is the only thing the target reads to decide whether to activate it, and it is now the first thing to survive trimming.",
+              "Adaptation applied: Description adjusted for each target: 523 source bytes → 523 B in the `.zip` (Perplexity, limit 850) and 476 B in the folder (Mistral, limit 490). Quoted examples are pruned first, then the sentences that only say what the skill does; the activation criterion is kept."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptation applied: Description reordered: the sentences that say WHEN to load the skill were moved ahead of the ones that describe what it does. It is the only thing the target reads to decide whether to activate it, and it is now the first thing to survive trimming.",
+              "Adaptation applied: Description adjusted for each target: 523 source bytes → 523 B in the `.zip` (Perplexity, limit 850) and 476 B in the folder (Mistral, limit 490). Quoted examples are pruned first, then the sentences that only say what the skill does; the activation criterion is kept."
+            ],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "directorio_local",
+            "motivos": [
+              "Adaptation applied: Description reordered: the sentences that say WHEN to load the skill were moved ahead of the ones that describe what it does. It is the only thing the target reads to decide whether to activate it, and it is now the first thing to survive trimming.",
+              "Adaptation applied: Description adjusted for each target: 523 source bytes → 523 B in the `.zip` (Perplexity, limit 850) and 476 B in the folder (Mistral, limit 490). Quoted examples are pruned first, then the sentences that only say what the skill does; the activation criterion is kept."
+            ],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "carpeta",
+            "motivos": [
+              "Adaptation applied: Description reordered: the sentences that say WHEN to load the skill were moved ahead of the ones that describe what it does. It is the only thing the target reads to decide whether to activate it, and it is now the first thing to survive trimming.",
+              "Adaptation applied: Description adjusted for each target: 523 source bytes → 523 B in the `.zip` (Perplexity, limit 850) and 476 B in the folder (Mistral, limit 490). Quoted examples are pruned first, then the sentences that only say what the skill does; the activation criterion is kept."
+            ],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible_con_adaptacion",
+            "modo_instalacion": "zip",
+            "motivos": [
+              "Adaptation applied: Description reordered: the sentences that say WHEN to load the skill were moved ahead of the ones that describe what it does. It is the only thing the target reads to decide whether to activate it, and it is now the first thing to survive trimming.",
+              "Adaptation applied: Description adjusted for each target: 523 source bytes → 523 B in the `.zip` (Perplexity, limit 850) and 476 B in the folder (Mistral, limit 490). Quoted examples are pruned first, then the sentences that only say what the skill does; the activation criterion is kept."
+            ],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [
+        {
+          "codigo": "description-densa",
+          "mensaje": "Description of 523 bytes: it fits in the Perplexity zip but not in the Mistral folder (490 B), where it is trimmed. The target's index pays this cost in every session, so the shorter the better.",
+          "severidad": "baja"
+        }
+      ],
+      "name": "description-larga"
+    }
+  ]
+}

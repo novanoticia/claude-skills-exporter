@@ -128,5 +128,19 @@ class Ingles(unittest.TestCase):
         self.assertIn("$HOME is “/”, so ~/ writes to the root", informe)
 
 
+class Frances(unittest.TestCase):
+
+    def test_el_informe_sale_en_frances(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r = correr("export", str(FIXTURES / "repo-descarga-remota"), "--out", tmp,
+                       "--anular-revision-seguridad", "--lang", "fr")
+            informe = (Path(tmp) / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("**Niveau de risque :**", informe)
+        self.assertNotIn("Nivel de riesgo", informe)
+        self.assertNotIn("Risk level", informe)
+        self.assertIn("Télécharge du contenu distant et l'exécute", informe)
+
+
 if __name__ == "__main__":
     unittest.main()

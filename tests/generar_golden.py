@@ -68,6 +68,15 @@ def main() -> int:
             json.dumps(datos, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8")
         print("regenerado (seguridad)", fixture)
+
+    from test_idiomas_golden import CASOS, GOLDEN as GOLDEN_I18N, IDIOMAS, resumen  # noqa: E402
+    for idioma in IDIOMAS:
+        (GOLDEN_I18N / idioma).mkdir(parents=True, exist_ok=True)
+        for caso in CASOS:
+            (GOLDEN_I18N / idioma / (caso + ".json")).write_text(
+                json.dumps(resumen(caso, idioma), ensure_ascii=False, indent=2,
+                           sort_keys=True) + "\n", encoding="utf-8")
+            print("regenerado ({})".format(idioma), caso)
     return 0
 
 
