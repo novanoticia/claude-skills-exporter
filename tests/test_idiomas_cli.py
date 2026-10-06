@@ -142,5 +142,55 @@ class Frances(unittest.TestCase):
         self.assertIn("Télécharge du contenu distant et l'exécute", informe)
 
 
+class Auto(unittest.TestCase):
+
+    def test_toma_el_primer_locale_significativo(self):
+        self.assertEqual(i18n.detectar_del_entorno({"LANG": "fr_FR.UTF-8"}), "fr")
+
+    def test_lc_all_manda_sobre_lang(self):
+        self.assertEqual(
+            i18n.detectar_del_entorno({"LC_ALL": "en_GB.UTF-8", "LANG": "fr_FR.UTF-8"}), "en")
+
+    def test_c_y_posix_se_saltan(self):
+        self.assertEqual(
+            i18n.detectar_del_entorno({"LC_ALL": "C", "LANG": "fr_FR.UTF-8"}), "fr")
+        self.assertEqual(
+            i18n.detectar_del_entorno({"LC_ALL": "C.UTF-8", "LANG": "fr_FR.UTF-8"}), "fr")
+        self.assertEqual(i18n.detectar_del_entorno({"LANG": "POSIX"}), "es")
+
+    def test_idioma_sin_catalogo_cae_a_espanol(self):
+        self.assertEqual(i18n.detectar_del_entorno({"LANG": "de_DE.UTF-8"}), "es")
+
+    def test_un_idioma_sin_catalogo_no_salta_a_la_variable_siguiente(self):
+        # Mezclar el idioma de dos variables seria peor que caer al base.
+        self.assertEqual(
+            i18n.detectar_del_entorno({"LC_ALL": "de_DE.UTF-8", "LANG": "fr_FR.UTF-8"}), "es")
+
+    def test_sin_variables_es_espanol(self):
+        self.assertEqual(i18n.detectar_del_entorno({}), "es")
+
+    def test_auto_se_resuelve_en_idioma_pedido(self):
+        self.assertEqual(i18n.idioma_pedido("auto", {"LANG": "fr_FR.UTF-8"}), "fr")
+        self.assertEqual(
+            i18n.idioma_pedido(None, {"CSE_LANG": "auto", "LANG": "en_US.UTF-8"}), "en")
+        self.assertEqual(i18n.idioma_pedido("AUTO", {"LANG": "fr_FR.UTF-8"}), "fr")
+
+    def test_auto_en_el_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r = correr("export", str(FIXTURES / "repo-descarga-remota"), "--out", tmp,
+                       "--anular-revision-seguridad", "--lang", "auto",
+                       entorno={"LANG": "fr_FR.UTF-8", "LC_ALL": "", "LC_MESSAGES": ""})
+            informe = (Path(tmp) / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("Niveau de risque", informe)
+
+    def test_sin_auto_la_variable_lang_no_cambia_nada(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            correr("export", str(FIXTURES / "repo-descarga-remota"), "--out", tmp,
+                   "--anular-revision-seguridad", entorno={"LANG": "fr_FR.UTF-8"})
+            informe = (Path(tmp) / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
+        self.assertIn("Nivel de riesgo", informe)
+
+
 if __name__ == "__main__":
     unittest.main()

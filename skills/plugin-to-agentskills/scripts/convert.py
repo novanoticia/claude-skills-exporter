@@ -719,8 +719,9 @@ def construir_parser():
                        choices=["ninguno", "degradado", "no_compatible"],
                        help="devolver código 2 si algún estado alcanza este umbral")
         p.add_argument("--lang", dest="lang", default=None, metavar="CODIGO",
-                       help="idioma de los informes y mensajes: es (por defecto), en, fr. "
-                            "También se lee de la variable CSE_LANG")
+                       help="idioma de los informes y mensajes: es (por defecto), en, fr, "
+                            "o auto para usar el del sistema. También se lee de la "
+                            "variable CSE_LANG")
         return p
 
     ins = comun(subs.add_parser(

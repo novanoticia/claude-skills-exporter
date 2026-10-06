@@ -99,11 +99,35 @@ def t_opcional(clave: str, defecto: str) -> str:
     return _cargar(_activo).get(clave, defecto)
 
 
+VARIABLES_DE_LOCALE = ("LC_ALL", "LC_MESSAGES", "LANG")
+
+
+def detectar_del_entorno(entorno=None) -> str:
+    """El idioma del locale del entorno, o el base si no hay catalogo.
+
+    Respeta la precedencia POSIX (LC_ALL, LC_MESSAGES, LANG). La primera
+    variable con valor decide, salvo `C` y `POSIX`, que significan «sin
+    idioma» y se saltan. Si el idioma que dice no tiene catalogo, gana el
+    base: no se salta a la siguiente variable, porque eso mezclaria idiomas.
+    """
+    entorno = os.environ if entorno is None else entorno
+    for variable in VARIABLES_DE_LOCALE:
+        valor = (entorno.get(variable) or "").strip()
+        if not valor or valor.upper() in ("C", "POSIX") or valor.upper().startswith("C."):
+            continue
+        codigo = normalizar_codigo(valor)
+        return codigo if codigo in idiomas_disponibles() else IDIOMA_BASE
+    return IDIOMA_BASE
+
+
 def idioma_pedido(flag, entorno=None) -> str:
     """Que idioma se pidio: el flag, si no CSE_LANG, si no el base.
 
-    Una variable vacia cuenta como ausente. No valida: eso lo hace
-    fijar_idioma, que es quien conoce los catalogos.
+    `auto` se resuelve aqui contra el entorno. Una variable vacia cuenta
+    como ausente. No valida: eso lo hace fijar_idioma.
     """
     entorno = os.environ if entorno is None else entorno
-    return flag or entorno.get("CSE_LANG") or IDIOMA_BASE
+    pedido = flag or entorno.get("CSE_LANG") or IDIOMA_BASE
+    if pedido.strip().lower() == "auto":
+        return detectar_del_entorno(entorno)
+    return pedido
