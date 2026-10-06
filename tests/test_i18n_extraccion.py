@@ -76,5 +76,26 @@ class Marcadores(unittest.TestCase):
         self.assertEqual(faltan, set())
 
 
+class Consola(unittest.TestCase):
+
+    def test_estan_las_claves_de_consola_y_error(self):
+        es = claves("es")
+        esperadas = ["consola.clonando", "consola.skills_encontradas",
+                     "consola.skill_riesgo", "consola.ok_salida", "consola.bloqueado",
+                     "consola.aviso_riesgo_alto", "error.destino_desconocido",
+                     "error.zip_only_sin_zip", "error.sin_skills",
+                     "error.only_sin_coincidencia", "error.origen_invalido",
+                     "error.clon_timeout", "error.clon_fallo"]
+        self.assertEqual(set(esperadas) - set(es), set())
+
+    def test_no_quedan_prefijos_de_mensaje_sin_traducir(self):
+        # Todo `[error]`, `[info]`, `[aviso]`, `[ok]` o `[bloqueado]` que el
+        # usuario ve nace de una clave; el prefijo vive dentro del catalogo.
+        origen = (RAIZ_SCRIPTS / "convert.py").read_text(encoding="utf-8")
+        sueltos = re.findall(r'["\']\[(?:error|info|aviso|ok|bloqueado)\]', origen)
+        # Unica excepcion fija: el error de idioma desconocido de main().
+        self.assertEqual(len(sueltos), 1, sueltos)
+
+
 if __name__ == "__main__":
     unittest.main()
