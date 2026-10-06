@@ -170,7 +170,11 @@ CSE_LANG=fr python3 convert.py audit ./mi-plugin      # la variable vale igual
 - Qué **no** se traduce: los nombres de los artefactos (`INFORME-PORTABILIDAD.md`,
   `resumen.json`, `<skill>.zip`) y los valores de `resumen.json` (`alta`, `critico`,
   `permisos_y_acciones`…), para que quien lo lea desde otro programa no tenga que conocer
-  el idioma. Dentro del informe, esos mismos valores sí salen traducidos.
+  el idioma. Dentro del informe salen traducidos los valores del propio conversor
+  (severidad, nivel, confianza, ámbito, estado); los que vienen de los perfiles de destino
+  —niveles de capacidad, modo de instalación, tipo de evidencia— se muestran tal cual.
+- Las notas de portabilidad que se incrustan al final del `SKILL.md` exportado también
+  salen en el idioma elegido, así que el artefacto depende de `--lang`.
 - `--lang auto` toma el idioma de `LC_ALL`, `LC_MESSAGES` o `LANG`, y cae a español si no
   hay catálogo para él. No es el valor por defecto a propósito: en macOS `LANG` suele ser
   `en_US.UTF-8` aunque trabajes en español.

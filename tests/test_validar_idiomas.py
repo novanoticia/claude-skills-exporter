@@ -126,6 +126,31 @@ class Validador(unittest.TestCase):
         self.assertTrue(any("falta la clave peligro." in e for e in self.errores()),
                         self.errores())
 
+    def test_marcador_posicional_en_otro_idioma(self):
+        # `{}` sin nombre pasa la comparacion de conjuntos (se descarta) y
+        # revienta en ejecucion con IndexError: str.format(**datos).
+        self.estropear(lambda d: d.update(
+            {"consola.skills_encontradas": d["consola.skills_encontradas"] + " {}"}))
+        self.assertTrue(any("consola.skills_encontradas" in e and "marcador" in e
+                            for e in self.errores()), self.errores())
+
+    def test_marcador_numerico_en_otro_idioma(self):
+        self.estropear(lambda d: d.update({"informe.origen": "- **Source:** `{0}`"}))
+        self.assertTrue(any("informe.origen" in e and "marcador" in e
+                            for e in self.errores()), self.errores())
+
+    def test_marcador_posicional_en_es(self):
+        es = leer(self.dir / "es.json")
+        es["informe.origen"] = "- **Origen:** `{}`"
+        escribir(self.dir / "es.json", es)
+        self.assertTrue(any(e.startswith("es.json") and "marcador" in e
+                            for e in self.errores()), self.errores())
+
+    def test_marcador_con_atributo(self):
+        self.estropear(lambda d: d.update({"informe.origen": "- **Source:** `{origen.real}`"}))
+        self.assertTrue(any("informe.origen" in e and "marcador" in e
+                            for e in self.errores()), self.errores())
+
     def test_es_no_lleva_claves_de_regla(self):
         es = leer(self.dir / "es.json")
         es["regla.SEC-EXEC-REMOTO-001.titulo"] = "x"

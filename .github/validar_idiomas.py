@@ -28,6 +28,17 @@ def _marcadores(plantilla: str) -> set:
     return {campo for _, campo, _, _ in string.Formatter().parse(plantilla) if campo}
 
 
+def _marcadores_invalidos(plantilla: str) -> list:
+    """Campos que str.format(**datos) no sabe resolver: sin nombre o no identificador.
+
+    `{}` y `{0}` se descartan al comparar conjuntos de marcadores, pero en
+    ejecucion lanzan IndexError; `{a.b}` y `{a[0]}` acceden a atributos de un
+    dato. Solo se admiten campos con nombre de identificador.
+    """
+    return sorted({campo for _, campo, _, _ in string.Formatter().parse(plantilla)
+                   if campo is not None and not campo.isidentifier()})
+
+
 def _leer(ruta: Path):
     return json.loads(ruta.read_text(encoding="utf-8"))
 
@@ -62,6 +73,15 @@ def comprobar(raiz: Path) -> list:
         if k.startswith(("regla.", "peligro.")):
             errores.append("es.json: lleva la clave {} (el español de reglas y "
                            "peligros vive en reglas.json y en targets/)".format(k))
+            continue
+        try:
+            malos = _marcadores_invalidos(base[k])
+        except ValueError as e:
+            errores.append("es.json: {} no es una plantilla válida ({})".format(k, e))
+            continue
+        if malos:
+            errores.append("es.json: {} usa marcadores sin nombre de identificador "
+                           "{}: solo se admiten campos con nombre".format(k, malos))
 
     for codigo, datos in sorted(catalogos.items()):
         meta = datos.get("_meta")
@@ -89,6 +109,12 @@ def comprobar(raiz: Path) -> list:
             except ValueError as e:
                 errores.append("{}.json: {} no es una plantilla válida ({})".format(
                     codigo, k, e))
+                continue
+            malos = _marcadores_invalidos(v)
+            if malos:
+                errores.append("{}.json: {} usa marcadores sin nombre de identificador "
+                               "{}: solo se admiten campos con nombre".format(
+                                   codigo, k, malos))
                 continue
             if k in base and m_prop != _marcadores(base[k]):
                 errores.append("{}.json: los marcadores de {} no coinciden con es "

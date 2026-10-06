@@ -24,7 +24,7 @@ python3 -m unittest discover -s tests -t tests > /tmp/suite.log 2>&1; echo "codi
 grep -E "^(OK|FAILED|Ran )" /tmp/suite.log
 ```
 
-Hoy son **425 pruebas** y salen todas en verde. Si ves menos, algo no se está
+Hoy son **437 pruebas** y salen todas en verde. Si ves menos, algo no se está
 descubriendo.
 
 ### Los cinco validadores del CI
@@ -151,6 +151,9 @@ español nuevo en un `.py`**: añade la clave a `es.json` (y a `en.json` y `fr.j
   dispara el *gate* sobre la propia herramienta (lo caza
   `tests/test_seg_golden.EsteRepositorio`). Descríbelo con palabras. **No amplíes la
   exención de `_es_el_catalogo`** para arreglarlo: es una decisión de seguridad.
+- Un texto que **recomiende una frase** (por ejemplo «Cárgala cuando…») tiene que
+  recomendar una que `ACTIVATION_RX`, en `descripcion.py`, reconozca; si no, el usuario
+  sigue el consejo del informe y recibe el mismo hallazgo otra vez.
 - Los golden de `tests/golden-i18n/` se regeneran con `tests/generar_golden.py`, igual que
   los demás. Los de `tests/golden/` y `tests/golden-seguridad/` (español) **no deben
   cambiar** por tocar traducciones.

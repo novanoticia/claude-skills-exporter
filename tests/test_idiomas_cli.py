@@ -36,6 +36,11 @@ class IdiomaPedido(unittest.TestCase):
     def test_variable_vacia_cuenta_como_ausente(self):
         self.assertEqual(i18n.idioma_pedido(None, {"CSE_LANG": ""}), "es")
 
+    def test_un_flag_vacio_se_pide_y_no_se_ignora(self):
+        # `--lang "$IDIOMA"` con la variable vacia es un error de uso: no debe
+        # caer en silencio al idioma de CSE_LANG ni al base.
+        self.assertEqual(i18n.idioma_pedido("", {"CSE_LANG": "en"}), "")
+
 
 class LangEnElCli(unittest.TestCase):
 
@@ -55,6 +60,12 @@ class LangEnElCli(unittest.TestCase):
         r = correr("inspect", str(FIXTURES / "repo-descarga-remota"),
                    "--lang", "es", entorno={"CSE_LANG": "xx"})
         self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_lang_vacio_da_error_aunque_haya_variable(self):
+        r = correr("inspect", str(FIXTURES / "repo-descarga-remota"), "--lang", "",
+                   entorno={"CSE_LANG": "en"})
+        self.assertEqual(r.returncode, 1, r.stderr)
+        self.assertIn("[error] idioma desconocido: .", r.stderr)
 
     def test_acepta_forma_de_locale(self):
         r = correr("inspect", str(FIXTURES / "repo-descarga-remota"), "--lang", "ES_es.UTF-8")
@@ -190,6 +201,38 @@ class Auto(unittest.TestCase):
                    "--anular-revision-seguridad", entorno={"LANG": "fr_FR.UTF-8"})
             informe = (Path(tmp) / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
         self.assertIn("Nivel de riesgo", informe)
+
+
+class NotasEnElArtefacto(unittest.TestCase):
+    """Las notas que se incrustan en el SKILL.md exportado salen en un solo idioma."""
+
+    def skill_md(self, idioma):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, tmp)
+        r = correr("export", str(FIXTURES / "skill-con-mcp"), "--out", tmp,
+                   "--anular-revision-seguridad", "--lang", idioma)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return (Path(tmp) / "con-mcp" / "SKILL.md").read_text(encoding="utf-8")
+
+    def test_en_espanol_siguen_las_cabeceras_de_siempre(self):
+        md = self.skill_md("es")
+        self.assertIn("## Notas de portabilidad (añadidas automáticamente)", md)
+        self.assertIn("**Probablemente no funcione en este entorno:**", md)
+
+    def test_en_ingles_no_queda_ninguna_cabecera_en_espanol(self):
+        md = self.skill_md("en")
+        self.assertIn("## Portability notes (added automatically)", md)
+        self.assertIn("**It probably will not work in this environment:**", md)
+        for espanol in ("Notas de portabilidad", "Probablemente no funcione",
+                        "Esta skill se exportó", "No simules el resultado"):
+            self.assertNotIn(espanol, md)
+
+    def test_en_frances_no_queda_ninguna_cabecera_en_espanol(self):
+        md = self.skill_md("fr")
+        self.assertIn("## Notes de portabilité (ajoutées automatiquement)", md)
+        for espanol in ("Notas de portabilidad", "Probablemente no funcione",
+                        "Esta skill se exportó", "No simules el resultado"):
+            self.assertNotIn(espanol, md)
 
 
 if __name__ == "__main__":

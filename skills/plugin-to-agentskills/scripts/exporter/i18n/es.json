@@ -160,5 +160,11 @@
   "estructural.SEC-ILEGIBLE-001.titulo": "Fichero que no se ha podido leer",
   "estructural.SEC-ILEGIBLE-001.mitigacion": "El análisis no ha podido abrirlo, así que no dice nada sobre su contenido. Corregir sus permisos y volver a auditar, o retirarlo del paquete.",
   "estructural.SEC-BINARIO-NO-DOCUMENTADO-001.titulo": "Fichero binario que ningún texto del repositorio menciona",
-  "estructural.SEC-BINARIO-NO-DOCUMENTADO-001.mitigacion": "Documentar qué es, de dónde sale y cómo reproducirlo; o retirarlo."
+  "estructural.SEC-BINARIO-NO-DOCUMENTADO-001.mitigacion": "Documentar qué es, de dónde sale y cómo reproducirlo; o retirarlo.",
+  "notas.titulo": "## Notas de portabilidad (añadidas automáticamente)",
+  "notas.intro": "Esta skill se exportó desde un plugin de Claude al estándar abierto Agent Skills.",
+  "notas.cambios": "**Cambios aplicados al exportar:**",
+  "notas.no_funcionara": "**Probablemente no funcione en este entorno:**",
+  "notas.limitaciones": "**Funcionará, pero con limitaciones:**",
+  "notas.pie": "Si una instrucción de esta skill depende de una herramienta que no tienes disponible, dilo explícitamente y propón una alternativa. No simules el resultado ni lo inventes."
 }

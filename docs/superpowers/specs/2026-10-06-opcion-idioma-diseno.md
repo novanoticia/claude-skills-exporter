@@ -234,3 +234,17 @@ todas simplifican la implementación o completan el alcance.
 6. **Los valores de los vocabularios cerrados sí se traducen en la prosa del informe**
    (`severidad **alta**` → `severity **high**`), no en `resumen.json`. Es la regla de §2:
    si lo lee una persona, se traduce.
+7. **Las notas de portabilidad incrustadas en el `SKILL.md` exportado salen en el idioma
+   elegido** (claves `notas.*`). Es texto que genera la herramienta para quien lee el
+   artefacto, no contenido de la skill; dejar las cabeceras en español sobre viñetas en
+   inglés mezclaba idiomas en lo que el usuario sube a otra plataforma. «Contenido de las
+   skills exportadas» (§2) sigue sin traducirse: es el de la propia skill.
+8. **El detector de activación reconoce los consejos del informe.** `ACTIVATION_RX` gana
+   formas inglesas («load it when…») y francesas («charge-la quand…», «quand l'utilisateur»…),
+   porque el informe en esos idiomas las recomienda y, sin ellas, el usuario que las
+   escribiese recibiría el mismo hallazgo.
+9. **`--lang ""` es un error**, no una petición ignorada (a diferencia de `CSE_LANG` vacía,
+   que cuenta como ausente).
+10. **El validador exige marcadores con nombre de identificador** en todos los catálogos,
+    `es.json` incluido: `{}`, `{0}` y `{a.b}` pasaban la comparación de conjuntos y
+    fallaban en ejecución.

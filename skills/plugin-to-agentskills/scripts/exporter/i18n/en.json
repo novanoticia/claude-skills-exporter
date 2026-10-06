@@ -205,5 +205,11 @@
   "peligro.perplexity-corte-90s.mitigacion": "Process in small chunks sized to finish within the limit, verify by re-reading the real state after each chunk, and check which items were touched instead of trusting the filter.",
   "peligro.perplexity-descripcion-rechaza-zip.titulo": "A description above the limit rejects the whole zip",
   "peligro.perplexity-descripcion-rechaza-zip.detalle": "The 1024 limit is measured in UTF-8 bytes even though the error message says “characters”. A description of 1063 characters but 1085 bytes was rejected. In Spanish every accent takes two bytes and every dash three.",
-  "peligro.perplexity-descripcion-rechaza-zip.mitigacion": "The converter trims to 850 bytes, with plenty of margin."
+  "peligro.perplexity-descripcion-rechaza-zip.mitigacion": "The converter trims to 850 bytes, with plenty of margin.",
+  "notas.titulo": "## Portability notes (added automatically)",
+  "notas.intro": "This skill was exported from a Claude plugin to the open Agent Skills standard.",
+  "notas.cambios": "**Changes applied on export:**",
+  "notas.no_funcionara": "**It probably will not work in this environment:**",
+  "notas.limitaciones": "**It will work, but with limitations:**",
+  "notas.pie": "If an instruction in this skill depends on a tool you do not have available, say so explicitly and propose an alternative. Do not simulate the result or make it up."
 }

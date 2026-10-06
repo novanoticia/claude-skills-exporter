@@ -21,7 +21,13 @@ ACTIVATION_RX = re.compile(
     r"trigger\w*\s+(?:on|when|obligatorio)|"
     r"use\s+(?:this\s+skill\s+)?when|used?\s+when|load\s+(?:this\s+)?when|"
     r"this\s+skill\s+should\s+be\s+used\s+when|apply\s+when|invoke\s+when|"
-    r"when\s+the\s+user",
+    r"when\s+the\s+user|(?:load|use|activate|invoke)\s+it\s+when|"
+    # Frances: el informe en frances recomienda estas formas, asi que el
+    # detector tiene que darlas por buenas o devolveria el mismo hallazgo.
+    r"(?:charge|active|utilise|invoque|emploie)(?:[-\s]l[aeo]s?)?\s+(?:quand|lorsque)|"
+    r"[àa]\s+utiliser\s+(?:quand|lorsque)|se\s+d[ée]clenche\s+(?:avec|quand|lorsque)|"
+    r"(?:quand|lorsque)\s+l['’]utilisateur|"
+    r"si\s+l['’]utilisateur\s+(?:demande|dit|pose|veut|[ée]crit)",
     re.I)
 
 # Abreviaturas tras las que un punto NO cierra frase.

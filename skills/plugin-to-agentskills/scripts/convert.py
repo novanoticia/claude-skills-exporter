@@ -463,24 +463,22 @@ def render_notes(res: SkillResult) -> str:
     if not (res.adaptations or blocking or degraded):
         return "\n"
 
-    out = ["\n\n---\n", "## Notas de portabilidad (añadidas automáticamente)\n",
-           "Esta skill se exportó desde un plugin de Claude al estándar abierto Agent Skills.\n"]
+    out = ["\n\n---\n", t("notas.titulo") + "\n",
+           t("notas.intro") + "\n"]
     if res.adaptations:
-        out.append("**Cambios aplicados al exportar:**\n")
+        out.append(t("notas.cambios") + "\n")
         out += [f"- {a}" for a in res.adaptations]
         out.append("")
     if blocking:
-        out.append("**Probablemente no funcione en este entorno:**\n")
+        out.append(t("notas.no_funcionara") + "\n")
         out += [f"- {f.message}" for f in blocking]
         out.append("")
     if degraded:
-        out.append("**Funcionará, pero con limitaciones:**\n")
+        out.append(t("notas.limitaciones") + "\n")
         out += [f"- {f.message}" for f in degraded]
         out.append("")
     if blocking or degraded:
-        out.append("Si una instrucción de esta skill depende de una herramienta que no tienes "
-                   "disponible, dilo explícitamente y propón una alternativa. No simules el "
-                   "resultado ni lo inventes.\n")
+        out.append(t("notas.pie") + "\n")
     return "\n".join(out) + "\n"
 
 

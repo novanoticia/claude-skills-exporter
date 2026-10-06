@@ -205,5 +205,11 @@
   "peligro.perplexity-corte-90s.mitigacion": "Traiter par petits lots dimensionnés pour se terminer dans la limite, vérifier en relisant l'état réel après chaque lot, et contrôler quels éléments ont été touchés au lieu de se fier au filtre.",
   "peligro.perplexity-descripcion-rechaza-zip.titulo": "Une description au-dessus de la limite fait rejeter le zip entier",
   "peligro.perplexity-descripcion-rechaza-zip.detalle": "La limite de 1024 se mesure en octets UTF-8 même si le message d'erreur dit « characters ». Une description de 1063 caractères mais 1085 octets a été rejetée. En espagnol, chaque accent occupe deux octets et chaque tiret trois.",
-  "peligro.perplexity-descripcion-rechaza-zip.mitigacion": "Le convertisseur tronque à 850 octets, avec une large marge."
+  "peligro.perplexity-descripcion-rechaza-zip.mitigacion": "Le convertisseur tronque à 850 octets, avec une large marge.",
+  "notas.titulo": "## Notes de portabilité (ajoutées automatiquement)",
+  "notas.intro": "Cette skill a été exportée depuis un plugin Claude vers le standard ouvert Agent Skills.",
+  "notas.cambios": "**Modifications appliquées à l'export :**",
+  "notas.no_funcionara": "**Elle ne fonctionnera probablement pas dans cet environnement :**",
+  "notas.limitaciones": "**Elle fonctionnera, mais avec des limites :**",
+  "notas.pie": "Si une instruction de cette skill dépend d'un outil dont vous ne disposez pas, dites-le explicitement et proposez une alternative. Ne simulez pas le résultat et ne l'inventez pas."
 }

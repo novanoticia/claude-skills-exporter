@@ -123,11 +123,14 @@ def detectar_del_entorno(entorno=None) -> str:
 def idioma_pedido(flag, entorno=None) -> str:
     """Que idioma se pidio: el flag, si no CSE_LANG, si no el base.
 
-    `auto` se resuelve aqui contra el entorno. Una variable vacia cuenta
-    como ausente. No valida: eso lo hace fijar_idioma.
+    `auto` se resuelve aqui contra el entorno. No valida: eso lo hace
+    fijar_idioma.
     """
     entorno = os.environ if entorno is None else entorno
-    pedido = flag or entorno.get("CSE_LANG") or IDIOMA_BASE
+    # Un flag vacio (`--lang ""`) es una peticion y no se ignora: caer en
+    # silencio a otro idioma escondiera un error de uso. Una variable de
+    # entorno vacia, en cambio, cuenta como ausente.
+    pedido = flag if flag is not None else (entorno.get("CSE_LANG") or IDIOMA_BASE)
     if pedido.strip().lower() == "auto":
         return detectar_del_entorno(entorno)
     return pedido
