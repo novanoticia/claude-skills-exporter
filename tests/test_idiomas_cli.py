@@ -75,5 +75,58 @@ class LangEnElCli(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, r.stderr)
 
 
+class Ingles(unittest.TestCase):
+
+    def export(self, fixture, *extra):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, tmp)
+        r = correr("export", str(FIXTURES / fixture), "--out", tmp,
+                   "--anular-revision-seguridad", "--lang", "en", *extra)
+        informe = Path(tmp) / "INFORME-PORTABILIDAD.md"
+        return r, (informe.read_text(encoding="utf-8") if informe.exists() else "")
+
+    def test_el_informe_sale_en_ingles(self):
+        r, informe = self.export("repo-descarga-remota")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("# Portability and security report", informe)
+        self.assertIn("**Risk level:**", informe)
+        self.assertNotIn("Nivel de riesgo", informe)
+        self.assertNotIn("Seguridad del paquete", informe)
+
+    def test_la_regla_sale_traducida(self):
+        _, informe = self.export("repo-descarga-remota")
+        self.assertIn("Downloads remote content and runs it", informe)
+        self.assertNotIn("Descarga contenido remoto", informe)
+
+    def test_la_consola_sale_en_ingles(self):
+        r, _ = self.export("repo-descarga-remota")
+        self.assertRegex(r.stdout, r"\[info\] \d+ skill\(s\) found")
+        self.assertNotIn("encontradas", r.stdout)
+        self.assertIn("[ok] Output in:", r.stdout)
+
+    def test_los_errores_salen_en_ingles(self):
+        r = correr("inspect", "/no/existe/seguro", "--lang", "en")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("does not exist as a path", r.stderr + r.stdout)
+        self.assertNotIn("no existe como ruta", r.stderr + r.stdout)
+
+    def test_el_peligro_de_un_perfil_sale_traducido(self):
+        # mistral-home-es-raiz se dispara con `~/` en una skill.
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, tmp)
+        raiz = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, raiz)
+        skill = raiz / "skills" / "tilde"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(
+            "---\nname: tilde\ndescription: Cargala cuando el usuario pida guardar notas.\n---\n"
+            "Guarda en ~/notas/diario.md lo que el usuario diga.\n", encoding="utf-8")
+        r = correr("export", str(raiz), "--out", tmp, "--anular-revision-seguridad",
+                   "--lang", "en")
+        informe = (Path(tmp) / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("$HOME is “/”, so ~/ writes to the root", informe)
+
+
 if __name__ == "__main__":
     unittest.main()
