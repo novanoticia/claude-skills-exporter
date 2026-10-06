@@ -26,24 +26,6 @@ RECOMENDACION = {
     Nivel.NO_EVALUABLE: "revision_incompleta",
 }
 
-TEXTO_RECOMENDACION = {
-    "instalacion_razonable":
-        "No se han detectado indicadores estáticos relevantes. Instalación "
-        "razonable tras leer el informe.",
-    "revisar_permisos":
-        "Se han detectado operaciones de riesgo que requieren revisión. "
-        "Instalación posible tras revisar los permisos que pide.",
-    "revision_humana_obligatoria":
-        "Se han detectado patrones incompatibles con el principio de mínimo "
-        "privilegio. No se recomienda la instalación automática: exige revisión humana.",
-    "bloqueada":
-        "El contenido incluye patrones potencialmente maliciosos o altamente "
-        "sospechosos. La instalación no puede recomendarse.",
-    "revision_incompleta":
-        "El paquete contiene material que no se ha podido analizar. La instalación "
-        "no puede recomendarse hasta completar la revisión.",
-}
-
 # Para escalar por combinacion hace falta confianza ALTA: una heuristica no
 # puede disparar sola el peor veredicto del sistema. El «al menos media» es
 # del gate (tarea 8), que es otra decision y con otras consecuencias.

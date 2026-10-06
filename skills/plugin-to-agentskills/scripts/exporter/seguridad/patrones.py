@@ -17,6 +17,7 @@ import os
 import re
 from pathlib import Path
 
+from exporter.i18n import t_opcional
 from exporter.modelo import Hallazgo
 from exporter.seguridad.recorrido import leer_para_analisis
 
@@ -61,6 +62,18 @@ def _es_el_catalogo(absoluta) -> bool:
         # El catalogo puede no existir donde se espera, o el fichero
         # auditado haber desaparecido entre el recorrido y este momento.
         return False
+
+
+def titulo_de(regla) -> str:
+    return t_opcional("regla.{}.titulo".format(regla["id"]), regla["titulo"])
+
+
+def detalle_de(regla) -> str:
+    return t_opcional("regla.{}.detalle".format(regla["id"]), regla["detalle"])
+
+
+def mitigacion_de(regla) -> str:
+    return t_opcional("regla.{}.mitigacion".format(regla["id"]), regla["mitigacion"])
 
 
 CLAVES = ("id", "familia", "dimension", "severidad", "confianza",
@@ -187,5 +200,5 @@ def analizar(ficheros, reglas) -> list:
                     ambito=f.ambito,
                     ubicacion="{}:{}".format(f.ruta, numero),
                     muestra=m.group(0).strip()[:120],
-                    titulo=r["titulo"], mitigacion=r["mitigacion"]))
+                    titulo=titulo_de(r), mitigacion=mitigacion_de(r)))
     return salida

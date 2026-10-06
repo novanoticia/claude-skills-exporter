@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime
 
+from exporter.i18n import t, t_opcional
 from exporter.modelo import Estado, Evaluacion
 
 # Niveles con los que damos la capacidad por disponible. `parcial` no basta
@@ -38,6 +39,15 @@ ESTADO_POR_SEVERIDAD = {
 }
 
 
+def texto_de_peligro(peligro, campo: str) -> str:
+    """`titulo`, `detalle` o `mitigacion` de un peligro, en el idioma activo.
+
+    El espanol vive en el perfil de destino; los catalogos de otros idiomas
+    lo sobrescriben con la clave `peligro.<id>.<campo>`.
+    """
+    return t_opcional("peligro.{}.{}".format(peligro["id"], campo), peligro[campo])
+
+
 def evaluar(skill, perfil, hoy: datetime.date) -> list:
     """Devuelve una Evaluacion por cada modo de instalacion del perfil."""
     motivos, peligros, estados = [], [], []
@@ -49,18 +59,15 @@ def evaluar(skill, perfil, hoy: datetime.date) -> list:
             continue
         if nivel == "desconocido":
             estados.append(Estado.NO_VERIFICABLE)
-            motivos.append(
-                "{}: el perfil no declara esta capacidad, asi que no se puede "
-                "afirmar nada.".format(cap.nombre))
+            motivos.append(t("compat.capacidad.desconocida", nombre=cap.nombre))
         elif cap.nivel == "requerida":
             estados.append(Estado.NO_COMPATIBLE)
             motivos.append(
-                "{}: requerida por la skill y el destino la declara «{}».".format(
-                    cap.nombre, nivel))
+                t("compat.capacidad.requerida", nombre=cap.nombre, nivel=nivel))
         else:
             estados.append(Estado.DEGRADADO)
             motivos.append(
-                "{}: opcional, y el destino la declara «{}».".format(cap.nombre, nivel))
+                t("compat.capacidad.opcional", nombre=cap.nombre, nivel=nivel))
 
     # --- Canal 2: peligros de conducta ---
     vistos = set()
@@ -71,19 +78,19 @@ def evaluar(skill, perfil, hoy: datetime.date) -> list:
             vistos.add(peligro["id"])
             peligros.append(peligro)
             estados.append(ESTADO_POR_SEVERIDAD[peligro["severidad"]])
-            motivos.append("{} (visto en {}).".format(peligro["titulo"], senal.ubicacion))
+            motivos.append(t("compat.peligro.visto", titulo=texto_de_peligro(peligro, "titulo"),
+                             ubicacion=senal.ubicacion))
 
     # --- Caducidad de la evidencia ---
     if perfil.caducado(hoy):
         estados.append(Estado.NO_VERIFICABLE)
         motivos.append(
-            "La evidencia de este perfil venció el {} (revisar_tras) y no se ha "
-            "vuelto a comprobar.".format(perfil.datos["evidencia"]["revisar_tras"]))
+            t("compat.evidencia.vencida", fecha=perfil.datos["evidencia"]["revisar_tras"]))
 
     # --- Adaptaciones aplicadas ---
     if skill.adaptaciones:
         estados.append(Estado.COMPATIBLE_CON_ADAPTACION)
-        motivos.extend("Adaptación aplicada: {}".format(a) for a in skill.adaptaciones)
+        motivos.extend(t("compat.adaptacion", texto=a) for a in skill.adaptaciones)
 
     estado = Estado.peor(estados)
     return [Evaluacion(destino=perfil.id, modo_instalacion=modo, estado=estado,
