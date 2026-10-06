@@ -60,6 +60,7 @@ from exporter.deteccion import (
     detectar_en_arbol,
 )
 from exporter.empaquetado import comprobar_limites, copiar_skill, zip_dir
+from exporter import i18n
 from exporter.frontmatter import split_frontmatter, yaml_escape
 from exporter.informes import informe_markdown, resumen_json
 from exporter.modelo import (
@@ -756,6 +757,9 @@ def construir_parser():
         p.add_argument("--fail-on", dest="fail_on", default="ninguno",
                        choices=["ninguno", "degradado", "no_compatible"],
                        help="devolver código 2 si algún estado alcanza este umbral")
+        p.add_argument("--lang", dest="lang", default=None, metavar="CODIGO",
+                       help="idioma de los informes y mensajes: es (por defecto), en, fr. "
+                            "También se lee de la variable CSE_LANG")
         return p
 
     ins = comun(subs.add_parser(
@@ -1142,6 +1146,19 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
 def main(argv=None) -> int:
     args = construir_parser().parse_args(normalizar_argv(
         sys.argv[1:] if argv is None else argv))
+
+    # El idioma se fija antes que cualquier otra cosa: todo mensaje posterior,
+    # incluidos los de error, ya sale en el idioma pedido. El error de idioma
+    # desconocido es la excepcion: se da en espanol fijo, porque no hay
+    # ningun idioma al que traducirlo.
+    try:
+        i18n.fijar_idioma(i18n.idioma_pedido(args.lang))
+    except i18n.IdiomaDesconocido as e:
+        print("[error] idioma desconocido: {}. Disponibles: {}".format(
+            e.codigo, ", ".join("{} — {}".format(c, n)
+                                for c, n in sorted(e.disponibles.items()))),
+            file=sys.stderr)
+        return 1
 
     # Se valida cuanto antes, antes de tocar disco: un CSE_FECHA invalido
     # debe abortar limpio, sin dejar un directorio de salida a medias.

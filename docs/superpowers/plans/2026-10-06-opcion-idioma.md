@@ -515,7 +515,8 @@ class LangEnElCli(unittest.TestCase):
     def test_los_tres_subcomandos_aceptan_el_flag(self):
         for sub in ("inspect", "audit"):
             with self.subTest(sub=sub):
-                r = correr(sub, str(FIXTURES / "repo-descarga-remota"), "--lang", "es")
+                # Fixture limpio: `audit` devuelve 2 si el riesgo no es bajo.
+                r = correr(sub, str(FIXTURES / "skill-minima"), "--lang", "es")
                 self.assertEqual(r.returncode, 0, r.stderr)
 
 

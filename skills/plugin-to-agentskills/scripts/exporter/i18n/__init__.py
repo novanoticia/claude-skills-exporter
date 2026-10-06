@@ -97,3 +97,13 @@ def t_opcional(clave: str, defecto: str) -> str:
     formatea, porque esos textos no son plantillas.
     """
     return _cargar(_activo).get(clave, defecto)
+
+
+def idioma_pedido(flag, entorno=None) -> str:
+    """Que idioma se pidio: el flag, si no CSE_LANG, si no el base.
+
+    Una variable vacia cuenta como ausente. No valida: eso lo hace
+    fijar_idioma, que es quien conoce los catalogos.
+    """
+    entorno = os.environ if entorno is None else entorno
+    return flag or entorno.get("CSE_LANG") or IDIOMA_BASE
