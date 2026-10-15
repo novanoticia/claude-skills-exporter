@@ -1,7 +1,7 @@
 # Claude Skills Exporter
 
 [![Versión en main](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fnovanoticia%2Fclaude-skills-exporter%2Fmain%2Fplugin.json&query=%24.version&prefix=v&label=Versi%C3%B3n%20en%20main&color=blue)](https://github.com/novanoticia/claude-skills-exporter/blob/main/plugin.json)
-**Última versión publicada:** [v1.1.0](https://github.com/novanoticia/claude-skills-exporter/releases/tag/v1.1.0) · [Ver publicaciones](https://github.com/novanoticia/claude-skills-exporter/releases)
+[![Última versión publicada](https://img.shields.io/github/v/release/novanoticia/claude-skills-exporter?display_name=tag&label=%C3%9Altima%20versi%C3%B3n%20publicada&color=green)](https://github.com/novanoticia/claude-skills-exporter/releases/latest)
 
 Coge un repositorio con un plugin (o unas skills) de Claude, extrae las skills,
 **audita, destino por destino, qué se romperá fuera de Claude** y las empaqueta para
