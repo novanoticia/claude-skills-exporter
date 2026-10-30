@@ -1,0 +1,47 @@
+name: Mistral PR Review
+
+on:
+  pull_request:
+    types: [ready_for_review, opened, synchronize, reopened, edited]
+
+# Un push nuevo cancela la revisión anterior del mismo PR.
+concurrency:
+  group: mistral-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  mistral-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Ejecutar solo el revisor de la rama de confianza; el PR se lee con Git.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # El script vive en .github/scripts/mistral_review.py (solo stdlib).
+      # Modelo: variable de repositorio MISTRAL_MODEL (Settings → Secrets and
+      # variables → Actions → Variables); sin ella, mistral-large-latest.
+      - name: Obtener los objetos del PR sin ejecutar su codigo
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+
+      - name: Mistral AI Review
+        if: hashFiles('.github/scripts/mistral_review.py') != ''
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          MISTRAL_MODEL: ${{ vars.MISTRAL_MODEL }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/mistral_review.py
