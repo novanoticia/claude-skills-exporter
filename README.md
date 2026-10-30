@@ -416,6 +416,10 @@ verificable` y el CI se pone en rojo sin que nadie haya tocado una línea.
 
 ## Autoría y licencia
 
+Las revisiones de PR pueden usar [Mistral AI](https://github.com/mistralai) como
+revisor automatizado, sin aplicar parches. La configuración de Actions y los
+límites del análisis se explican en [Revisión con Mistral](docs/revision-mistral.md).
+
 Creado por **Pablo Rodríguez López** ([@novanoticia](https://github.com/novanoticia)).
 
 Publicado bajo licencia **MIT** — ver [LICENSE](LICENSE). Puedes usarlo, modificarlo,
