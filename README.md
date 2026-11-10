@@ -257,8 +257,11 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 > en la interfaz: que ChatGPT aplique los mismos es una suposición razonable, sin
 > confirmar. El perfil los guarda además en unidades binarias (50 y 25 MiB), que es
 > una interpretación nuestra de los «MB» de la guía. La herramienta los comprueba al
-> empaquetar y, si un zip los supera, emite el hallazgo `limite-de-paquete`: significa
-> que **incumple el perfil configurado**, no que ChatGPT lo haya rechazado.
+> empaquetar —también en `audit`, sobre un zip temporal— y, si un zip los supera, emite
+> el hallazgo `limite-de-paquete` y marca como **no compatible** la celda del zip de
+> ChatGPT, de modo que `--fail-on no_compatible` devuelve 2. Significa que **incumple
+> el perfil configurado**, no que ChatGPT lo haya rechazado. El zip se escribe igual:
+> esto avisa, no bloquea, y no afecta a la celda de ningún otro destino.
 >
 > El zip normal lleva una única carpeta en la raíz con su `SKILL.md`. La herramienta
 > **no garantiza todavía** que sea el único: si la skill de origen trae otros
