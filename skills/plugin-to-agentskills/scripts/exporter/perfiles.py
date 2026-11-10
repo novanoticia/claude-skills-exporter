@@ -45,6 +45,18 @@ class Perfil:
     def modos(self) -> list:
         return list(self.datos["instalacion"]["modos"])
 
+    def instalacion_sin_probar(self, modo: str):
+        """La declaracion de un modo cuya instalacion NO esta probada, o None.
+
+        El campo `instalacion.evidencia_por_modo` es opcional. Un perfil que
+        no lo trae, o un modo que no figura en el, se evalua como siempre:
+        callar aqui no anade incertidumbre que el perfil no ha declarado.
+        """
+        entrada = self.datos["instalacion"].get("evidencia_por_modo", {}).get(modo)
+        if entrada is None or entrada.get("probada"):
+            return None
+        return entrada
+
     def peligros_para(self, senal_id: str) -> list:
         return [p for p in self.datos["peligros"] if senal_id in p.get("dispara_con", [])]
 
