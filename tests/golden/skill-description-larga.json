@@ -23,21 +23,23 @@
         "chatgpt": [
           {
             "bloqueo_seguridad": null,
-            "estado": "compatible_con_adaptacion",
+            "estado": "no_verificable",
             "modo_instalacion": "url_repositorio",
             "motivos": [
               "Adaptación aplicada: Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
-              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva.",
+              "Instalación por URL sin validar: este conversor exporta skills sueltas y no comprueba que el repositorio de origen sea un plugin que ChatGPT pueda instalar (https://agent-plugins.org/specification). No hereda el resultado del zip."
             ],
             "peligros": []
           },
           {
             "bloqueo_seguridad": null,
-            "estado": "compatible_con_adaptacion",
+            "estado": "no_verificable",
             "modo_instalacion": "zip",
             "motivos": [
               "Adaptación aplicada: Descripción reordenada: las frases que dicen CUÁNDO cargar la skill se han puesto delante de las que describen qué hace. Es lo único que el destino lee para decidir si la activa, y ahora es lo primero que sobrevive a un recorte.",
-              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva."
+              "Adaptación aplicada: Descripción ajustada a cada destino: 523 bytes de origen → 523 B en el `.zip` (Perplexity, tope 850) y 476 B en la carpeta (Mistral, tope 490). Se podan primero los ejemplos entrecomillados y después las frases que sólo cuentan qué hace la skill; el criterio de activación se conserva.",
+              "Instalación sin probar: nadie ha subido todavía a ChatGPT un zip de esta herramienta. Que el formato local sea correcto no acredita que se importe ni que la skill se active. Ruta documentada, no comprobada: https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
             ],
             "peligros": []
           }

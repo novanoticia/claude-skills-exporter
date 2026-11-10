@@ -92,11 +92,26 @@ def evaluar(skill, perfil, hoy: datetime.date) -> list:
         estados.append(Estado.COMPATIBLE_CON_ADAPTACION)
         motivos.extend(t("compat.adaptacion", texto=a) for a in skill.adaptaciones)
 
-    estado = Estado.peor(estados)
-    return [Evaluacion(destino=perfil.id, modo_instalacion=modo, estado=estado,
-                       motivos=list(motivos), peligros=list(peligros),
-                       bloqueo_seguridad=None)
-            for modo in perfil.modos()]
+    # --- Instalacion sin probar, modo por modo ---
+    #
+    # Todo lo anterior vale igual para cualquier modo del destino. Esto no:
+    # que un zip tenga el formato correcto no dice nada de instalar por URL,
+    # y ninguna de las dos cosas esta probada solo porque la otra lo este.
+    # Se suma a lo ya visto, no lo sustituye: Estado.peor deja ganar a un
+    # impedimento conocido sobre esta incertidumbre.
+    evaluaciones = []
+    for modo in perfil.modos():
+        estados_modo, motivos_modo = list(estados), list(motivos)
+        sin_probar = perfil.instalacion_sin_probar(modo)
+        if sin_probar is not None:
+            estados_modo.append(Estado.NO_VERIFICABLE)
+            motivos_modo.append(t("compat.instalacion." + sin_probar["motivo"],
+                                  destino=perfil.label, fuente=sin_probar["fuente"]))
+        evaluaciones.append(Evaluacion(
+            destino=perfil.id, modo_instalacion=modo,
+            estado=Estado.peor(estados_modo), motivos=motivos_modo,
+            peligros=list(peligros), bloqueo_seguridad=None))
+    return evaluaciones
 
 
 def anotar_limites(evaluaciones, avisos, modo: str = "zip") -> None:

@@ -23,7 +23,8 @@
             "estado": "no_compatible",
             "modo_instalacion": "url_repositorio",
             "motivos": [
-              "mcp.cliente: required by the skill, and the target declares it “no”."
+              "mcp.cliente: required by the skill, and the target declares it “no”.",
+              "Installation by URL not validated: this converter exports standalone skills and does not check that the source repository is a plugin ChatGPT can install (https://agent-plugins.org/specification). It does not inherit the zip's result."
             ],
             "peligros": []
           },
@@ -32,7 +33,8 @@
             "estado": "no_compatible",
             "modo_instalacion": "zip",
             "motivos": [
-              "mcp.cliente: required by the skill, and the target declares it “no”."
+              "mcp.cliente: required by the skill, and the target declares it “no”.",
+              "Installation untested: nobody has yet uploaded a zip from this tool to ChatGPT. A correct local format does not show that it imports or that the skill activates. Documented route, not checked: https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
             ],
             "peligros": []
           }

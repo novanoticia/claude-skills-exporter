@@ -89,6 +89,8 @@
   "compat.evidencia.vencida": "La preuve de ce profil a expiré le {fecha} (revisar_tras) et n'a pas été revérifiée.",
   "compat.adaptacion": "Adaptation appliquée : {texto}",
   "compat.limite_paquete": "Enfreint le profil configuré : {aviso} C'est une limite du profil, pas un refus observé sur la plateforme.",
+  "compat.instalacion.paquete-sin-probar": "Installation non testée : personne n'a encore envoyé à {destino} un zip produit par cet outil. Un format local correct ne prouve ni l'import ni l'activation de la skill. Parcours documenté, non vérifié : {fuente}",
+  "compat.instalacion.origen-sin-validar": "Installation par URL non validée : ce convertisseur exporte des skills isolées et ne vérifie pas que le dépôt d'origine soit un plugin que {destino} puisse installer ({fuente}). Elle n'hérite pas du résultat du zip.",
   "empaquetado.limite_zip_bytes": "Le zip occupe {tam} octets et {destino} en accepte {limite}.",
   "empaquetado.limite_zip_ficheros": "Le zip contient {n} fichiers et {destino} en accepte {limite}.",
   "empaquetado.limite_fichero": "« {fichero} » occupe {tam} octets décompressé et {destino} en accepte {limite}.",

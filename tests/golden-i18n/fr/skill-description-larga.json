@@ -23,21 +23,23 @@
         "chatgpt": [
           {
             "bloqueo_seguridad": null,
-            "estado": "compatible_con_adaptacion",
+            "estado": "no_verificable",
             "modo_instalacion": "url_repositorio",
             "motivos": [
               "Adaptation appliquée : Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
-              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé.",
+              "Installation par URL non validée : ce convertisseur exporte des skills isolées et ne vérifie pas que le dépôt d'origine soit un plugin que ChatGPT puisse installer (https://agent-plugins.org/specification). Elle n'hérite pas du résultat du zip."
             ],
             "peligros": []
           },
           {
             "bloqueo_seguridad": null,
-            "estado": "compatible_con_adaptacion",
+            "estado": "no_verificable",
             "modo_instalacion": "zip",
             "motivos": [
               "Adaptation appliquée : Description réordonnée : les phrases qui disent QUAND charger la skill ont été placées avant celles qui décrivent ce qu'elle fait. C'est la seule chose que la cible lit pour décider de l'activer, et c'est désormais la première à survivre à une troncature.",
-              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé."
+              "Adaptation appliquée : Description ajustée pour chaque cible : 523 octets d'origine → 523 o dans le `.zip` (Perplexity, limite 850) et 476 o dans le dossier (Mistral, limite 490). On élague d'abord les exemples entre guillemets, puis les phrases qui disent seulement ce que fait la skill ; le critère d'activation est conservé.",
+              "Installation non testée : personne n'a encore envoyé à ChatGPT un zip produit par cet outil. Un format local correct ne prouve ni l'import ni l'activation de la skill. Parcours documenté, non vérifié : https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
             ],
             "peligros": []
           }

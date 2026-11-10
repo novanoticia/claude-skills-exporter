@@ -45,16 +45,20 @@
         "chatgpt": [
           {
             "bloqueo_seguridad": null,
-            "estado": "compatible",
+            "estado": "no_verificable",
             "modo_instalacion": "url_repositorio",
-            "motivos": [],
+            "motivos": [
+              "Installation by URL not validated: this converter exports standalone skills and does not check that the source repository is a plugin ChatGPT can install (https://agent-plugins.org/specification). It does not inherit the zip's result."
+            ],
             "peligros": []
           },
           {
             "bloqueo_seguridad": null,
-            "estado": "compatible",
+            "estado": "no_verificable",
             "modo_instalacion": "zip",
-            "motivos": [],
+            "motivos": [
+              "Installation untested: nobody has yet uploaded a zip from this tool to ChatGPT. A correct local format does not show that it imports or that the skill activates. Documented route, not checked: https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
+            ],
             "peligros": []
           }
         ],

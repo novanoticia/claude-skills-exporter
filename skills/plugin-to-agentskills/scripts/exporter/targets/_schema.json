@@ -19,7 +19,21 @@
           "items": { "enum": ["zip", "carpeta", "directorio_local", "url_repositorio"] }
         },
         "ruta_ui": { "type": "string" },
-        "una_skill_por_subida": { "type": "boolean" }
+        "una_skill_por_subida": { "type": "boolean" },
+        "evidencia_por_modo": {
+          "type": "object",
+          "propertyNames": { "enum": ["zip", "carpeta", "directorio_local", "url_repositorio"] },
+          "additionalProperties": {
+            "type": "object",
+            "required": ["probada", "motivo", "fuente"],
+            "additionalProperties": false,
+            "properties": {
+              "probada": { "type": "boolean" },
+              "motivo": { "enum": ["paquete-sin-probar", "origen-sin-validar"] },
+              "fuente": { "type": "string", "format": "uri" }
+            }
+          }
+        }
       }
     },
     "formato": {
