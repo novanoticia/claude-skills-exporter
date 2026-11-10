@@ -4,7 +4,7 @@
   "label": "ChatGPT",
   "instalacion": {
     "modos": ["url_repositorio", "zip"],
-    "ruta_ui": "Con «Work» activado, en Complementos: buscar por nombre o añadir desde la URL del repositorio",
+    "ruta_ui": "Zip de una skill: Plugins → Skills → Create → Upload from your computer (ruta documentada por OpenAI, sin probar). Repositorio por URL: con «Work» activado, en Complementos",
     "una_skill_por_subida": true
   },
   "formato": {
@@ -46,6 +46,16 @@
       {
         "titulo": "Agent Plugins 1.0.0 — Especificación",
         "url": "https://agent-plugins.org/specification"
+      },
+      {
+        "titulo": "OpenAI — Skills en la API (consultada el 2026-11-10)",
+        "url": "https://developers.openai.com/api/docs/guides/tools-skills",
+        "seccion": "Limits and validation: origen de limites_paquete. Son limites de la API; no se han observado en la interfaz de ChatGPT"
+      },
+      {
+        "titulo": "OpenAI — Skills in ChatGPT (consultada el 2026-10-07)",
+        "url": "https://help.openai.com/en/articles/20001066-skills-in-chatgpt",
+        "seccion": "Ruta de subida y disponibilidad. Consulta documental, no prueba manual del zip"
       }
     ]
   }

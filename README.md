@@ -12,9 +12,11 @@ instalarlas en **ChatGPT**, **claude.ai**, **Claude Code**, **Mistral Vibe Work*
 > el formato portátil de empaquetado de la Agentic AI Foundation (OpenAI, Amazon,
 > Microsoft, Cursor y Vercel, con Google como *core maintainer*). Este repositorio
 > es a la vez un plugin conforme a esa especificación y la herramienta que lleva
-> otros plugins hacia ella. Las skills que produce validan contra el conjunto
-> cerrado de frontmatter de [Agent Skills](https://agentskills.io/specification),
-> que es lo que ChatGPT, claude.ai y la Skills API exigen para aceptar una subida.
+> otros plugins hacia ella. Al exportar, el frontmatter se reduce a un conjunto
+> cerrado de claves de [Agent Skills](https://agentskills.io/specification): `name`,
+> `description`, `license`, `compatibility` y `metadata`. Eso es una condición de
+> formato, no una validación completa de cada paquete ni una garantía de que una
+> plataforma concreta acepte la subida: eso sólo lo acredita probarlo en el destino.
 
 👉 **Si no manejas GitHub, empieza por la [guía de uso](docs/guia.html)** — descárgala y
 ábrela con doble clic en el navegador. Cubre instalar la herramienta, exportar un
@@ -226,7 +228,7 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 
 | Destino | Qué subir | `description` | Ruta |
 |---|---|---|---|
-| **ChatGPT** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 1024 caracteres | Con `Work` activado, en **Complementos** (ver la nota) |
+| **ChatGPT** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 1024 caracteres (el estándar) | *Plugins* → *Skills* → *Create* → *Upload from your computer* — documentada, **sin probar** (ver la nota) |
 | **Perplexity Computer** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 850 B | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
 | **Mistral Vibe Work** | `mi-skill/` — la **carpeta** | ≤ 490 B | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
 | **Claude Code** | `mi-skill/` — la **carpeta** | ≤ 490 B de hecho | Copiar a `~/.claude/skills/`, o instalar el plugin con `/plugin install` |
@@ -236,22 +238,42 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 > el de cada plataforma: la carpeta es una sola y la marca Mistral con sus 490 B, aunque
 > Claude Code admita los 1024 caracteres del estándar.
 
-> **Para ChatGPT sirve el mismo `.zip` de Perplexity**, sin volver a exportar: su tope
-> es de 1024 caracteres y el zip trae la descripción de 850 bytes, así que cabe de
-> sobra. Exige además que el zip contenga **una única carpeta en la raíz** y **un solo
-> `SKILL.md`** — que es exactamente lo que genera esta herramienta. Sus otros límites
-> (50 MB de zip, 500 ficheros, 25 MB por fichero descomprimido) quedan muy lejos para
-> una skill normal — pero la herramienta los comprueba: si un zip los superara, saldría
-> el hallazgo `limite-de-paquete` en el informe. Está en el **plan gratuito**, con
-> límites de uso.
+> **Para ChatGPT se genera el mismo `.zip` que para Perplexity**, sin volver a
+> exportar. Lo que eso acredita es poco y conviene decirlo tal cual: la descripción
+> cumple el presupuesto de 850 bytes, que queda por debajo de los 1024 caracteres del
+> estándar. **No acredita que ChatGPT importe el zip, ni que active la skill, ni que
+> ejecute sus scripts**: nadie ha subido todavía un zip de esta herramienta a ChatGPT.
 >
-> **Sobre la ruta exacta en ChatGPT, honestamente: no la hemos verificado para un zip
-> suelto.** Lo que sí está comprobado a mano es instalar un *repositorio* como
+> Hay cuatro cosas distintas que es fácil confundir:
+>
+> | Qué | Qué sabemos | De dónde sale |
+> |---|---|---|
+> | **El estándar Agent Skills** | `description` de 1 a 1024 caracteres, `name` de 1 a 64 | [Especificación](https://agentskills.io/specification) |
+> | **La API de Skills de OpenAI** | 50 MB de zip, 500 ficheros, 25 MB por fichero descomprimido, y un solo `SKILL.md` por paquete, sin distinguir mayúsculas | [Guía de la API](https://developers.openai.com/api/docs/guides/tools-skills), consultada el 10 de noviembre de 2026 |
+> | **La interfaz de ChatGPT** | Ruta *Plugins* → *Skills* → *Create* → *Upload from your computer*; la subida se analiza antes de quedar disponible, y la función depende del producto, la cuenta y el espacio de trabajo | [Skills in ChatGPT](https://help.openai.com/en/articles/20001066-skills-in-chatgpt), consultada el 7 de octubre de 2026 |
+> | **Un plugin por URL de repositorio** | Es otro contrato: exige un `plugin.json` en la raíz del repositorio. Este conversor exporta skills sueltas, **no** construye ni valida un plugin instalable por URL | [Agent Plugins](https://agent-plugins.org/specification) |
+>
+> Los límites de tamaño del perfil de ChatGPT están **tomados de la API**, no observados
+> en la interfaz: que ChatGPT aplique los mismos es una suposición razonable, sin
+> confirmar. El perfil los guarda además en unidades binarias (50 y 25 MiB), que es
+> una interpretación nuestra de los «MB» de la guía. La herramienta los comprueba al
+> empaquetar y, si un zip los supera, emite el hallazgo `limite-de-paquete`: significa
+> que **incumple el perfil configurado**, no que ChatGPT lo haya rechazado.
+>
+> El zip normal lleva una única carpeta en la raíz con su `SKILL.md`. La herramienta
+> **no garantiza todavía** que sea el único: si la skill de origen trae otros
+> `SKILL.md` en subcarpetas, o dos variantes de mayúsculas en la misma carpeta, el
+> resultado puede llevar más de uno u omitir alguno sin avisar. Revisa el contenido
+> del zip si tu skill tiene esa forma.
+>
+> **Sobre la disponibilidad:** no afirmamos en qué planes está. La ayuda de OpenAI la
+> condiciona al producto, a la cuenta y al espacio de trabajo; si no ves la opción, eso
+> no dice nada sobre el zip.
+>
+> **Lo único probado a mano** (agosto de 2026) fue instalar un *repositorio* como
 > complemento —activar `Work` en el selector, ir a **Complementos** y añadirlo por
-> nombre o por URL—. Para un `.zip` de una skill aislada, que es lo que produce esta
-> herramienta, mira la gestión de complementos con `Work` activado y consulta la
-> documentación de ChatGPT si la interfaz ha cambiado. Preferimos decir esto a repetir
-> unos pasos concretos que ya nos salieron mal una vez.
+> nombre o por URL—. Es la operación de la última fila de la tabla, no la subida de un
+> zip, y haber instalado aquel repositorio no demuestra que cualquier otro se instale.
 
 > **No son intercambiables.** Descomprimir el `.zip` **no** da la carpeta de Mistral: la
 > descripción que sale es la larga. Si sólo conservas el zip y luego quieres subirlo a

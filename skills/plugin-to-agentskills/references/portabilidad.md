@@ -11,7 +11,9 @@ un aviso del informe importa.
 > README o de este fichero: no verifica la ruta de instalación, ni las capacidades, ni que
 > las celdas digan lo mismo que el JSON. La tabla recoge sólo tres de los cinco destinos;
 > ChatGPT y claude.ai tienen perfil propio (`chatgpt.json`, `claude-ai.json`) y comparten
-> el zip de 850 bytes. Lo que sigue viviendo sólo aquí es la evidencia narrativa: qué se
+> el zip de 850 bytes. Del zip en ChatGPT no hay todavía ninguna observación propia: sus
+> límites de paquete están tomados de la guía de la API de Skills de OpenAI, no de la
+> interfaz, y la importación está sin probar. Lo que sigue viviendo sólo aquí es la evidencia narrativa: qué se
 > observó, en qué ejecución y por qué importa.
 
 | | Perplexity Computer | Mistral Vibe Work | Claude Code |
@@ -123,10 +125,12 @@ compatible**, no «riesgo medio».
 
 ## 2. Frontmatter
 
-Sólo `name` y `description` son obligatorios. Y el frontmatter del estándar es un conjunto
-**cerrado**: `name`, `description`, `license`, `compatibility` y `metadata`. Cualquier otra
-clave al nivel superior no se ignora — el destino rechaza la skill entera («Unexpected
-key(s) in SKILL.md frontmatter»).
+Sólo `name` y `description` son obligatorios. El estándar define además `license`,
+`compatibility`, `metadata` y, como campo experimental, `allowed-tools`. El conversor emite
+un conjunto **cerrado** más corto, por política propia: `name`, `description`, `license`,
+`compatibility` y `metadata`. El motivo es que una clave inesperada al nivel superior no
+siempre se ignora — se ha visto a un destino rechazar la skill entera («Unexpected key(s) in
+SKILL.md frontmatter»).
 
 ```yaml
 ---
@@ -140,7 +144,7 @@ descarta el resto. Estas son las que más suelen aparecer, y por qué se caen:
 
 | Clave | Por qué se cae |
 |---|---|
-| `allowed-tools` / `allowed_tools` | Está en el estándar, pero su semántica es de Claude Code y fuera no significa nada: se retira igualmente |
+| `allowed-tools` / `allowed_tools` | Está en el estándar como campo experimental. Se retira por política del conversor: los nombres de herramienta son los de Claude Code y no hay evidencia de que otro destino los interprete igual. No es una afirmación de que fuera de Claude nunca tenga efecto |
 | `model` | El destino elige su propio modelo |
 | `argument-hint` | Pertenece a los slash commands, no a las skills |
 | `disable-model-invocation` | Control de invocación propio de Claude |
@@ -219,23 +223,27 @@ Reglas prácticas:
 - Máximo duro: 1024, y **la unidad depende del destino**: Perplexity Computer lo mide en
   bytes UTF-8 (`tope_duro_description.unidad: bytes`); el estándar, ChatGPT, claude.ai,
   Mistral y Claude Code lo declaran en caracteres. Escribe pensando en bytes: es el
-  criterio más estrecho y el único que se ha visto rechazar una subida.
+  criterio más estrecho. Que Perplexity cuente bytes es la lectura prudente de un rechazo
+  observado, no un hecho demostrado (ver más abajo).
 - Presupuesto que aplica el conversor, por debajo del máximo y por destino: **490 bytes**
   en la carpeta de Mistral, **850** en el zip de Perplexity.
 
-### El límite de 1024 se mide en bytes
+### El límite de 1024: se presupuesta en bytes
 
-Comprobado subiendo `email-triage.zip` a Perplexity Computer:
+Observado subiendo `email-triage.zip` a Perplexity Computer:
 
 ```
 failed to parse skill file: invalid skill description:
 description exceeds maximum length of 1024 characters
 ```
 
-Aunque el mensaje diga *characters*, la cuenta es en bytes. Esa descripción tenía
-1063 caracteres — pero **1085 bytes**, porque cada tilde, cada `ñ` y cada `¿` ocupan
-dos, y cada `—` ocupa tres. Un texto en español se pasa del límite unos 20-30 bytes
-antes de lo que sugiere contar letras. El conversor ya no recorta a un número fijo: toma
+Esa descripción tenía 1063 caracteres y **1085 bytes**: cada tilde, cada `ñ` y cada `¿`
+ocupan dos bytes, y cada `—` ocupa tres. Las dos cifras superan 1024, así que este rechazo
+**no permite distinguir** si Perplexity cuenta caracteres o bytes; haría falta una
+descripción de menos de 1024 caracteres y más de 1024 bytes para saberlo. Mientras no se
+haga esa prueba, el conversor presupuesta en bytes, que es la lectura más estrecha: un
+texto en español llega a 1024 bytes unos 20-30 caracteres antes que a 1024 caracteres, y
+quedarse corto no rompe nada. El conversor ya no recorta a un número fijo: toma
 el presupuesto de los perfiles de destino, el más estrecho de los que aceptan cada modo de
 instalación — 850 bytes para el zip (Perplexity, ChatGPT, claude.ai) y 490 para la carpeta
 (Mistral). Los dos quedan muy por debajo del tope duro.
@@ -306,7 +314,7 @@ validación tiene que pasar al cuerpo de la skill como instrucción explícita.
 |---|---|---|
 | Índice (`name` + `description`) | ~100 tokens | Siempre, en cada sesión |
 | Cuerpo del `SKILL.md` | <5.000 tokens | Al cargarse la skill |
-| `references/`, `scripts/`, `assets/` | Sin límite práctico, salvo donde el destino publique uno: ChatGPT declara 50 MB de zip, 500 ficheros y 25 MB por fichero, y el conversor los comprueba al empaquetar (aviso `limite-de-paquete`) | Sólo si el agente los abre |
+| `references/`, `scripts/`, `assets/` | Sin límite práctico, salvo donde el destino publique uno: la API de Skills de OpenAI publica 50 MB de zip, 500 ficheros y 25 MB por fichero; el perfil de ChatGPT los adopta sin haberlos observado en su interfaz, y el conversor los comprueba al empaquetar (aviso `limite-de-paquete`) | Sólo si el agente los abre |
 
 Si el cuerpo se pasa, mueve lo condicional a `references/` y deja en el `SKILL.md` una
 línea del tipo *"si la API devuelve un error, lee `references/errores.md`"*.

@@ -110,7 +110,9 @@ quiere paquetes si sólo pregunta por portabilidad.
    ```
 
    Deja en `dist-agentskills/` un `<skill>.zip` (Perplexity, claude.ai, ChatGPT) y una
-   carpeta `<skill>/` (Mistral, Claude Code) por cada skill. Añade `--only nombre1 nombre2`
+   carpeta `<skill>/` (Mistral, Claude Code) por cada skill. Para ChatGPT, dile al usuario
+   que el zip cumple el presupuesto de descripción pero que su importación ahí **no se ha
+   probado**: no le prometas que se instalará ni que se activará. Añade `--only nombre1 nombre2`
    para exportar sólo algunas. `--zip-only` borra las carpetas y **con ellas la variante de
    Mistral**: úsalo sólo si el usuario dice que va a Perplexity y a ningún otro sitio.
    Combinado con un `--target` que sólo instala en carpeta —Mistral—, el conversor lo
@@ -203,10 +205,10 @@ quiere paquetes si sólo pregunta por portabilidad.
   `description-sin-activacion` en riesgo alto: ahí hay que reescribir a mano, empezando
   por los disparadores con las palabras que usaría el usuario. Ofrécete a hacerlo.
 - **El tope de 1024 de la descripción no se cuenta igual en todos los destinos.** En
-  Perplexity Computer se mide en bytes UTF-8 aunque el mensaje diga *characters*:
-  comprobado, rechaza el zip entero con *"exceeds maximum length of 1024 characters"*
-  ante una descripción de 1063 caracteres pero **1085 bytes** — en español las tildes
-  cuentan doble. En ChatGPT, claude.ai, Mistral y Claude Code el mismo tope se declara
+  Perplexity Computer se trata como bytes UTF-8 por prudencia: se le ha visto rechazar
+  el zip entero con *"exceeds maximum length of 1024 characters"* ante una descripción
+  de 1063 caracteres y **1085 bytes** — en español las tildes cuentan doble—, un caso
+  que supera el tope en las dos unidades y por tanto no demuestra cuál usa. En ChatGPT, claude.ai, Mistral y Claude Code el mismo tope se declara
   en caracteres; lo dice cada perfil en `tope_duro_description`. El conversor ni se
   acerca a ese techo: recorta a **850 bytes en el zip y 490 en la carpeta**, y adelanta
   las frases de activación **antes** de recortar, así que lo que se pierde es la cola
