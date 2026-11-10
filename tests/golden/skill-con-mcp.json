@@ -23,7 +23,8 @@
             "estado": "no_compatible",
             "modo_instalacion": "url_repositorio",
             "motivos": [
-              "mcp.cliente: requerida por la skill y el destino la declara «no»."
+              "mcp.cliente: requerida por la skill y el destino la declara «no».",
+              "Instalación por URL sin validar: este conversor exporta skills sueltas y no comprueba que el repositorio de origen sea un plugin que ChatGPT pueda instalar (https://agent-plugins.org/specification). No hereda el resultado del zip."
             ],
             "peligros": []
           },
@@ -32,7 +33,8 @@
             "estado": "no_compatible",
             "modo_instalacion": "zip",
             "motivos": [
-              "mcp.cliente: requerida por la skill y el destino la declara «no»."
+              "mcp.cliente: requerida por la skill y el destino la declara «no».",
+              "Instalación sin probar: nadie ha subido todavía a ChatGPT un zip de esta herramienta. Que el formato local sea correcto no acredita que se importe ni que la skill se active. Ruta documentada, no comprobada: https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
             ],
             "peligros": []
           }

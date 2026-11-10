@@ -33,8 +33,10 @@ from exporter.perfiles import Perfil, cargar_perfiles  # noqa: E402
 
 CONVERT = RAIZ_SCRIPTS / "convert.py"
 
-# Anterior al `revisar_tras` de los cinco perfiles: asi el estado de partida
-# es `compatible` y lo unico que puede cambiarlo es el limite.
+# Anterior al `revisar_tras` de los cinco perfiles: asi la evidencia no esta
+# caducada y lo unico que puede llevar a `no_compatible` es el limite. En
+# ChatGPT el estado de partida es `no_verificable`, porque su perfil declara
+# que la instalacion no esta probada; en los demas, `compatible`.
 FECHA = "2026-09-01"
 HOY = datetime.date(2026, 9, 1)
 
@@ -89,8 +91,9 @@ class ExportConUnZipQueIncumpleElPerfil(unittest.TestCase):
         _, _, resumen = self.exportar(500, "--target", "chatgpt")
         chatgpt = estados(resumen, "chatgpt")
         self.assertEqual(chatgpt["zip"], Estado.NO_COMPATIBLE)
-        # Instalar por URL no usa el zip: su limite no le afecta.
-        self.assertEqual(chatgpt["url_repositorio"], Estado.COMPATIBLE)
+        # Instalar por URL no usa el zip: su limite no le afecta, y se queda
+        # en el estado de partida de ChatGPT.
+        self.assertEqual(chatgpt["url_repositorio"], Estado.NO_VERIFICABLE)
         # Y un limite que solo declara ChatGPT no degrada a nadie mas.
         for destino in ("perplexity-computer", "claude-ai", "mistral-vibe-work",
                         "claude-code"):
@@ -122,7 +125,7 @@ class ExportConUnZipQueIncumpleElPerfil(unittest.TestCase):
         with zipfile.ZipFile(salida / "mini.zip") as z:
             self.assertEqual(len(z.namelist()), 500)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertEqual(estados(resumen, "chatgpt")["zip"], Estado.COMPATIBLE)
+        self.assertEqual(estados(resumen, "chatgpt")["zip"], Estado.NO_VERIFICABLE)
         self.assertNotIn("limite-de-paquete", json.dumps(resumen))
 
     def test_el_limite_se_evalua_aunque_el_zip_no_se_publique(self):
@@ -214,18 +217,18 @@ class AnotarLimites(unittest.TestCase):
 
     def test_sin_avisos_no_toca_nada(self):
         evs = self.evaluaciones(cargar_perfiles()["chatgpt"])
+        antes = [(e.estado, list(e.motivos)) for e in evs]
         anotar_limites(evs, [])
-        self.assertEqual({e.estado for e in evs}, {Estado.COMPATIBLE})
-        self.assertEqual([e.motivos for e in evs], [[], []])
+        self.assertEqual([(e.estado, e.motivos) for e in evs], antes)
 
     def test_un_aviso_marca_solo_el_modo_zip(self):
         evs = self.evaluaciones(cargar_perfiles()["chatgpt"])
         anotar_limites(evs, ["El zip lleva 501 ficheros y ChatGPT admite 500."])
         por_modo = {e.modo_instalacion: e for e in evs}
         self.assertEqual(por_modo["zip"].estado, Estado.NO_COMPATIBLE)
-        self.assertEqual(len(por_modo["zip"].motivos), 1)
-        self.assertEqual(por_modo["url_repositorio"].estado, Estado.COMPATIBLE)
-        self.assertEqual(por_modo["url_repositorio"].motivos, [])
+        self.assertTrue(any("501" in m for m in por_modo["zip"].motivos))
+        self.assertEqual(por_modo["url_repositorio"].estado, Estado.NO_VERIFICABLE)
+        self.assertFalse(any("501" in m for m in por_modo["url_repositorio"].motivos))
 
     def test_un_incumplimiento_conocido_gana_a_la_evidencia_caducada(self):
         # Con el perfil caducado todo sale `no_verificable`. Un limite
@@ -239,7 +242,7 @@ class AnotarLimites(unittest.TestCase):
         self.assertEqual(por_modo["zip"].estado, Estado.NO_COMPATIBLE)
         self.assertEqual(por_modo["url_repositorio"].estado, Estado.NO_VERIFICABLE)
         # El motivo de la caducidad no se pierde.
-        self.assertEqual(len(por_modo["zip"].motivos), 2)
+        self.assertTrue(any("2026-11-07" in m for m in por_modo["zip"].motivos))
 
 
 if __name__ == "__main__":

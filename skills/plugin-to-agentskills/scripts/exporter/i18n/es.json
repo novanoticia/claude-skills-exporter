@@ -89,6 +89,8 @@
   "compat.evidencia.vencida": "La evidencia de este perfil venció el {fecha} (revisar_tras) y no se ha vuelto a comprobar.",
   "compat.adaptacion": "Adaptación aplicada: {texto}",
   "compat.limite_paquete": "Incumple el perfil configurado: {aviso} Es un límite del perfil, no un rechazo observado en la plataforma.",
+  "compat.instalacion.paquete-sin-probar": "Instalación sin probar: nadie ha subido todavía a {destino} un zip de esta herramienta. Que el formato local sea correcto no acredita que se importe ni que la skill se active. Ruta documentada, no comprobada: {fuente}",
+  "compat.instalacion.origen-sin-validar": "Instalación por URL sin validar: este conversor exporta skills sueltas y no comprueba que el repositorio de origen sea un plugin que {destino} pueda instalar ({fuente}). No hereda el resultado del zip.",
   "empaquetado.limite_zip_bytes": "El zip ocupa {tam} bytes y {destino} admite {limite}.",
   "empaquetado.limite_zip_ficheros": "El zip lleva {n} ficheros y {destino} admite {limite}.",
   "empaquetado.limite_fichero": "«{fichero}» ocupa {tam} bytes descomprimido y {destino} admite {limite}.",

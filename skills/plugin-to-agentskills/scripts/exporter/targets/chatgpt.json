@@ -5,7 +5,19 @@
   "instalacion": {
     "modos": ["url_repositorio", "zip"],
     "ruta_ui": "Zip de una skill: Plugins → Skills → Create → Upload from your computer (ruta documentada por OpenAI, sin probar). Repositorio por URL: con «Work» activado, en Complementos",
-    "una_skill_por_subida": true
+    "una_skill_por_subida": true,
+    "evidencia_por_modo": {
+      "zip": {
+        "probada": false,
+        "motivo": "paquete-sin-probar",
+        "fuente": "https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
+      },
+      "url_repositorio": {
+        "probada": false,
+        "motivo": "origen-sin-validar",
+        "fuente": "https://agent-plugins.org/specification"
+      }
+    }
   },
   "formato": {
     "acepta": ["agent-skills", "agent-plugins"],

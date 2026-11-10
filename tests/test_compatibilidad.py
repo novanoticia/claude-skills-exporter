@@ -26,10 +26,15 @@ class MotorDeEstados(unittest.TestCase):
     def setUp(self):
         self.perfiles = cargar_perfiles()
 
-    def test_skill_limpia_es_compatible_en_todas_partes(self):
+    def test_skill_limpia_es_compatible_donde_la_instalacion_esta_probada(self):
+        # ChatGPT declara que ninguno de sus dos modos de instalacion esta
+        # probado, asi que ni una skill limpia sale `compatible` ahi: sale
+        # `no_verificable`. Lo cubre tests/test_evidencia_instalacion.py.
         for perfil in self.perfiles.values():
             evs = evaluar(skill(), perfil, HOY)
-            self.assertEqual(evs[0].estado, Estado.COMPATIBLE, perfil.id)
+            esperado = (Estado.NO_VERIFICABLE if perfil.id == "chatgpt"
+                        else Estado.COMPATIBLE)
+            self.assertEqual(evs[0].estado, esperado, perfil.id)
 
     def test_capacidad_requerida_ausente_es_no_compatible(self):
         # Mistral no tiene Python: una skill cuya logica vive en scripts/ queda inerte.

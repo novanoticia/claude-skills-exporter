@@ -269,6 +269,16 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 > resultado puede llevar más de uno u omitir alguno sin avisar. Revisa el contenido
 > del zip si tu skill tiene esa forma.
 >
+> **Por eso ChatGPT sale siempre como «no verificable» en el informe**, aunque el zip
+> esté bien formado. Su perfil declara, modo por modo, que la instalación no está
+> probada: el zip, porque nadie lo ha subido; la URL de repositorio, porque el
+> conversor no valida que el origen sea un plugin instalable. Cada modo lleva su
+> propio motivo. Es deliberado, y tiene una consecuencia en CI: `--fail-on degradado`
+> devuelve 2 por ChatGPT con cualquier skill (`--fail-on no_compatible`, no). Si no
+> exportas para ChatGPT, limita la auditoría con `audit --target`. El aviso se retira
+> editando `instalacion.evidencia_por_modo` en `targets/chatgpt.json` cuando exista
+> una prueba manual registrada.
+>
 > **Sobre la disponibilidad:** no afirmamos en qué planes está. La ayuda de OpenAI la
 > condiciona al producto, a la cuenta y al espacio de trabajo; si no ves la opción, eso
 > no dice nada sobre el zip.
