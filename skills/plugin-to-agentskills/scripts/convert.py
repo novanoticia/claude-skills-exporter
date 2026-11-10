@@ -44,7 +44,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from exporter.compatibilidad import evaluar
+from exporter.compatibilidad import anotar_limites, evaluar
 from exporter.descripcion import (
     clamp_description,
     compact_description,
@@ -855,6 +855,34 @@ def presupuesto_de(perfiles, ids) -> int:
                default=MAX_DESCRIPTION_CHARS)
 
 
+def medir_paquetes(results, work_dir: Path, zips_dir: Path, perfiles,
+                   evaluaciones) -> None:
+    """Empaqueta cada skill en un temporal y cruza el zip con los perfiles.
+
+    Va ANTES de informar y de calcular el umbral, y en `audit` igual que en
+    `export`: asi los dos ven el mismo incumplimiento y la matriz no puede
+    contradecir al hallazgo. El zip se queda en `zips_dir`; `export` publica
+    despues ese mismo fichero, de modo que lo medido es lo que se entrega.
+
+    Solo se escribe y se lee el zip: no se extrae ni se ejecuta nada.
+
+    El hallazgo se anade despues de escribir el SKILL.md del zip, que es el
+    orden que ya habia: la nota incrustada del zip no lo menciona.
+    """
+    zips_dir.mkdir(parents=True, exist_ok=True)
+    for r in results:
+        write_skill_md(r, work_dir / r.name, r.desc_zip)
+        zip_path = zips_dir / "{}.zip".format(r.name)
+        zip_dir(work_dir / r.name, zip_path, arc_prefix=r.name)
+        for pid, perfil in perfiles.items():
+            if "zip" not in perfil.modos():
+                continue
+            avisos = comprobar_limites(zip_path, perfil)
+            for aviso in avisos:
+                r.findings.append(Finding("alta", "limite-de-paquete", aviso))
+            anotar_limites(evaluaciones[r.name][pid], avisos)
+
+
 def ejecutar(args, perfiles, elegidos, hoy) -> int:
     # Los presupuestos salen de los modos que REALMENTE declaran los perfiles
     # elegidos, no de las dos constantes "carpeta" y "zip". Con esas dos, un
@@ -978,6 +1006,9 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
                 pid: evaluar(skill, perfil, hoy) for pid, perfil in perfiles_informe.items()
             }
 
+        zips_dir = Path(tmp) / "_zips"
+        medir_paquetes(results, work_dir, zips_dir, perfiles_informe, evaluaciones)
+
         if args.comando == "audit":
             print()
             print(informe_markdown(results, evaluaciones, args.source,
@@ -1036,13 +1067,10 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
             shutil.move(str(work_dir / r.name), str(out / r.name))
 
             if quiere_zip:
-                write_skill_md(r, out / r.name, r.desc_zip)      # dentro del zip: Perplexity
-                zip_dir(out / r.name, out / f"{r.name}.zip", arc_prefix=r.name)
-                for pid, perfil in perfiles.items():
-                    if "zip" not in perfil.modos():
-                        continue
-                    for aviso in comprobar_limites(out / "{}.zip".format(r.name), perfil):
-                        r.findings.append(Finding("alta", "limite-de-paquete", aviso))
+                # El zip ya esta hecho y medido (medir_paquetes): se publica
+                # ese mismo fichero, no uno vuelto a empaquetar.
+                shutil.move(str(zips_dir / "{}.zip".format(r.name)),
+                            str(out / "{}.zip".format(r.name)))
             if quiere_carpeta:
                 write_skill_md(r, out / r.name, r.desc_folder)   # en disco: Mistral
             elif (out / r.name).exists():

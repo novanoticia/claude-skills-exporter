@@ -88,6 +88,7 @@
   "compat.peligro.visto": "{titulo} (seen in {ubicacion}).",
   "compat.evidencia.vencida": "The evidence for this profile expired on {fecha} (revisar_tras) and has not been checked again.",
   "compat.adaptacion": "Adaptation applied: {texto}",
+  "compat.limite_paquete": "Breaks the configured profile: {aviso} This is a limit in the profile, not a rejection observed on the platform.",
   "empaquetado.limite_zip_bytes": "The zip takes {tam} bytes and {destino} accepts {limite}.",
   "empaquetado.limite_zip_ficheros": "The zip holds {n} files and {destino} accepts {limite}.",
   "empaquetado.limite_fichero": "“{fichero}” takes {tam} bytes uncompressed and {destino} accepts {limite}.",
