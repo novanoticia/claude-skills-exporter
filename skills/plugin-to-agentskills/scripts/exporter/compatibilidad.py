@@ -97,3 +97,27 @@ def evaluar(skill, perfil, hoy: datetime.date) -> list:
                        motivos=list(motivos), peligros=list(peligros),
                        bloqueo_seguridad=None)
             for modo in perfil.modos()]
+
+
+def anotar_limites(evaluaciones, avisos, modo: str = "zip") -> None:
+    """Lleva a la Evaluacion del modo `zip` los limites de paquete incumplidos.
+
+    Los limites se miden sobre el paquete ya hecho, y eso ocurre despues de
+    `evaluar`. Sin este paso el hallazgo existia pero la matriz y `--fail-on`
+    no se enteraban: el informe decia a la vez que el zip incumplia el perfil
+    y que el destino era compatible.
+
+    Solo toca el modo que usa el paquete. Un destino que tambien se instala
+    por URL de repositorio no sube ese zip, y su celda no cambia.
+
+    Un limite incumplido es un impedimento conocido, asi que gana a
+    `no_verificable`: una evidencia caducada no puede taparlo. Lo que se
+    afirma es que incumple EL PERFIL, no que la plataforma lo rechace.
+    """
+    if not avisos:
+        return
+    for ev in evaluaciones:
+        if ev.modo_instalacion != modo:
+            continue
+        ev.motivos.extend(t("compat.limite_paquete", aviso=a) for a in avisos)
+        ev.estado = Estado.peor([ev.estado, Estado.NO_COMPATIBLE])

@@ -88,6 +88,7 @@
   "compat.peligro.visto": "{titulo} (visto en {ubicacion}).",
   "compat.evidencia.vencida": "La evidencia de este perfil venció el {fecha} (revisar_tras) y no se ha vuelto a comprobar.",
   "compat.adaptacion": "Adaptación aplicada: {texto}",
+  "compat.limite_paquete": "Incumple el perfil configurado: {aviso} Es un límite del perfil, no un rechazo observado en la plataforma.",
   "empaquetado.limite_zip_bytes": "El zip ocupa {tam} bytes y {destino} admite {limite}.",
   "empaquetado.limite_zip_ficheros": "El zip lleva {n} ficheros y {destino} admite {limite}.",
   "empaquetado.limite_fichero": "«{fichero}» ocupa {tam} bytes descomprimido y {destino} admite {limite}.",
