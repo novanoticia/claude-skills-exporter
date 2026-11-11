@@ -89,16 +89,63 @@ def parse_simple_yaml(raw: str) -> dict:
     return data
 
 
+# Escapes de una cadena YAML entre comillas dobles que este subconjunto
+# decodifica. Cualquier otro se deja como esta: no se reinterpreta lo que no
+# se soporta.
+_ESCAPES_DOBLES = {"\\": "\\", '"': '"', "/": "/", "n": "\n", "t": "\t", "r": "\r"}
+_ESCAPE_RX = re.compile(r'\\(["\\/ntr])')
+
+
 def unquote(v: str) -> str:
+    """Quita las comillas de un escalar Y decodifica sus escapes.
+
+    Antes solo quitaba los delimitadores. Una descripcion `"dice \\"hola\\""`
+    se quedaba con las barras dentro, y `yaml_escape` las volvia a escapar al
+    exportar: cada pasada anadia barras y el valor leido dejaba de ser el del
+    autor.
+
+    Las dos formas se decodifican como manda YAML: entre comillas simples lo
+    unico especial es la comilla doblada; entre comillas dobles, la barra
+    invertida. Un escalar sin comillas no se toca.
+    """
     v = v.strip()
     if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
-        return v[1:-1]
+        interior = v[1:-1]
+        if v[0] == "'":
+            return interior.replace("''", "'")
+        return _ESCAPE_RX.sub(lambda m: _ESCAPES_DOBLES[m.group(1)], interior)
     return v
 
 
+# Escalares que un lector YAML NO leeria como cadena si van sin comillas:
+# numeros, booleanos, nulos y fechas. El estandar Agent Skills pide cadenas
+# en `name`, `description` y en los valores de `metadata`, asi que un
+# `name: 123` o un `version: 4.1` cambia de tipo al llegar al destino.
+# Se cubren las formas de YAML 1.1 y 1.2, porque no se sabe con cual lee
+# cada plataforma.
+_TIPADO_IMPLICITO_RX = re.compile(r"""^(?:
+      [-+]?[0-9][0-9_]*                                   # entero, tambien 017
+    | [-+]?0[xXoObB][0-9a-fA-F_]+                         # hex, octal, binario
+    | [-+]?(?:\.[0-9]+|[0-9][0-9_]*(?:\.[0-9_]*)?)(?:[eE][-+]?[0-9]+)?   # decimal
+    | [-+]?\.(?:inf|Inf|INF) | \.(?:nan|NaN|NAN)
+    | y|Y|yes|Yes|YES|n|N|no|No|NO
+    | true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF
+    | ~|null|Null|NULL
+    | [0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt\ ].*)?         # fecha o marca de tiempo
+    | =|<<
+)$""", re.VERBOSE)
+
+
 def yaml_escape(v: str) -> str:
-    """Serializa un escalar en una sola línea de forma segura."""
+    """Serializa un escalar en una sola línea de forma segura.
+
+    Entrecomilla lo que YAML leeria como otra cosa que una cadena: caracteres
+    con significado propio, un indicador de lista o de clave al principio, y
+    los escalares de tipado implicito.
+    """
     v = " ".join(str(v).split())
-    if re.search(r'[:#\[\]{}&*!|>%@`"\']', v) or v == "":
+    if (v == "" or re.search(r'[:#\[\]{}&*!|>%@`"\']', v)
+            or v in ("-", "?") or v.startswith(("- ", "? "))
+            or _TIPADO_IMPLICITO_RX.match(v)):
         return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return v
