@@ -158,10 +158,21 @@ destino rechace la skill entera:
 ```yaml
 metadata:
   autor: Pablo
-  version: 4.1
+  version: "4.1"
   depends:
     - otra-skill
 ```
+
+Los valores salen siempre como **cadenas**. Un escalar que YAML leería como número,
+booleano, nulo o fecha —`4.1`, `123`, `true`, `null`, `2026-10-07`— se escribe entre
+comillas, también en `name` y `description`: el estándar pide cadenas, y un
+`version: 4.1` sin comillas llega al destino convertido en número. Las comillas del
+origen se leen con sus escapes (`\"` entre comillas dobles, `''` entre simples), de modo
+que exportar dos veces la misma skill da el mismo frontmatter.
+
+El parser es deliberadamente limitado: una clave por línea, escalares en bloque, listas y
+mapas de un nivel. No cubre YAML entero; anclas, etiquetas, mapas en línea (`{a: b}`) o
+escapes Unicode (`\u00e9`) no se interpretan.
 
 ## 3. La descripción: el campo que decide todo
 
