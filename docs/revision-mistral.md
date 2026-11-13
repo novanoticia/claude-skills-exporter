@@ -37,6 +37,24 @@ Una respuesta inválida o un error de API hace fallar el check y deja un informe
 no equivale a haber encontrado un defecto del programa. El resumen de Actions
 se escribe antes de publicar el comentario para conservarlo si falla GitHub.
 
+**Segunda solicitud.** Si la respuesta llega pero no valida (esquema o citas
+fuera del diff), se pide una vez más; un fallo de API no se repite por esta vía.
+El registro de Actions y el comentario nombran la regla incumplida, nunca el
+contenido de la respuesta.
+
+**Modelos que razonan.** `mistral-large-latest` pasó a razonar antes de
+responder: devuelve el contenido en bloques (`thinking` y `text`) y gastaba el
+margen de salida entero en razonar, de ahí los informes «no completada»
+(medido en `email-triage-plugin#202`: 31.129 caracteres de razonamiento y
+ninguno de respuesta con 8.000 tokens). El revisor lee solo los bloques `text`,
+envía `reasoning_effort: "low"` —si el modelo no admite el parámetro, lo retira
+y repite— y da un margen de 16.000 tokens. Si la API corta la respuesta, el
+informe añade su código de causa (`length`) y el registro de Actions dice el
+modelo servido y cuánto ocupó el razonamiento y cuánto la respuesta: solo
+recuentos, nada del contenido. Cada revisión consume así del orden de 10.000
+tokens de salida; para evitarlo, fija un modelo sin razonamiento en
+`MISTRAL_MODEL`. Que 16.000 basten para diffs mucho mayores no está medido.
+
 El diff se limita a 150.000 caracteres, la guía a 20.000 y el contexto Python a
 10.000 por archivo y 40.000 en total. Se excluyen los golden generados de
 `tests/golden/`, `tests/golden-seguridad/` y `tests/golden-i18n/`. Los fixtures
