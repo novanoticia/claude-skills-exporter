@@ -259,7 +259,7 @@ class TestMain(unittest.TestCase):
         evento = json.dumps({"pull_request": {
             "number": 7, "base": {"sha": "base"}, "head": {"sha": "abc123"}}})
         variables = {"MISTRAL_API_KEY": "clave", "GITHUB_EVENT_PATH": "evento.json",
-                     "GITHUB_REPOSITORY": "o/r", "GITHUB_RUN_ID": ""}
+                     "GITHUB_REPOSITORY": "o/r", "GITHUB_RUN_ID": "", "GH_TOKEN": ""}
         variables.update(entorno or {})
         with mock.patch.dict(os.environ, variables), \
                 mock.patch("builtins.open", mock.mock_open(read_data=evento)), \
@@ -364,7 +364,8 @@ class TestComprobaciones(unittest.TestCase):
                 mock.patch.object(mr, "MAX_ARCHIVO", 12):
             contexto = mr.obtener_contexto(TestMain.DIFF, "abc123")
         self.assertEqual(run.call_args.args[0], ["git", "show", "abc123:a.py"])
-        self.assertIn("contexto recortado", contexto)
+        # Ni una linea cabe en 12 caracteres: se dice, sin partir lineas.
+        self.assertIn("omitido por presupuesto: funcion", contexto)
         self.assertNotIn("pass", contexto)
         mensajes, _ = mr.construir_mensajes("T", "D", TestMain.DIFF,
                                            (None, ""), contexto)
@@ -379,7 +380,7 @@ class TestComprobaciones(unittest.TestCase):
                 # ejecuta directamente para comprobar el fallo de permisos.
                 evento = json.dumps({"pull_request": {"number": 7,
                     "head": {"sha": "abc123"}, "base": {"sha": "base"}}})
-                with mock.patch.dict(os.environ, {"MISTRAL_API_KEY": "clave",
+                with mock.patch.dict(os.environ, {"MISTRAL_API_KEY": "clave", "GH_TOKEN": "",
                         "GITHUB_EVENT_PATH": "evento", "GITHUB_REPOSITORY": "o/r"}), \
                         mock.patch.object(mr, "obtener_diff", return_value=TestMain.DIFF), \
                         mock.patch.object(mr, "obtener_rutas_diff", return_value={"a.py"}), \

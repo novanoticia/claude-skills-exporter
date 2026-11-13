@@ -25,5 +25,10 @@
   "mensaje_24": "::error::No se pudo publicar el comentario; consulta el resumen de Actions.",
   "etiqueta_escenario": "Escenario",
   "etiqueta_fragmento": "Fragmento",
-  "etiqueta_arreglo": "Arreglo"
+  "etiqueta_arreglo": "Arreglo",
+  "mensaje_27": "**Resultado:** %d hallazgo(s) · %d comprobación(es) pendiente(s) · %d sin defecto aparente.",
+  "mensaje_28": "### Comprobaciones por lectura pendientes (%d) — sin ejecutar tests",
+  "mensaje_29": "El modelo no pudo decidirlas con lo que recibió: compruébalas a mano o con un test.",
+  "mensaje_30": "<summary>Comprobaciones por lectura sin defecto aparente (%d) — sin ejecutar tests</summary>",
+  "mensaje_31": "**Revisión de Mistral no repetida:** el commit `%s` ya tiene un informe válido en este PR. Para pedir otro, usa «Re-run jobs»."
 }
