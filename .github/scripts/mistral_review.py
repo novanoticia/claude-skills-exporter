@@ -46,7 +46,7 @@ MAX_CONTEXTO = 40_000
 MAX_ARCHIVO = 10_000
 # Tokens de respuesta. Con 4000, seis comprobaciones razonadas mas hallazgos
 # rozaban el limite y la API cortaba la respuesta (PR #18: dos de dos).
-MAX_SALIDA = 8000
+INTENTOS_RESPUESTA = 2
 VENTANA = 15         # lineas alrededor de un cambio fuera de toda funcion
 MAX_ESPERA = 60     # no reintentar antes de Retry-After si supera este limite
 EXCLUIDOS = (        # generados: se regeneran con scripts, no se revisan
@@ -368,21 +368,95 @@ def espera_reintento(error, intento):
     return espera if espera <= MAX_ESPERA else None
 
 
+# El margen incluye el razonamiento del modelo. Medido en
+# email-triage-plugin#202 con `mistral-large-latest`: unos 6.500 tokens de
+# razonamiento antes de empezar la respuesta; con 8.000 se cortaba a medias.
+MAX_SALIDA = 16000
+# `mistral-large-latest` paso a razonar antes de responder y gastaba el margen
+# entero en ello. Si el modelo no admite el parametro, se retira y se repite.
+ESFUERZO = "low"
+
+
 class RespuestaIncompleta(ValueError):
-    """La API termino la respuesta por un motivo distinto de `stop`.
+    """La API termino sin `stop`. `causa` es su codigo (`length` = se agoto
+    MAX_SALIDA) reducido a letras: nunca lleva contenido de la respuesta."""
 
-    `causa` es el codigo de la API (`length` = se agoto MAX_SALIDA) reducido a
-    letras y guiones bajos: nombra el motivo sin copiar nada de la respuesta.
-    """
-
-    def __init__(self, causa):
+    def __init__(self, causa, medidas=""):
         ValueError.__init__(self, "Mistral no completó la revisión")
         self.causa = re.sub(r"[^a-z_]", "", str(causa or "").lower())[:20]
+        self.medidas = medidas
+
+
+def texto_de(contenido):
+    """Texto de la respuesta. Los modelos con razonamiento devuelven una lista
+    de bloques (`thinking` y `text`) en vez de una cadena: solo cuenta `text`."""
+    if isinstance(contenido, list):
+        partes = [b.get("text") for b in contenido
+                  if isinstance(b, dict) and b.get("type") == "text"]
+        if all(isinstance(p, str) for p in partes):
+            return "".join(partes)
+        return None
+    return contenido
+
+
+def _cadenas(valor):
+    if isinstance(valor, str):
+        yield valor
+    elif isinstance(valor, dict):
+        for clave, v in valor.items():
+            if clave != "type":
+                yield from _cadenas(v)
+    elif isinstance(valor, list):
+        for v in valor:
+            yield from _cadenas(v)
+
+
+def _caracteres(valor):
+    return sum(len(c) for c in _cadenas(valor))
+
+
+def medir_corte(respuesta):
+    """Solo recuentos de una respuesta cortada, para el registro de Actions:
+    distinguen una respuesta larga de una que se repite, rellena con espacios
+    o gasta el margen en razonar. El modelo y los tipos de bloque se reducen
+    a un alfabeto fijo: nada del contenido llega al registro."""
+    try:
+        contenido = respuesta["choices"][0]["message"]["content"]
+        uso = respuesta.get("usage")
+        tokens = uso.get("completion_tokens") if isinstance(uso, dict) else None
+        modelo = re.sub(r"[^a-z0-9.-]", "", str(respuesta.get("model") or "").lower())[:40]
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return ""
+    medidas = ["modelo=%s" % (modelo or "?"),
+               "tokens_salida=%s" % (tokens if isinstance(tokens, int) else "?")]
+    if isinstance(contenido, list):
+        por_tipo = {}
+        for bloque in contenido:
+            tipo = bloque.get("type") if isinstance(bloque, dict) else None
+            tipo = re.sub(r"[^a-z_]", "", str(tipo or "otro").lower())[:20] or "otro"
+            por_tipo[tipo] = por_tipo.get(tipo, 0) + _caracteres(bloque)
+        medidas.append("bloques=%d" % len(contenido))
+        medidas.extend("caracteres_%s=%d" % par for par in sorted(por_tipo.items()))
+        # Un razonamiento en bucle repite lineas: pocas distintas entre muchas.
+        razonado = [l.strip() for b in contenido
+                    if isinstance(b, dict) and b.get("type") == "thinking"
+                    for c in _cadenas(b) for l in c.splitlines() if l.strip()]
+        if razonado:
+            medidas.append("lineas_thinking=%d lineas_thinking_distintas=%d" % (
+                len(razonado), len(set(razonado))))
+    texto = texto_de(contenido)
+    if isinstance(texto, str):
+        lineas = [l.strip() for l in texto.splitlines() if l.strip()]
+        medidas.append("caracteres=%d espacios=%d lineas=%d lineas_distintas=%d" % (
+            len(texto), sum(c.isspace() for c in texto), len(lineas), len(set(lineas))))
+    else:
+        medidas.append("contenido no textual")
+    return " ".join(medidas)
 
 
 def llamar_mistral(mensajes, modelo, clave, json_mode=True):
     cuerpo = {"model": modelo, "messages": mensajes, "temperature": 0.1,
-              "max_tokens": MAX_SALIDA}
+              "max_tokens": MAX_SALIDA, "reasoning_effort": ESFUERZO}
     if json_mode:
         cuerpo["response_format"] = {"type": "json_object"}
     for intento in range(3):
@@ -397,21 +471,27 @@ def llamar_mistral(mensajes, modelo, clave, json_mode=True):
             try:
                 eleccion = respuesta["choices"][0]
                 if eleccion["finish_reason"] != "stop":
-                    raise RespuestaIncompleta(eleccion["finish_reason"])
-                contenido = eleccion["message"]["content"]
+                    raise RespuestaIncompleta(eleccion["finish_reason"],
+                                              medir_corte(respuesta))
+                contenido = texto_de(eleccion["message"]["content"])
             except (KeyError, IndexError, TypeError) as error:
                 raise ValueError("Respuesta de API de Mistral inválida") from error
             if not isinstance(contenido, str) or not contenido.strip():
                 raise ValueError("Mistral devolvió contenido vacío o no textual")
             return contenido
         except urllib.error.HTTPError as error:
-            if error.code == 400 and "response_format" in cuerpo and intento < 2:
+            if error.code == 400 and intento < 2:
                 detalle = error.read(8192).decode("utf-8", errors="replace").lower()
-                if ("response_format" in detalle or "json_object" in detalle) and any(
+                if "reasoning_effort" in cuerpo and "reasoning_effort" in detalle:
+                    del cuerpo["reasoning_effort"]
+                    print(t('mensaje_33'))
+                    continue  # comparte el presupuesto total de tres solicitudes
+                if "response_format" in cuerpo and (
+                        "response_format" in detalle or "json_object" in detalle) and any(
                         palabra in detalle for palabra in
                         ("not supported", "unsupported", "does not support")):
                     del cuerpo["response_format"]
-                    continue  # comparte el presupuesto total de tres solicitudes
+                    continue
             if error.code not in (429, 500, 502, 503, 504) or intento == 2:
                 raise
             espera = espera_reintento(error, intento)
@@ -442,21 +522,25 @@ def cita_en(fragmento, lineas):
     return any(linea[1:].strip() in candidatos for linea in lineas)
 
 
-def interpretar(texto, diff=None, exigir_comprobaciones=False,
-                rutas_comprobaciones=None):
-    """Valida esquema y, si se aporta diff, citas; devuelve resultado o None."""
+def validar(texto, diff=None, exigir_comprobaciones=False,
+            rutas_comprobaciones=None):
+    """Valida esquema y, si se aporta diff, citas.
+
+    Devuelve (resultado, None) o (None, motivo). El motivo nombra la regla
+    incumplida, nunca el contenido de la respuesta: puede citar el prompt.
+    """
     try:
         datos = json.loads(texto)
     except (TypeError, ValueError):
-        return None
+        return None, "json"
     if not isinstance(datos, dict) or not isinstance(datos.get("hallazgos"), list):
-        return None
+        return None, "esquema"
     if not isinstance(datos.get("resumen"), str) or not datos["resumen"].strip():
-        return None
+        return None, "esquema"
     comprobaciones = datos.get("comprobaciones")
     if comprobaciones is not None or exigir_comprobaciones:
         if not isinstance(comprobaciones, list) or not 1 <= len(comprobaciones) <= 6:
-            return None
+            return None, "comprobaciones"
         rutas = rutas_comprobaciones
         if rutas is None and diff is not None:
             rutas = indice_diff(diff)
@@ -464,11 +548,11 @@ def interpretar(texto, diff=None, exigir_comprobaciones=False,
             if not isinstance(c, dict) or any(
                     not isinstance(c.get(k), str) or not c[k].strip()
                     for k in ("archivo", "escenario", "conclusion", "estado")):
-                return None
+                return None, "comprobaciones"
             if c["estado"] not in ("revisado", "pendiente"):
-                return None
+                return None, "comprobaciones"
             if rutas is not None and c["archivo"] not in rutas:
-                return None
+                return None, "ruta"
     # No descartar filas invalidas: convertirlas en [] anunciaria un falso exito.
     campos = ("severidad", "archivo", "fragmento", "problema", "escenario", "arreglo")
     hallazgos = datos["hallazgos"]
@@ -476,14 +560,20 @@ def interpretar(texto, diff=None, exigir_comprobaciones=False,
     for h in hallazgos:
         if not isinstance(h, dict) or any(
                 not isinstance(h.get(c), str) or not h[c].strip() for c in campos):
-            return None
+            return None, "hallazgo"
         if h["severidad"] not in SEVERIDADES:
-            return None
+            return None, "hallazgo"
         if archivos is not None:
             lineas = archivos.get(h["archivo"], set())
             if not cita_en(h["fragmento"], lineas):
-                return None
-    return datos["resumen"].strip(), hallazgos
+                return None, "cita"
+    return (datos["resumen"].strip(), hallazgos), None
+
+
+def interpretar(texto, diff=None, exigir_comprobaciones=False,
+                rutas_comprobaciones=None):
+    """Como validar(), pero solo el resultado: None si la respuesta no vale."""
+    return validar(texto, diff, exigir_comprobaciones, rutas_comprobaciones)[0]
 
 
 def _linea(valor, limite=500):
@@ -491,7 +581,8 @@ def _linea(valor, limite=500):
 
 
 def renderizar(resultado, modelo, diff_len, recortado, cabeza="", error=None,
-               comprobaciones=None, ejecucion_url="", intento="", base=""):
+               comprobaciones=None, ejecucion_url="", intento="", motivo=None,
+               base=""):
     partes = [MARCA, t('mensaje_02') % modelo]
     if cabeza:
         partes.append(t('mensaje_05') % cabeza)
@@ -504,6 +595,8 @@ def renderizar(resultado, modelo, diff_len, recortado, cabeza="", error=None,
         partes.append(t('mensaje_07') % error)
     elif resultado is None:
         partes.append(t('mensaje_08'))
+        if motivo:
+            partes.append(t('mensaje_26') % (INTENTOS_RESPUESTA, t('motivo_' + motivo)))
     else:
         resumen, hallazgos = resultado
         if base and cabeza:
@@ -612,7 +705,7 @@ def main():
         print(aviso)
         return 0
     diff, recortado, resultado, error = "", False, None, None
-    comprobaciones = None
+    comprobaciones = motivo = None
     try:
         diff = obtener_diff(pr["base"]["sha"], pr["head"]["sha"])
         if not diff.strip():
@@ -620,21 +713,27 @@ def main():
         else:
             mensajes, recortado = construir_mensajes(pr.get("title"), pr.get("body"),
                 diff, leer_guia(), obtener_contexto(diff[:MAX_DIFF], pr["head"]["sha"]))
-            texto = llamar_mistral(mensajes, modelo, clave)
-            resultado = interpretar(texto, diff[:MAX_DIFF], exigir_comprobaciones=True,
-                rutas_comprobaciones=obtener_rutas_diff(
-                    pr["base"]["sha"], pr["head"]["sha"]))
-            if resultado is not None:
-                comprobaciones = json.loads(texto)["comprobaciones"]
+            rutas = obtener_rutas_diff(pr["base"]["sha"], pr["head"]["sha"])
+            for solicitud in range(1, INTENTOS_RESPUESTA + 1):
+                texto = llamar_mistral(mensajes, modelo, clave)
+                resultado, motivo = validar(texto, diff[:MAX_DIFF],
+                    exigir_comprobaciones=True, rutas_comprobaciones=rutas)
+                if resultado is not None:
+                    comprobaciones = json.loads(texto)["comprobaciones"]
+                    break
+                # Solo la regla incumplida: la respuesta puede citar el prompt.
+                print(t('mensaje_25') % (solicitud, INTENTOS_RESPUESTA,
+                                         t('motivo_' + motivo)))
     except urllib.error.HTTPError as fallo:
         error = t('mensaje_23') % fallo.code
     except (urllib.error.URLError, TimeoutError):
         error = t('mensaje_19')
     except ValueError as fallo:
         error = t('mensaje_20')
-        causa = getattr(fallo, "causa", "")
-        if causa:  # solo el codigo de la API, nunca el contenido
-            error += " (`%s`)" % causa
+        if getattr(fallo, "causa", ""):
+            error += " (`%s`)" % fallo.causa
+        if getattr(fallo, "medidas", ""):
+            print(t('mensaje_32') % fallo.medidas)
     except (OSError, subprocess.CalledProcessError):
         error = t('mensaje_21')
     # No mostrar cuerpos de error de la API: pueden contener datos del prompt.
@@ -646,7 +745,7 @@ def main():
         servidor, repo, ejecucion, intento)) if ejecucion else ""
     cuerpo = renderizar(resultado, modelo, len(diff), recortado,
                         cabeza=pr["head"]["sha"], error=error,
-                        comprobaciones=comprobaciones,
+                        comprobaciones=comprobaciones, motivo=motivo,
                         base=pr["base"]["sha"],
                         ejecucion_url=ejecucion_url, intento=intento)
     escribir_resumen(cuerpo)

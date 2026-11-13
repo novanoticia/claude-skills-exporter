@@ -338,6 +338,80 @@ class TestSinClave(unittest.TestCase):
             self.assertEqual(mr.main(), 0)
 
 
+class TestReintentoRespuesta(unittest.TestCase):
+    DIFF = TestMain.DIFF
+
+    def ejecutar_secuencia(self, respuestas):
+        """main() con una respuesta distinta por solicitud a Mistral."""
+        evento = json.dumps({"pull_request": {
+            "number": 7, "base": {"sha": "base"}, "head": {"sha": "abc123"}}})
+        variables = {"MISTRAL_API_KEY": "clave", "GITHUB_EVENT_PATH": "evento.json",
+                     "GITHUB_REPOSITORY": "o/r", "GITHUB_RUN_ID": "", "GH_TOKEN": ""}
+        with mock.patch.dict(os.environ, variables), \
+                mock.patch("builtins.open", mock.mock_open(read_data=evento)), \
+                mock.patch.object(mr, "obtener_diff", return_value=self.DIFF), \
+                mock.patch.object(mr, "obtener_rutas_diff", return_value={"a.py"}), \
+                mock.patch.object(mr, "leer_guia", return_value=(None, "")), \
+                mock.patch.object(mr, "obtener_contexto", return_value="contexto"), \
+                mock.patch.object(mr, "llamar_mistral", side_effect=respuestas) as llamar, \
+                mock.patch.object(mr, "publicar") as publicar, \
+                mock.patch("builtins.print") as imprimir:
+            codigo = mr.main()
+        registro = "\n".join(str(c.args[0]) for c in imprimir.call_args_list if c.args)
+        return codigo, publicar.call_args.args[2], llamar.call_count, registro
+
+    VALIDA = json.dumps({"resumen": "R", "hallazgos": [],
+                         "comprobaciones": [COMPROBACION]})
+    CITA_FALSA = json.dumps({"resumen": "R", "comprobaciones": [COMPROBACION],
+                             "hallazgos": [dict(HALLAZGO, fragmento="SECRETO inventado")]})
+
+    def test_respuesta_invalida_se_reintenta_una_vez_y_puede_recuperarse(self):
+        codigo, cuerpo, llamadas, registro = self.ejecutar_secuencia(
+            [self.CITA_FALSA, self.VALIDA])
+        self.assertEqual((codigo, llamadas), (0, 2))
+        self.assertIn("**Sin hallazgos.**", cuerpo)
+        self.assertNotIn("Revisión no válida", cuerpo)
+        self.assertIn("intento 1 de 2", registro)
+
+    def test_dos_respuestas_invalidas_fallan_y_dicen_la_regla_sin_el_contenido(self):
+        codigo, cuerpo, llamadas, registro = self.ejecutar_secuencia(
+            ["no json", self.CITA_FALSA])
+        self.assertEqual((codigo, llamadas), (1, 2))
+        self.assertIn("Revisión no válida", cuerpo)
+        self.assertIn(mr.t("motivo_cita"), cuerpo)       # la regla del ultimo intento
+        self.assertIn(mr.t("motivo_json"), registro)     # la del primero, en el registro
+        self.assertIn(mr.t("motivo_cita"), registro)
+        for texto in (cuerpo, registro):
+            self.assertNotIn("SECRETO inventado", texto)
+            self.assertNotIn("no json", texto)
+
+    def test_respuesta_valida_no_gasta_una_segunda_solicitud(self):
+        codigo, _, llamadas, _ = self.ejecutar_secuencia([self.VALIDA, self.VALIDA])
+        self.assertEqual((codigo, llamadas), (0, 1))
+
+    def test_fallo_de_api_no_se_reintenta_como_respuesta_invalida(self):
+        codigo, cuerpo, llamadas, _ = self.ejecutar_secuencia(
+            [ValueError("truncada"), self.VALIDA])
+        self.assertEqual((codigo, llamadas), (1, 1))
+        self.assertIn("Revisión no completada", cuerpo)
+
+    def test_cada_regla_incumplida_tiene_su_motivo(self):
+        base = {"resumen": "R", "hallazgos": [], "comprobaciones": [COMPROBACION]}
+        casos = (("no json", "json"),
+                 (json.dumps(dict(base, resumen="")), "esquema"),
+                 (json.dumps(dict(base, comprobaciones=[COMPROBACION] * 7)), "comprobaciones"),
+                 (json.dumps(dict(base, comprobaciones=[
+                     dict(COMPROBACION, archivo="inventado.py")])), "ruta"),
+                 (json.dumps(dict(base, hallazgos=[dict(HALLAZGO, arreglo="")])), "hallazgo"),
+                 (self.CITA_FALSA, "cita"),
+                 (self.VALIDA, None))
+        for texto, motivo in casos:
+            with self.subTest(motivo=motivo):
+                resultado, obtenido = mr.validar(texto, self.DIFF, True, {"a.py"})
+                self.assertEqual(obtenido, motivo)
+                self.assertEqual(resultado is None, motivo is not None)
+
+
 class TestComprobaciones(unittest.TestCase):
     def test_exige_escenarios_y_rutas_del_diff_sin_aceptar_exito_vacio(self):
         base = {"resumen": "R", "hallazgos": [], "comprobaciones": [COMPROBACION]}

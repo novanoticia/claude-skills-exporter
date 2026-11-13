@@ -26,9 +26,19 @@
   "etiqueta_escenario": "Escenario",
   "etiqueta_fragmento": "Fragmento",
   "etiqueta_arreglo": "Arreglo",
+  "mensaje_25": "::warning::Respuesta de Mistral no válida (intento %d de %d): %s.",
+  "mensaje_26": "Regla incumplida en el último de %d intentos: %s.",
+  "motivo_json": "la respuesta no es JSON",
+  "motivo_esquema": "faltan el resumen o la lista de hallazgos",
+  "motivo_comprobaciones": "las comprobaciones no son entre 1 y 6 o están incompletas",
+  "motivo_ruta": "una comprobación cita un archivo que no está en el diff",
+  "motivo_hallazgo": "un hallazgo está incompleto o tiene una severidad desconocida",
+  "motivo_cita": "el fragmento de un hallazgo no coincide con ninguna línea del diff",
   "mensaje_27": "**Resultado:** %d hallazgo(s) · %d comprobación(es) pendiente(s) · %d sin defecto aparente.",
   "mensaje_28": "### Comprobaciones por lectura pendientes (%d) — sin ejecutar tests",
   "mensaje_29": "El modelo no pudo decidirlas con lo que recibió: compruébalas a mano o con un test.",
   "mensaje_30": "<summary>Comprobaciones por lectura sin defecto aparente (%d) — sin ejecutar tests</summary>",
-  "mensaje_31": "**Revisión de Mistral no repetida:** el commit `%s` ya tiene un informe válido en este PR. Para pedir otro, usa «Re-run jobs»."
+  "mensaje_31": "**Revisión de Mistral no repetida:** el commit `%s` ya tiene un informe válido en este PR. Para pedir otro, usa «Re-run jobs».",
+  "mensaje_32": "::warning::Respuesta cortada: %s",
+  "mensaje_33": "::warning::El modelo no admite reasoning_effort; se retira."
 }
