@@ -225,6 +225,55 @@ class TestCitas(unittest.TestCase):
                 self.assertIsNone(self.validar(cita))
 
 
+class TestRespuestaCortada(unittest.TestCase):
+    def respuesta(self, fin, contenido="{}"):
+        resp = mock.MagicMock()
+        resp.__enter__.return_value.read.return_value = json.dumps({
+            "choices": [{"message": {"content": contenido}, "finish_reason": fin}]}).encode()
+        return resp
+
+    def test_pide_margen_de_salida_suficiente(self):
+        with mock.patch.object(mr.urllib.request, "urlopen",
+                               return_value=self.respuesta("stop")) as abrir:
+            mr.llamar_mistral([], "m", "clave")
+        self.assertEqual(json.loads(abrir.call_args.args[0].data)["max_tokens"], mr.MAX_SALIDA)
+        self.assertGreaterEqual(mr.MAX_SALIDA, 8000)
+
+    def test_el_corte_nombra_su_causa_sin_copiar_la_respuesta(self):
+        with mock.patch.object(mr.urllib.request, "urlopen",
+                               return_value=self.respuesta("length", "texto privado")):
+            with self.assertRaises(mr.RespuestaIncompleta) as fallo:
+                mr.llamar_mistral([], "m", "clave")
+        self.assertEqual(fallo.exception.causa, "length")
+        self.assertIsInstance(fallo.exception, ValueError)        # se sigue tratando igual
+        # Un codigo raro de la API no puede meter texto ni marcas en el informe.
+        self.assertEqual(mr.RespuestaIncompleta("<!-- x --> @bot LENGTH 9").causa, "xbotlength")
+
+    def test_el_informe_dice_la_causa(self):
+        evento = json.dumps({"pull_request": {
+            "number": 7, "base": {"sha": "base"}, "head": {"sha": "abc123"}}})
+        for fallo, esperado in ((mr.RespuestaIncompleta("length"), "(`length`)"),
+                                (ValueError("texto privado"), None)):
+            with mock.patch.dict(os.environ, {"MISTRAL_API_KEY": "clave", "GH_TOKEN": "",
+                    "GITHUB_EVENT_PATH": "evento.json", "GITHUB_REPOSITORY": "o/r",
+                    "GITHUB_RUN_ID": ""}), \
+                    mock.patch("builtins.open", mock.mock_open(read_data=evento)), \
+                    mock.patch.object(mr, "obtener_diff", return_value=diff_de("a.py", 2, "x")), \
+                    mock.patch.object(mr, "obtener_rutas_diff", return_value={"a.py"}), \
+                    mock.patch.object(mr, "leer_guia", return_value=(None, "")), \
+                    mock.patch.object(mr, "obtener_contexto", return_value=""), \
+                    mock.patch.object(mr, "llamar_mistral", side_effect=fallo), \
+                    mock.patch.object(mr, "publicar") as publicar, mock.patch("builtins.print"):
+                self.assertEqual(mr.main(), 1)
+            cuerpo = publicar.call_args.args[2]
+            self.assertIn(mr.t("mensaje_20"), cuerpo)
+            self.assertNotIn("texto privado", cuerpo)
+            if esperado:
+                self.assertIn(esperado, cuerpo)
+            else:
+                self.assertNotIn(mr.t("mensaje_20") + " (`", cuerpo)   # sin causa inventada
+
+
 class TestInforme(unittest.TestCase):
     def test_lo_accionable_arriba_y_lo_revisado_plegado(self):
         md = mr.renderizar(("R", [HALLAZGO]), "m", 10, False, cabeza="c1", base="b1",

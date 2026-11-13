@@ -44,6 +44,9 @@ MAX_DIFF = 150_000   # caracteres; codestral admite mucho mas, el coste no
 MAX_GUIA = 20_000
 MAX_CONTEXTO = 40_000
 MAX_ARCHIVO = 10_000
+# Tokens de respuesta. Con 4000, seis comprobaciones razonadas mas hallazgos
+# rozaban el limite y la API cortaba la respuesta (PR #18: dos de dos).
+MAX_SALIDA = 8000
 VENTANA = 15         # lineas alrededor de un cambio fuera de toda funcion
 MAX_ESPERA = 60     # no reintentar antes de Retry-After si supera este limite
 EXCLUIDOS = (        # generados: se regeneran con scripts, no se revisan
@@ -365,9 +368,21 @@ def espera_reintento(error, intento):
     return espera if espera <= MAX_ESPERA else None
 
 
+class RespuestaIncompleta(ValueError):
+    """La API termino la respuesta por un motivo distinto de `stop`.
+
+    `causa` es el codigo de la API (`length` = se agoto MAX_SALIDA) reducido a
+    letras y guiones bajos: nombra el motivo sin copiar nada de la respuesta.
+    """
+
+    def __init__(self, causa):
+        ValueError.__init__(self, "Mistral no completó la revisión")
+        self.causa = re.sub(r"[^a-z_]", "", str(causa or "").lower())[:20]
+
+
 def llamar_mistral(mensajes, modelo, clave, json_mode=True):
     cuerpo = {"model": modelo, "messages": mensajes, "temperature": 0.1,
-              "max_tokens": 4000}
+              "max_tokens": MAX_SALIDA}
     if json_mode:
         cuerpo["response_format"] = {"type": "json_object"}
     for intento in range(3):
@@ -382,7 +397,7 @@ def llamar_mistral(mensajes, modelo, clave, json_mode=True):
             try:
                 eleccion = respuesta["choices"][0]
                 if eleccion["finish_reason"] != "stop":
-                    raise ValueError("Mistral no completó la revisión")
+                    raise RespuestaIncompleta(eleccion["finish_reason"])
                 contenido = eleccion["message"]["content"]
             except (KeyError, IndexError, TypeError) as error:
                 raise ValueError("Respuesta de API de Mistral inválida") from error
@@ -615,8 +630,11 @@ def main():
         error = t('mensaje_23') % fallo.code
     except (urllib.error.URLError, TimeoutError):
         error = t('mensaje_19')
-    except ValueError:
+    except ValueError as fallo:
         error = t('mensaje_20')
+        causa = getattr(fallo, "causa", "")
+        if causa:  # solo el codigo de la API, nunca el contenido
+            error += " (`%s`)" % causa
     except (OSError, subprocess.CalledProcessError):
         error = t('mensaje_21')
     # No mostrar cuerpos de error de la API: pueden contener datos del prompt.
