@@ -40,5 +40,6 @@
   "mensaje_30": "<summary>Comprobaciones por lectura sin defecto aparente (%d) — sin ejecutar tests</summary>",
   "mensaje_31": "**Revisión de Mistral no repetida:** el commit `%s` ya tiene un informe válido en este PR. Para pedir otro, usa «Re-run jobs».",
   "mensaje_32": "::warning::Respuesta cortada: %s",
-  "mensaje_33": "::warning::El modelo no admite reasoning_effort; se retira."
+  "mensaje_33": "::warning::El modelo no admite reasoning_effort; se retira.",
+  "mensaje_34": "::warning::Respuesta cortada (solicitud %d de %d), se pide otra: %s"
 }
