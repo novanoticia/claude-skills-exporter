@@ -32,6 +32,13 @@ anterior en curso. Una ejecución cancelada antes de publicar no deja informe.
 
 El modelo debe aportar escenarios comprobados por lectura o pendientes, además
 de sus hallazgos. Las citas se contrastan literalmente con el diff enviado.
+Una cita es una línea completa del diff (sangría y prefijo libres) o, desde
+el 2026-11-15, **varias líneas seguidas de un mismo hunk**, cada una completa;
+las líneas en blanco no cuentan. Dos líneas reales pero separadas, de hunks o
+archivos distintos, siguen invalidando la respuesta. Se portó de
+email-triage-plugin (PR #210): allí GLM 5.3 Flash vio el defecto del caso de
+control de la evaluación, lo citó con sus dos líneas y se perdía la revisión
+entera. El prompt sigue pidiendo una sola línea.
 Las rutas de las comprobaciones admiten renombrados puros, permisos y binarios.
 Una respuesta inválida o un error de API hace fallar el check y deja un informe;
 no equivale a haber encontrado un defecto del programa. El resumen de Actions
