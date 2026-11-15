@@ -206,6 +206,23 @@ def indice_diff(diff):
     return archivos
 
 
+def bloques_diff(diff):
+    """Lineas de cada hunk, en orden, por ruta: {ruta: [[linea, ...], ...]}.
+
+    Un hunk empieza cuando el numero de linea salta respecto al esperado (dos
+    hunks contiguos en el fichero quedan unidos, que es lo que son). Solo lo
+    usa `cita_consecutiva`, que necesita el orden que `indice_diff` pierde.
+    """
+    bloques = {}
+    esperado = {}
+    for archivo, linea, numero in _lineas_de_hunks(diff):
+        lista = bloques.setdefault(archivo, [])
+        if not lista or numero != esperado[archivo]:
+            lista.append([])
+        lista[-1].append(linea)
+        esperado[archivo] = numero if linea.startswith("-") else numero + 1
+    return bloques
+
 def lineas_cambiadas(diff):
     """Numeros de linea, en la cabeza, de lo anadido o eliminado por ruta.
 
@@ -522,6 +539,39 @@ def cita_en(fragmento, lineas):
     return any(linea[1:].strip() in candidatos for linea in lineas)
 
 
+def _misma_linea(trozo, linea):
+    """`trozo` (con o sin prefijo y sangria) es la linea `linea` del diff."""
+    limpio = trozo.strip()
+    candidatos = {limpio}
+    if limpio[:1] in ("+", "-"):
+        candidatos.add(limpio[1:].strip())
+    return linea[1:].strip() in candidatos
+
+
+def cita_consecutiva(fragmento, bloques):
+    """¿Es `fragmento` un tramo de lineas SEGUIDAS de un mismo hunk?
+
+    Portado de email-triage-plugin (PR #210, decision del mantenedor del
+    2026-11-15): GLM 5.3 Flash vio el defecto del caso de control de la
+    evaluacion y lo cito con sus dos lineas, y se perdia la revision entera.
+    Cada linea se compara como en `cita_en` (sangria y prefijo libres, resto
+    exacto); las lineas en blanco no cuentan en ningun lado; al menos una
+    debe tener letras o numeros. Dos lineas reales pero separadas no valen:
+    el modelo no puede componer una cita con trozos sueltos del diff.
+    """
+    # En blanco = sin contenido tras quitar el prefijo, igual que en el diff:
+    # «+» solo es una linea anadida vacia (revision de Codex, PR #210).
+    trozos = [t for t in fragmento.split("\n")
+              if t.strip() and t.strip() not in ("+", "-")]
+    if not trozos or not any(ch.isalnum() for t in trozos for ch in t):
+        return False
+    for bloque in bloques or ():
+        lineas = [l for l in bloque if l[1:].strip()]
+        for inicio in range(len(lineas) - len(trozos) + 1):
+            if all(_misma_linea(t, l) for t, l in zip(trozos, lineas[inicio:])):
+                return True
+    return False
+
 def validar(texto, diff=None, exigir_comprobaciones=False,
             rutas_comprobaciones=None):
     """Valida esquema y, si se aporta diff, citas.
@@ -557,6 +607,7 @@ def validar(texto, diff=None, exigir_comprobaciones=False,
     campos = ("severidad", "archivo", "fragmento", "problema", "escenario", "arreglo")
     hallazgos = datos["hallazgos"]
     archivos = indice_diff(diff) if diff is not None else None
+    bloques = bloques_diff(diff) if diff is not None else None
     for h in hallazgos:
         if not isinstance(h, dict) or any(
                 not isinstance(h.get(c), str) or not h[c].strip() for c in campos):
@@ -565,7 +616,8 @@ def validar(texto, diff=None, exigir_comprobaciones=False,
             return None, "hallazgo"
         if archivos is not None:
             lineas = archivos.get(h["archivo"], set())
-            if not cita_en(h["fragmento"], lineas):
+            if not (cita_en(h["fragmento"], lineas) or cita_consecutiva(
+                    h["fragmento"], bloques.get(h["archivo"]))):
                 return None, "cita"
     return (datos["resumen"].strip(), hallazgos), None
 
