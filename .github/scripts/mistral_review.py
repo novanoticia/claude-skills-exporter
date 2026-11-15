@@ -46,6 +46,10 @@ MAX_CONTEXTO = 40_000
 MAX_ARCHIVO = 10_000
 # Tokens de respuesta. Con 4000, seis comprobaciones razonadas mas hallazgos
 # rozaban el limite y la API cortaba la respuesta (PR #18: dos de dos).
+# Desde el 2026-11-15 tambien cuenta una respuesta cortada por `length`:
+# GLM 5.3 Flash escribio una vez 25.000 caracteres en una linea (casi la
+# mitad espacios) hasta agotar el margen, y la misma revision relanzada
+# salio bien (repo-auditor-ia, PR #26; portado de email-triage-plugin #213).
 INTENTOS_RESPUESTA = 2
 VENTANA = 15         # lineas alrededor de un cambio fuera de toda funcion
 MAX_ESPERA = 60     # no reintentar antes de Retry-After si supera este limite
@@ -767,7 +771,13 @@ def main():
                 diff, leer_guia(), obtener_contexto(diff[:MAX_DIFF], pr["head"]["sha"]))
             rutas = obtener_rutas_diff(pr["base"]["sha"], pr["head"]["sha"])
             for solicitud in range(1, INTENTOS_RESPUESTA + 1):
-                texto = llamar_mistral(mensajes, modelo, clave)
+                try:
+                    texto = llamar_mistral(mensajes, modelo, clave)
+                except RespuestaIncompleta as corte:
+                    if corte.causa != "length" or solicitud == INTENTOS_RESPUESTA:
+                        raise
+                    print(t('mensaje_34') % (solicitud, INTENTOS_RESPUESTA, corte.medidas))
+                    continue
                 resultado, motivo = validar(texto, diff[:MAX_DIFF],
                     exigir_comprobaciones=True, rutas_comprobaciones=rutas)
                 if resultado is not None:

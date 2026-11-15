@@ -48,6 +48,11 @@ se escribe antes de publicar el comentario para conservarlo si falla GitHub.
 fuera del diff), se pide una vez más; un fallo de API no se repite por esta vía.
 El registro de Actions y el comentario nombran la regla incumplida, nunca el
 contenido de la respuesta.
+Desde el 2026-11-15 una respuesta **cortada por `length`** también se pide
+otra vez, dentro del mismo tope de dos solicitudes: GLM 5.3 Flash escribió
+una vez 25.000 caracteres en una sola línea, casi la mitad espacios, hasta
+agotar el margen, y la misma revisión relanzada salió bien (repo-auditor-ia,
+PR #26). Los demás cortes (`model_length`, `error`) no se repiten.
 
 **Modelos que razonan.** `mistral-large-latest` pasó a razonar antes de
 responder: devuelve el contenido en bloques (`thinking` y `text`) y gastaba el
