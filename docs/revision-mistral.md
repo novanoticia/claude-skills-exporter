@@ -1,83 +1,40 @@
 # Revisión de PR con Mistral
 
-El workflow `Mistral PR Review` analiza el diff y las reglas de `REVIEW.md`,
-`AGENTS.md` o `CLAUDE.md`, en ese orden. No ejecuta el conversor ni los fixtures
-del PR, no aplica parches, no crea commits y no fusiona cambios. Las reparaciones
-siguen a cargo de Claude y del mantenedor.
+El workflow `Mistral PR Review` (`.github/workflows/mistral-review.yml`) solo
+**llama** al revisor compartido
+[novanoticia/mistral-review](https://github.com/novanoticia/mistral-review),
+que lee el diff y las reglas de `REVIEW.md`, `AGENTS.md` o `CLAUDE.md`, en ese
+orden. No ejecuta el conversor ni los fixtures del PR, no aplica parches, no crea
+commits y no fusiona cambios. Las reparaciones siguen a cargo de Claude y del
+mantenedor.
+
+Desde el 2026-11-15 el código, las pruebas y la documentación detallada del
+revisor (citas, segunda solicitud, cortes por `length`, límites de tamaño,
+secretos tachados) viven en ese repo; antes había aquí una copia propia en
+`.github/scripts/`. Una mejora se hace allí una vez y llega a todos los repos.
 
 ## Configuración
 
 En Settings → Secrets and variables → Actions:
 
 1. Añade el secreto `MISTRAL_API_KEY` con la clave de tu cuenta de API.
-2. Opcionalmente, añade la variable `MISTRAL_MODEL`; por defecto se utiliza
-   `mistral-large-latest`.
+2. Opcionalmente, añade la variable `MISTRAL_MODEL`; sin ella se usa el modelo
+   por defecto del revisor compartido (`zai-glm-5-3-flash`).
 
-La instalación no copia ni permite leer claves de otros repositorios. Si falta
-la clave, Actions muestra «revisión omitida»; eso no cuenta como evaluación.
-Los PR de forks no reciben el secreto.
+Si falta la clave, Actions muestra «revisión omitida»; eso no cuenta como
+evaluación. Los PR de forks no reciben el secreto. El check se llama ahora
+`mistral-review / mistral-review`.
 
-El script se ejecuta desde la rama predeterminada, con permiso de lectura de
-contenido y de publicación de comentarios. Solo lee objetos Git del PR. Por ello
-la función queda activa después de fusionar esta instalación: durante su propio
-PR el paso se omite si el script aún no existe en la rama predeterminada.
+## Lo propio de este repo
 
-## Informes y límites
+Se excluyen los golden generados de `tests/golden/`, `tests/golden-seguridad/`
+y `tests/golden-i18n/` (parámetro `excluded` del workflow). Los fixtures siguen
+siendo datos de prueba inertes: el revisor no los ejecuta. Nada del revisor se
+distribuye dentro de la skill.
 
-Se ejecuta al abrir, actualizar, editar, reabrir o marcar listo un PR. Cada
-resultado crea un comentario nuevo con el SHA, el modelo y un enlace al intento
-de Actions. El perfil del proveedor es [Mistral AI](https://github.com/mistralai).
-Los resultados anteriores no se sobrescriben; un push cancela la ejecución
-anterior en curso. Una ejecución cancelada antes de publicar no deja informe.
+## Límites
 
-El modelo debe aportar escenarios comprobados por lectura o pendientes, además
-de sus hallazgos. Las citas se contrastan literalmente con el diff enviado.
-Una cita es una línea completa del diff (sangría y prefijo libres) o, desde
-el 2026-11-15, **varias líneas seguidas de un mismo hunk**, cada una completa;
-las líneas en blanco no cuentan. Dos líneas reales pero separadas, de hunks o
-archivos distintos, siguen invalidando la respuesta. Se portó de
-email-triage-plugin (PR #210): allí GLM 5.3 Flash vio el defecto del caso de
-control de la evaluación, lo citó con sus dos líneas y se perdía la revisión
-entera. El prompt sigue pidiendo una sola línea.
-Las rutas de las comprobaciones admiten renombrados puros, permisos y binarios.
-Una respuesta inválida o un error de API hace fallar el check y deja un informe;
-no equivale a haber encontrado un defecto del programa. El resumen de Actions
-se escribe antes de publicar el comentario para conservarlo si falla GitHub.
-
-**Segunda solicitud.** Si la respuesta llega pero no valida (esquema o citas
-fuera del diff), se pide una vez más; un fallo de API no se repite por esta vía.
-El registro de Actions y el comentario nombran la regla incumplida, nunca el
-contenido de la respuesta.
-Desde el 2026-11-15 una respuesta **cortada por `length`** también se pide
-otra vez, dentro del mismo tope de dos solicitudes: GLM 5.3 Flash escribió
-una vez 25.000 caracteres en una sola línea, casi la mitad espacios, hasta
-agotar el margen, y la misma revisión relanzada salió bien (repo-auditor-ia,
-PR #26). Los demás cortes (`model_length`, `error`) no se repiten.
-
-**Modelos que razonan.** `mistral-large-latest` pasó a razonar antes de
-responder: devuelve el contenido en bloques (`thinking` y `text`) y gastaba el
-margen de salida entero en razonar, de ahí los informes «no completada»
-(medido en `email-triage-plugin#202`: 31.129 caracteres de razonamiento y
-ninguno de respuesta con 8.000 tokens). El revisor lee solo los bloques `text`,
-envía `reasoning_effort: "low"` —si el modelo no admite el parámetro, lo retira
-y repite— y da un margen de 16.000 tokens. Si la API corta la respuesta, el
-informe añade su código de causa (`length`) y el registro de Actions dice el
-modelo servido y cuánto ocupó el razonamiento y cuánto la respuesta: solo
-recuentos, nada del contenido. Cada revisión consume así del orden de 10.000
-tokens de salida; para evitarlo, fija un modelo sin razonamiento en
-`MISTRAL_MODEL`. Que 16.000 basten para diffs mucho mayores no está medido.
-
-El diff se limita a 150.000 caracteres, la guía a 20.000 y el contexto Python a
-10.000 por archivo y 40.000 en total. Se excluyen los golden generados de
-`tests/golden/`, `tests/golden-seguridad/` y `tests/golden-i18n/`. Los fixtures
-siguen siendo datos de prueba inertes: no se ejecutan por el revisor.
-
-Los textos visibles del revisor de CI están en
-`.github/scripts/mistral_review_es.json`, separados de los catálogos del programa
-exportado. Los scripts de revisión no se distribuyen dentro de la skill.
-
-Las pruebas locales simulan Mistral y GitHub. Validan formato, contexto,
-transporte y conservación del historial; no la calidad del juicio del modelo.
-Una cita válida no demuestra un defecto y «sin hallazgos» no demuestra que el
-código sea correcto. Contrasta los avisos con los tests y el código antes de
-pedir a Claude que repare nada.
+Es una segunda opinión barata, no un detector fiable. Una cita válida no
+demuestra un defecto y «sin hallazgos» no demuestra que el código sea correcto.
+Contrasta los avisos con los tests y el código antes de pedir a Claude que
+repare nada.
