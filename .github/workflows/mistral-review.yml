@@ -15,8 +15,10 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
-    uses: novanoticia/mistral-review/.github/workflows/review.yml@main
+    uses: novanoticia/mistral-review/.github/workflows/review.yml@v1
     with:
+      # Debe coincidir con la etiqueta de `uses:` (version fija de mistral-review).
+      ref: v1
       model: ${{ vars.MISTRAL_MODEL }}
       # Golden generados: se regeneran con scripts, no se revisan.
       excluded: |
