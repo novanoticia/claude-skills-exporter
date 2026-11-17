@@ -82,6 +82,7 @@
   "adaptacion.claves-retiradas": "Frontmatter keys removed (they do not exist outside Claude): {claves}.",
   "adaptacion.rutas-plugin-root": "Paths ${{CLAUDE_PLUGIN_ROOT}}/... converted into paths relative to the skill.",
   "adaptacion.claves-a-metadata": "Keys moved to `metadata` (the standard's frontmatter is a closed set and the target rejects them at the top level): {claves}.",
+  "adaptacion.compatibility-lista": "`compatibility` was a list and the standard requires a string: it has been joined with commas ({elementos} items).",
   "portabilidad.senal": "{explicacion} Seen in {ubicacion}: {muestra}",
   "portabilidad.descripcion-pendiente": "Skill imported from {carpeta}. PENDING: write an activation description.",
   "compat.capacidad.desconocida": "{nombre}: the profile does not declare this capability, so nothing can be stated.",
