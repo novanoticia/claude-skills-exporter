@@ -11,9 +11,11 @@ un aviso del informe importa.
 > README o de este fichero: no verifica la ruta de instalación, ni las capacidades, ni que
 > las celdas digan lo mismo que el JSON. La tabla recoge sólo tres de los cinco destinos;
 > ChatGPT y claude.ai tienen perfil propio (`chatgpt.json`, `claude-ai.json`) y comparten
-> el zip de 850 bytes. Del zip en ChatGPT no hay todavía ninguna observación propia: sus
-> límites de paquete están tomados de la guía de la API de Skills de OpenAI, no de la
-> interfaz, y la importación está sin probar. Lo que sigue viviendo sólo aquí es la evidencia narrativa: qué se
+> el zip de 850 bytes. El zip en ChatGPT web se probó a mano el 17 de noviembre de 2026
+> (`docs/pruebas-manuales.md` en el repositorio): se importa tal cual y responde al elegir
+> la skill. Su tope de 780 MiB es el que anuncia la interfaz; los de 500 ficheros y 25 MiB
+> por fichero siguen tomados de la guía de la API de Skills de OpenAI. La activación
+> automática no se ha probado. Lo que sigue viviendo sólo aquí es la evidencia narrativa: qué se
 > observó, en qué ejecución y por qué importa.
 
 | | Perplexity Computer | Mistral Vibe Work | Claude Code |
@@ -343,7 +345,7 @@ validación tiene que pasar al cuerpo de la skill como instrucción explícita.
 |---|---|---|
 | Índice (`name` + `description`) | ~100 tokens | Siempre, en cada sesión |
 | Cuerpo del `SKILL.md` | <5.000 tokens | Al cargarse la skill |
-| `references/`, `scripts/`, `assets/` | Sin límite práctico, salvo donde el destino publique uno: la API de Skills de OpenAI publica 50 MB de zip, 500 ficheros y 25 MB por fichero; el perfil de ChatGPT los adopta sin haberlos observado en su interfaz, y el conversor los comprueba al empaquetar (aviso `limite-de-paquete`) | Sólo si el agente los abre |
+| `references/`, `scripts/`, `assets/` | Sin límite práctico, salvo donde el destino publique uno: el perfil de ChatGPT fija 780 MiB de zip, que es lo que anuncia su interfaz, y 500 ficheros y 25 MiB por fichero, tomados de la API de Skills de OpenAI sin haberlos observado en la interfaz; el conversor los comprueba al empaquetar (aviso `limite-de-paquete`) | Sólo si el agente los abre |
 
 Si el cuerpo se pasa, mueve lo condicional a `references/` y deja en el `SKILL.md` una
 línea del tipo *"si la API devuelve un error, lee `references/errores.md`"*.

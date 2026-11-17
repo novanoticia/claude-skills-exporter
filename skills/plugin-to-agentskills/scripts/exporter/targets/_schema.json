@@ -25,13 +25,16 @@
           "propertyNames": { "enum": ["zip", "carpeta", "directorio_local", "url_repositorio"] },
           "additionalProperties": {
             "type": "object",
-            "required": ["probada", "motivo", "fuente"],
+            "required": ["probada", "fuente"],
             "additionalProperties": false,
             "properties": {
               "probada": { "type": "boolean" },
               "motivo": { "enum": ["paquete-sin-probar", "origen-sin-validar"] },
               "fuente": { "type": "string", "format": "uri" }
-            }
+            },
+            "if": { "properties": { "probada": { "const": false } } },
+            "then": { "required": ["motivo"] },
+            "else": { "not": { "required": ["motivo"] } }
           }
         }
       }

@@ -4,13 +4,12 @@
   "label": "ChatGPT",
   "instalacion": {
     "modos": ["url_repositorio", "zip"],
-    "ruta_ui": "Zip de una skill: Plugins → Skills → Create → Upload from your computer (ruta documentada por OpenAI, sin probar). Repositorio por URL: con «Work» activado, en Complementos",
+    "ruta_ui": "Zip de una skill: en ChatGPT web, Complementos → Habilidades → Añadir → Subir desde tu ordenador (probado el 2026-11-17 con una cuenta Plus). Repositorio por URL: con «Work» activado, en Complementos",
     "una_skill_por_subida": true,
     "evidencia_por_modo": {
       "zip": {
-        "probada": false,
-        "motivo": "paquete-sin-probar",
-        "fuente": "https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
+        "probada": true,
+        "fuente": "https://github.com/novanoticia/claude-skills-exporter/blob/main/docs/pruebas-manuales.md"
       },
       "url_repositorio": {
         "probada": false,
@@ -27,7 +26,7 @@
     "conserva_arbol": true
   },
   "limites_paquete": {
-    "zip_max_bytes": 52428800,
+    "zip_max_bytes": 817889280,
     "ficheros_max": 500,
     "fichero_max_bytes": 26214400
   },
@@ -62,12 +61,17 @@
       {
         "titulo": "OpenAI — Skills en la API (consultada el 2026-11-10)",
         "url": "https://developers.openai.com/api/docs/guides/tools-skills",
-        "seccion": "Limits and validation: origen de limites_paquete. Son limites de la API; no se han observado en la interfaz de ChatGPT"
+        "seccion": "Limits and validation: origen de ficheros_max y fichero_max_bytes. Son limites de la API; no se han observado en la interfaz de ChatGPT"
       },
       {
         "titulo": "OpenAI — Skills in ChatGPT (consultada el 2026-10-07)",
         "url": "https://help.openai.com/en/articles/20001066-skills-in-chatgpt",
         "seccion": "Ruta de subida y disponibilidad. Consulta documental, no prueba manual del zip"
+      },
+      {
+        "titulo": "Prueba manual del zip en ChatGPT web (2026-11-17)",
+        "url": "https://github.com/novanoticia/claude-skills-exporter/blob/main/docs/pruebas-manuales.md",
+        "seccion": "Subida aceptada, invocacion explicita correcta y tope de 780 MiB por archivo anunciado en el dialogo de subida. Origen de zip_max_bytes. La activacion automatica no se ha probado"
       }
     ]
   }
