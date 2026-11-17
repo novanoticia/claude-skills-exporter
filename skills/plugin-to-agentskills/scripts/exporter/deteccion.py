@@ -97,9 +97,11 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> tuple:
     `copiar_skill` tropieza despues con los mismos ficheros -tampoco puede
     leerlos para copiarlos-, asi que convert.py junta las dos listas.
 
-    `excluir` es un conjunto de nombres de fichero (basename, no ruta) que se
-    saltan. Lo usa quien ya audito ese fichero por otra via -por ejemplo el
-    cuerpo YA ADAPTADO del SKILL.md- y no quiere leerlo dos veces desde disco.
+    `excluir` es un conjunto de nombres de fichero que se saltan SOLO en la
+    raiz del arbol. Lo usa quien ya audito ese fichero por otra via -por
+    ejemplo el cuerpo YA ADAPTADO del SKILL.md- y no quiere leerlo dos veces
+    desde disco. Antes se aplicaba a cualquier profundidad, y un SKILL.md
+    anidado en una subcarpeta se quedaba sin auditar sin que nadie lo dijera.
 
     Los directorios de `IGNORED_DIRS` se podan de la busqueda: son los mismos
     que discover_skills() y copiar_skill() ya excluyen en el resto del
@@ -110,8 +112,9 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> tuple:
     ilegibles = []
     for base, dirs, ficheros in os.walk(str(raiz)):
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
+        en_la_raiz = base == str(raiz)   # os.walk devuelve la raiz tal cual
         for nombre in sorted(ficheros):
-            if nombre in excluir:
+            if en_la_raiz and nombre in excluir:
                 continue
             ruta = os.path.join(base, nombre)
             if os.path.splitext(nombre)[1].lower() not in EXTENSIONES_TEXTO:
