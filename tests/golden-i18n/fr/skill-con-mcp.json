@@ -33,8 +33,7 @@
             "estado": "no_compatible",
             "modo_instalacion": "zip",
             "motivos": [
-              "mcp.cliente : requise par la skill, et la cible la déclare « no ».",
-              "Installation non testée : personne n'a encore envoyé à ChatGPT un zip produit par cet outil. Un format local correct ne prouve ni l'import ni l'activation de la skill. Parcours documenté, non vérifié : https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
+              "mcp.cliente : requise par la skill, et la cible la déclare « no »."
             ],
             "peligros": []
           }

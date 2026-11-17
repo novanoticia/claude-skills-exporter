@@ -125,7 +125,9 @@ class ExportConUnZipQueIncumpleElPerfil(unittest.TestCase):
         with zipfile.ZipFile(salida / "mini.zip") as z:
             self.assertEqual(len(z.namelist()), 500)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertEqual(estados(resumen, "chatgpt")["zip"], Estado.NO_VERIFICABLE)
+        # Compatible desde la prueba manual del 2026-11-17: el zip ya no
+        # sale no_verificable (ver test_prueba_manual_chatgpt).
+        self.assertEqual(estados(resumen, "chatgpt")["zip"], Estado.COMPATIBLE)
         self.assertNotIn("limite-de-paquete", json.dumps(resumen))
 
     def test_el_limite_se_evalua_aunque_el_zip_no_se_publique(self):
