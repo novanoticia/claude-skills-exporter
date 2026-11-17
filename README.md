@@ -228,7 +228,7 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 
 | Destino | Qué subir | `description` | Ruta |
 |---|---|---|---|
-| **ChatGPT** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 1024 caracteres (el estándar) | *Plugins* → *Skills* → *Create* → *Upload from your computer* — documentada, **sin probar** (ver la nota) |
+| **ChatGPT** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 1024 caracteres (el estándar) | En ChatGPT web: *Complementos* → *Habilidades* → *Añadir* → *Subir desde tu ordenador* — **probada a mano** el 17 de noviembre de 2026 (ver la nota) |
 | **Perplexity Computer** | `mi-skill.zip` — **tal cual**, sin tocar | ≤ 850 B | `perplexity.ai/computer/skills` → *Create skill* → *Upload a skill* |
 | **Mistral Vibe Work** | `mi-skill/` — la **carpeta** | ≤ 490 B | `chat.mistral.ai/work` → *Context* → *Skills* → *New Skill* |
 | **Claude Code** | `mi-skill/` — la **carpeta** | ≤ 490 B de hecho | Copiar a `~/.claude/skills/`, o instalar el plugin con `/plugin install` |
@@ -241,8 +241,11 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 > **Para ChatGPT se genera el mismo `.zip` que para Perplexity**, sin volver a
 > exportar. Lo que eso acredita es poco y conviene decirlo tal cual: la descripción
 > cumple el presupuesto de 850 bytes, que queda por debajo de los 1024 caracteres del
-> estándar. **No acredita que ChatGPT importe el zip, ni que active la skill, ni que
-> ejecute sus scripts**: nadie ha subido todavía un zip de esta herramienta a ChatGPT.
+> estándar. El 17 de noviembre de 2026 se subió a mano a ChatGPT web, con una cuenta
+> Plus: **se importa y responde cuando se elige la skill**. Esa prueba **no acredita que
+> ChatGPT la active sola, ni que ejecute sus scripts**, ni que funcione igual en otras
+> cuentas o espacios de trabajo. El detalle está en
+> [`docs/pruebas-manuales.md`](docs/pruebas-manuales.md).
 >
 > Hay cuatro cosas distintas que es fácil confundir:
 >
@@ -251,12 +254,14 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 > | **El estándar Agent Skills** | `description` de 1 a 1024 caracteres, `name` de 1 a 64 | [Especificación](https://agentskills.io/specification) |
 > | **La API de Skills de OpenAI** | 50 MB de zip, 500 ficheros, 25 MB por fichero descomprimido, y un solo `SKILL.md` por paquete, sin distinguir mayúsculas | [Guía de la API](https://developers.openai.com/api/docs/guides/tools-skills), consultada el 10 de noviembre de 2026 |
 > | **La interfaz de ChatGPT** | Ruta *Plugins* → *Skills* → *Create* → *Upload from your computer*; la subida se analiza antes de quedar disponible, y la función depende del producto, la cuenta y el espacio de trabajo | [Skills in ChatGPT](https://help.openai.com/en/articles/20001066-skills-in-chatgpt), consultada el 7 de octubre de 2026 |
+> | **Lo observado en ChatGPT web** | En español, *Complementos* → *Habilidades* → *Añadir* → *Subir desde tu ordenador*. Acepta `.zip`, `.skill` o `SKILL.md` de hasta **780 MiB por archivo**; el zip del conversor se importa tal cual y responde al elegir la skill | [Prueba manual](docs/pruebas-manuales.md) del 17 de noviembre de 2026 |
 > | **Un plugin por URL de repositorio** | Es otro contrato: exige un `plugin.json` en la raíz del repositorio. Este conversor exporta skills sueltas, **no** construye ni valida un plugin instalable por URL | [Agent Plugins](https://agent-plugins.org/specification) |
 >
-> Los límites de tamaño del perfil de ChatGPT están **tomados de la API**, no observados
-> en la interfaz: que ChatGPT aplique los mismos es una suposición razonable, sin
-> confirmar. El perfil los guarda además en unidades binarias (50 y 25 MiB), que es
-> una interpretación nuestra de los «MB» de la guía. La herramienta los comprueba al
+> El tope del zip del perfil de ChatGPT, **780 MiB**, es el que anuncia el diálogo de
+> subida de la web. Los otros dos límites, **500 ficheros y 25 MiB por fichero**, siguen
+> **tomados de la API** y no se han observado en la interfaz: que ChatGPT aplique los
+> mismos es una suposición razonable, sin confirmar. Los 25 MiB son además una
+> interpretación nuestra de los «25 MB» de la guía. La herramienta los comprueba al
 > empaquetar —también en `audit`, sobre un zip temporal— y, si un zip los supera, emite
 > el hallazgo `limite-de-paquete` y marca como **no compatible** la celda del zip de
 > ChatGPT, de modo que `--fail-on no_compatible` devuelve 2. Significa que **incumple
@@ -271,24 +276,29 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 > tu skill tiene esa forma, revisa el contenido del zip o saca la skill anidada a su
 > propia carpeta.
 >
-> **Por eso ChatGPT sale siempre como «no verificable» en el informe**, aunque el zip
-> esté bien formado. Su perfil declara, modo por modo, que la instalación no está
-> probada: el zip, porque nadie lo ha subido; la URL de repositorio, porque el
-> conversor no valida que el origen sea un plugin instalable. Cada modo lleva su
-> propio motivo. Es deliberado, y tiene una consecuencia en CI: `--fail-on degradado`
-> devuelve 2 por ChatGPT con cualquier skill (`--fail-on no_compatible`, no). Si no
-> exportas para ChatGPT, limita la auditoría con `audit --target`. El aviso se retira
-> editando `instalacion.evidencia_por_modo` en `targets/chatgpt.json` cuando exista
-> una prueba manual registrada.
+> **En la matriz, ChatGPT sigue saliendo «no verificable»**, aunque el zip esté bien
+> formado. Su perfil declara la instalación modo por modo. El **zip** está probado desde
+> el 17 de noviembre de 2026 y se evalúa como cualquier otro destino. La **URL de
+> repositorio** sigue sin probar, porque el conversor no valida que el origen sea un
+> plugin instalable. La celda de la matriz resume los dos modos con el peor, y el detalle
+> por skill solo lista los modos que tienen algún motivo. Tiene una consecuencia en CI:
+> `--fail-on degradado` devuelve 2 por ChatGPT con cualquier skill (`--fail-on
+> no_compatible`, no). Si no exportas para ChatGPT, limita la auditoría con
+> `audit --target`.
+>
+> Además, la evidencia del perfil venció el 7 de noviembre de 2026 (`revisar_tras`), y
+> un perfil vencido degrada todos sus veredictos a «no verificable». La prueba manual
+> solo cubre la subida del zip, no el resto del perfil, así que la fecha no se ha
+> renovado.
 >
 > **Sobre la disponibilidad:** no afirmamos en qué planes está. La ayuda de OpenAI la
 > condiciona al producto, a la cuenta y al espacio de trabajo; si no ves la opción, eso
 > no dice nada sobre el zip.
 >
-> **Lo único probado a mano** (agosto de 2026) fue instalar un *repositorio* como
-> complemento —activar `Work` en el selector, ir a **Complementos** y añadirlo por
-> nombre o por URL—. Es la operación de la última fila de la tabla, no la subida de un
-> zip, y haber instalado aquel repositorio no demuestra que cualquier otro se instale.
+> **Probado a mano**, además de la subida del zip: en agosto de 2026 se instaló un
+> *repositorio* como complemento —activar `Work` en el selector, ir a **Complementos** y
+> añadirlo por nombre o por URL—. Es la operación de la última fila de la tabla, y haber
+> instalado aquel repositorio no demuestra que cualquier otro se instale.
 
 > **No son intercambiables.** Descomprimir el `.zip` **no** da la carpeta de Mistral: la
 > descripción que sale es la larga. Si sólo conservas el zip y luego quieres subirlo a

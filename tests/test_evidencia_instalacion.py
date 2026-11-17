@@ -7,6 +7,10 @@ conversor ni siquiera valida —exporta skills sueltas, no plugins—.
 
 El perfil puede declarar ahora, por modo, que la instalacion no esta probada.
 Es opcional: un perfil que no lo declara se evalua como siempre.
+
+Desde la prueba manual del 2026-11-17 el zip de ChatGPT esta probado
+(test_prueba_manual_chatgpt); la URL de repositorio sigue sin probar, y es
+la que mantiene viva la declaracion por modo.
 """
 
 import copy
@@ -52,18 +56,14 @@ class ChatGPTDeclaraQueNoEstaProbado(unittest.TestCase):
         self.perfiles = cargar_perfiles()
         self.evs = por_modo(evaluar(skill(), self.perfiles["chatgpt"], HOY))
 
-    def test_una_skill_limpia_ya_no_sale_compatible(self):
-        self.assertEqual(self.evs["zip"].estado, Estado.NO_VERIFICABLE)
+    def test_una_skill_limpia_sale_compatible_solo_por_zip(self):
+        self.assertEqual(self.evs["zip"].estado, Estado.COMPATIBLE)
         self.assertEqual(self.evs["url_repositorio"].estado, Estado.NO_VERIFICABLE)
 
     def test_cada_modo_lleva_su_propio_motivo(self):
         zip_, url = self.evs["zip"].motivos, self.evs["url_repositorio"].motivos
-        self.assertEqual(len(zip_), 1)
+        self.assertEqual(zip_, [])
         self.assertEqual(len(url), 1)
-        self.assertNotEqual(zip_, url)
-
-    def test_el_motivo_del_zip_cita_la_fuente_documental(self):
-        self.assertIn("help.openai.com", self.evs["zip"].motivos[0])
 
     def test_el_motivo_de_la_url_dice_que_no_se_valida_un_plugin(self):
         motivo = self.evs["url_repositorio"].motivos[0]
@@ -90,8 +90,8 @@ class LaIncertidumbreNoTapaLoConocido(unittest.TestCase):
         m = por_modo(evs)
         self.assertEqual(m["zip"].estado, Estado.NO_COMPATIBLE)
         self.assertEqual(m["url_repositorio"].estado, Estado.NO_VERIFICABLE)
-        # Y el motivo de la instalacion sin probar no desaparece.
-        self.assertEqual(len(m["zip"].motivos), 2)
+        # El zip ya esta probado: su unico motivo es el limite.
+        self.assertEqual(len(m["zip"].motivos), 1)
 
     def test_una_capacidad_que_falta_sigue_siendo_no_compatible(self):
         datos = copy.deepcopy(cargar_perfiles()["chatgpt"].datos)
@@ -162,12 +162,15 @@ class PorElCLI(unittest.TestCase):
         r = self.lanzar("export", self.tmp / "repo", "--out", salida)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         informe = (salida / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
-        self.assertIn("ChatGPT (zip)", informe)
+        # El detalle solo lista los modos con motivos: el zip, ya probado,
+        # no tiene ninguno; la URL de repositorio, si.
+        self.assertNotIn("ChatGPT (zip)", informe)
         self.assertIn("ChatGPT (url_repositorio)", informe)
         resumen = json.loads((salida / "resumen.json").read_text(encoding="utf-8"))
         compat = resumen["skills"][0]["compatibilidad"]
-        self.assertEqual({e["estado"] for e in compat["chatgpt"]},
-                         {Estado.NO_VERIFICABLE})
+        self.assertEqual({e["modo_instalacion"]: e["estado"] for e in compat["chatgpt"]},
+                         {"zip": Estado.COMPATIBLE,
+                          "url_repositorio": Estado.NO_VERIFICABLE})
         for pid in OTROS:
             self.assertEqual({e["estado"] for e in compat[pid]},
                              {Estado.COMPATIBLE}, pid)

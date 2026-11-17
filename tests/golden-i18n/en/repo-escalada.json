@@ -54,11 +54,9 @@
           },
           {
             "bloqueo_seguridad": null,
-            "estado": "no_verificable",
+            "estado": "compatible",
             "modo_instalacion": "zip",
-            "motivos": [
-              "Installation untested: nobody has yet uploaded a zip from this tool to ChatGPT. A correct local format does not show that it imports or that the skill activates. Documented route, not checked: https://help.openai.com/en/articles/20001066-skills-in-chatgpt"
-            ],
+            "motivos": [],
             "peligros": []
           }
         ],
