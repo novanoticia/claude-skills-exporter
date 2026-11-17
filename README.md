@@ -141,7 +141,7 @@ es una URL de repositorio, no si ya tienes la carpeta descargada.
 | Código | Cuándo |
 |---|---|
 | `0` | Nada que reportar. También `inspect`, que no evalúa destinos y siempre sale con 0 |
-| `1` | Error de uso o de entrada: el origen no existe, no contiene ningún `SKILL.md`, `--target` desconocido, `--only` sin coincidencias, dos skills que reclaman el mismo nombre, un `--out` que la herramienta se niega a borrar, o un `--lang` desconocido |
+| `1` | Error de uso o de entrada: el origen no existe, no contiene ningún `SKILL.md`, `--target` desconocido, `--only` sin coincidencias, dos skills que reclaman el mismo nombre, dos ficheros de skill en la misma carpeta, un `--out` que la herramienta se niega a borrar, o un `--lang` desconocido |
 | `2` | Se ha alcanzado el umbral de `--fail-on`, **o** el nivel de riesgo de seguridad no es `bajo` |
 | `3` | Sólo en `export`: el *gate* de seguridad ha impedido escribir los artefactos de al menos una skill |
 
@@ -263,11 +263,13 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 > el perfil configurado**, no que ChatGPT lo haya rechazado. El zip se escribe igual:
 > esto avisa, no bloquea, y no afecta a la celda de ningún otro destino.
 >
-> El zip normal lleva una única carpeta en la raíz con su `SKILL.md`. La herramienta
-> **no garantiza todavía** que sea el único: si la skill de origen trae otros
-> `SKILL.md` en subcarpetas, o dos variantes de mayúsculas en la misma carpeta, el
-> resultado puede llevar más de uno u omitir alguno sin avisar. Revisa el contenido
-> del zip si tu skill tiene esa forma.
+> El zip normal lleva una única carpeta en la raíz con su `SKILL.md`. Dos variantes de
+> mayúsculas en la misma carpeta (`SKILL.md` y `skill.md`) abortan la exportación con
+> código 1, sin escribir nada. Un `SKILL.md` en una subcarpeta de la skill **sí** viaja
+> en el zip, como un fichero más, y el informe lo avisa con el hallazgo `skill-anidada`.
+> No se ha comprobado cómo trata ChatGPT un segundo `SKILL.md` dentro del paquete: si
+> tu skill tiene esa forma, revisa el contenido del zip o saca la skill anidada a su
+> propia carpeta.
 >
 > **Por eso ChatGPT sale siempre como «no verificable» en el informe**, aunque el zip
 > esté bien formado. Su perfil declara, modo por modo, que la instalación no está
