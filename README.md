@@ -83,7 +83,7 @@ ChatGPT»* o *«¿es portable esta skill?»*. La skill se activa sola porque su
 
 ### Actualizar
 
-Los manifiestos fijan `version` (hoy `1.1.0`). Claude Code sólo ofrece una
+Los manifiestos fijan `version` (hoy `1.2.0`). Claude Code sólo ofrece una
 actualización cuando ese número cambia, así que **cada publicación debe subirla** en
 `.claude-plugin/plugin.json` y en `plugin.json`: `1.0.1` para correcciones, `1.1.0` para
 funciones nuevas. Los commits intermedios no llegan a quien ya lo tiene instalado.
@@ -435,9 +435,9 @@ python3 .github/validate_plugin.py .
 python3 -m pip install --quiet jsonschema && python3 .github/validar_perfiles.py .
 ```
 
-Esta comprobación importa más de lo habitual porque el marketplace se sincroniza solo y
-no hay versión fija: un manifiesto roto llegaría a quien tenga el plugin instalado en el
-mismo `push`.
+Esta comprobación importa más de lo habitual porque el marketplace se lee directamente
+del repositorio: un manifiesto roto llegaría a quien instale el plugin en cuanto se
+fusione, sin esperar a que se suba `version`.
 
 Si tocas un perfil de `targets/*.json` y regeneras los golden, fija la fecha con
 `CSE_FECHA=AAAA-MM-DD python3 tests/generar_golden.py`: sin ella, en cuanto la fecha real
