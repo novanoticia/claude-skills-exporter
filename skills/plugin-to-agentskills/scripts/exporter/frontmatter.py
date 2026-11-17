@@ -43,17 +43,12 @@ def parse_simple_yaml(raw: str) -> dict:
             # antes se asumía lista siempre y un `metadata:` con claves dentro
             # se perdía entero, que es justo donde la spec manda guardar los
             # datos propios del autor.
-            items = [x for x in buf if x]
-            pares = [re.match(r"^([A-Za-z0-9_\-.]+)\s*:\s*(.+)$", x)
-                     for x in items if not x.startswith("- ")]
-            if items and all(x.startswith("- ") for x in items):
-                data[key] = [unquote(x[2:].strip()) for x in items]
-            elif items and all(pares):
-                data[key] = {m.group(1): unquote(m.group(2).strip())
-                             for m in pares}
-            else:
+            items = [x for _, x in buf if x]
+            if items and items[0].startswith("- "):
                 data[key] = [unquote(x[2:].strip()) for x in items
                              if x.startswith("- ")]
+            else:
+                data[key] = _mapa_anidado(buf)
         key, buf, mode = None, [], None
 
     for line in raw.splitlines():
@@ -67,10 +62,12 @@ def parse_simple_yaml(raw: str) -> dict:
         if mode in ("block", "nested") and cur_indent > indent:
             # En modo `nested` se guarda la línea CRUDA: aún no se sabe si el
             # bloque es una lista o un mapa, y flush() necesita el prefijo.
-            buf.append(stripped)
+            # En `nested` va con su sangria: un `- item` cuelga de la subclave
+            # anterior, no del mapa.
+            buf.append((cur_indent, stripped) if mode == "nested" else stripped)
             continue
         if mode == "nested" and stripped.startswith("- ") and cur_indent >= indent:
-            buf.append(stripped)
+            buf.append((cur_indent, stripped))
             continue
         flush()
 
@@ -87,6 +84,41 @@ def parse_simple_yaml(raw: str) -> dict:
             data[k] = unquote(v)
     flush()
     return data
+
+
+def _mapa_anidado(lineas) -> dict:
+    """Mapa de un nivel bajo una clave sin valor, con listas por subclave.
+
+    `lineas` son pares (sangria, texto). Una subclave sin valor recoge los
+    `- item` que la siguen: `metadata:` / `deps:` / `- a` da
+    {"deps": ["a"]}. Antes esa lista convertia el mapa entero en lista y las
+    claves hermanas se perdian. Lo que no encaja (mapas mas hondos) se ignora,
+    como el resto del subconjunto.
+    """
+    mapa, abierta, base = {}, None, None
+    for sangria, texto in lineas:
+        if texto.startswith("- "):
+            if abierta is not None:
+                if not isinstance(mapa[abierta], list):
+                    mapa[abierta] = []
+                mapa[abierta].append(unquote(texto[2:].strip()))
+            continue
+        if base is None:
+            base = sangria
+        if sangria > base:
+            continue
+        m = re.match(r"^([A-Za-z0-9_\-.]+)\s*:\s*(.*)$", texto)
+        if not m:
+            abierta = None
+            continue
+        valor = m.group(2).strip()
+        if valor:
+            mapa[m.group(1)] = unquote(valor)
+            abierta = None
+        else:
+            mapa[m.group(1)] = ""
+            abierta = m.group(1)
+    return mapa
 
 
 # Escapes de una cadena YAML entre comillas dobles que este subconjunto
