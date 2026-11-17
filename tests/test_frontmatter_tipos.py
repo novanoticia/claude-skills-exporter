@@ -67,7 +67,9 @@ class EscalaresDeTipadoImplicito(unittest.TestCase):
     def test_lo_que_ya_se_entrecomillaba_sigue_igual(self):
         self.assertEqual(yaml_escape("con: dos puntos"), '"con: dos puntos"')
         self.assertEqual(yaml_escape(""), '""')
-        self.assertEqual(yaml_escape('dice "hola"'), '"dice \\"hola\\""')
+        # Una comilla en mitad del texto ya no obliga a entrecomillar: ver
+        # test_frontmatter_sin_barras.
+        self.assertEqual(yaml_escape('dice "hola"'), 'dice "hola"')
 
     def test_un_indicador_de_lista_o_clave_al_principio_se_protege(self):
         for v in ("- uno", "? dos", "-", "?"):

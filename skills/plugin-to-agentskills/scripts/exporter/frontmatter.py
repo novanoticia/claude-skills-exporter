@@ -136,16 +136,33 @@ _TIPADO_IMPLICITO_RX = re.compile(r"""^(?:
 )$""", re.VERBOSE)
 
 
-def yaml_escape(v: str) -> str:
-    """Serializa un escalar en una sola línea de forma segura.
+# Caracteres que YAML no deja abrir un escalar plano. En mitad del texto no
+# significan nada: `dice "hola"` o `v1.2 [beta]` son cadenas planas validas.
+_INDICADORES_INICIALES = frozenset("[]{},#&*!|>'\"%@`?:")
 
-    Entrecomilla lo que YAML leeria como otra cosa que una cadena: caracteres
-    con significado propio, un indicador de lista o de clave al principio, y
-    los escalares de tipado implicito.
+
+def _necesita_comillas(v: str) -> bool:
+    return bool(v == "" or v[0] in _INDICADORES_INICIALES
+                or v == "-" or v.startswith("- ")
+                or ": " in v or " #" in v or v.endswith(":")
+                or _TIPADO_IMPLICITO_RX.match(v))
+
+
+def yaml_escape(v: str) -> str:
+    """Serializa un escalar en una sola linea de forma segura.
+
+    Entrecomilla SOLO lo que YAML exige: un indicador al principio, `: ` o
+    ` #` dentro, un `:` final y los escalares de tipado implicito. Antes se
+    entrecomillaba cualquier valor con una comilla o un corchete en mitad del
+    texto, con las comillas interiores escapadas con barra; ChatGPT web no
+    decodifica esos escapes y mostraba las barras (observado el 2026-11-17).
+
+    Cuando hay que entrecomillar un valor con `"` o `\\`, se usan comillas
+    simples, que no tienen escapes con barra: la comilla simple se dobla.
     """
     v = " ".join(str(v).split())
-    if (v == "" or re.search(r'[:#\[\]{}&*!|>%@`"\']', v)
-            or v in ("-", "?") or v.startswith(("- ", "? "))
-            or _TIPADO_IMPLICITO_RX.match(v)):
-        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
-    return v
+    if not _necesita_comillas(v):
+        return v
+    if '"' in v or "\\" in v:
+        return "'" + v.replace("'", "''") + "'"
+    return '"' + v + '"'
