@@ -82,6 +82,7 @@
   "adaptacion.claves-retiradas": "Clés de frontmatter retirées (elles n'existent pas en dehors de Claude) : {claves}.",
   "adaptacion.rutas-plugin-root": "Chemins ${{CLAUDE_PLUGIN_ROOT}}/... convertis en chemins relatifs à la skill.",
   "adaptacion.claves-a-metadata": "Clés déplacées vers `metadata` (le frontmatter du standard est un ensemble fermé et la cible les rejette au niveau supérieur) : {claves}.",
+  "adaptacion.compatibility-lista": "`compatibility` était une liste et le standard exige une chaîne : elle a été jointe par des virgules ({elementos} éléments).",
   "portabilidad.senal": "{explicacion} Vu dans {ubicacion} : {muestra}",
   "portabilidad.descripcion-pendiente": "Skill importée depuis {carpeta}. EN ATTENTE : rédiger une description d'activation.",
   "compat.capacidad.desconocida": "{nombre} : le profil ne déclare pas cette capacité, on ne peut donc rien affirmer.",

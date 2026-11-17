@@ -82,6 +82,7 @@
   "adaptacion.claves-retiradas": "Claves de frontmatter retiradas (no existen fuera de Claude): {claves}.",
   "adaptacion.rutas-plugin-root": "Rutas ${{CLAUDE_PLUGIN_ROOT}}/... convertidas en rutas relativas a la skill.",
   "adaptacion.claves-a-metadata": "Claves movidas a `metadata` (el frontmatter del estándar es un conjunto cerrado y al nivel superior el destino las rechaza): {claves}.",
+  "adaptacion.compatibility-lista": "`compatibility` venía como lista y el estándar pide una cadena: se ha unido con comas ({elementos} elementos).",
   "portabilidad.senal": "{explicacion} Visto en {ubicacion}: {muestra}",
   "portabilidad.descripcion-pendiente": "Skill importada de {carpeta}. PENDIENTE: escribir descripción de activación.",
   "compat.capacidad.desconocida": "{nombre}: el perfil no declara esta capacidad, asi que no se puede afirmar nada.",

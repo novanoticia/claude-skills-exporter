@@ -167,12 +167,15 @@ metadata:
 `depends` es una lista en el origen, pero el estándar define `metadata` como un mapa de
 **cadenas**: sale como texto JSON (`["otra-skill"]`), que cualquier lector convierte de
 nuevo en lista sin ambigüedad. Si el `metadata` de origen ya traía su propio `depends`,
-se respeta y no se pisa.
+se respeta y no se pisa. Una lista escrita dentro del propio `metadata` de origen
+(`deps:` seguido de `- una`) sale igual, como texto JSON, y sus claves hermanas se
+conservan.
 
 `name` se normaliza a minúsculas, cifras y guiones, y se recorta a 64 caracteres sin
 dejar un guion al final. `compatibility` no se toca, pero si pasa de 500 caracteres —el
 máximo del estándar— el informe lo avisa con el hallazgo `compatibility-larga`: no se
-recorta, porque cortar una lista de requisitos la falsea.
+recorta, porque cortar una lista de requisitos la falsea. Si viene escrita como lista
+YAML, se une con comas en una sola cadena y el cambio se anota al final del `SKILL.md`.
 
 Los valores salen siempre como **cadenas**. Un escalar que YAML leería como número,
 booleano, nulo o fecha —`4.1`, `123`, `true`, `null`, `2026-10-07`, y también `1:30`, que un

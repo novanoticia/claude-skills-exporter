@@ -454,6 +454,17 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
                     if k not in ("name", "description")
                     and isinstance(fm.get(k), str) and fm.get(k)}
 
+    # `compatibility` es una cadena en el estandar. Escrita como lista YAML
+    # el filtro de arriba la descartaba sin dejar rastro; se une con comas,
+    # que es como la redactan los ejemplos de la spec, y se anota.
+    compat_lista = fm.get("compatibility")
+    if isinstance(compat_lista, list):
+        elementos = [str(x) for x in compat_lista if str(x).strip()]
+        if elementos:
+            res.fm_extra["compatibility"] = ", ".join(elementos)
+            res.adaptations.append(t("adaptacion.compatibility-lista",
+                                     elementos=len(elementos)))
+
     # El estandar limita `compatibility` a 500 caracteres. No se recorta:
     # cortar una lista de requisitos la falsea. Se cuentan caracteres, no
     # bytes, que es la unidad que fija el estandar.
@@ -468,7 +479,11 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     # salía al nivel superior y el destino rechazaba la skill entera.
     meta = {}
     if isinstance(fm.get("metadata"), dict):
-        meta.update({str(k): str(v) for k, v in fm["metadata"].items()})
+        # Una lista dentro de `metadata` sale como texto JSON, igual que
+        # `depends`: el estandar define `metadata` como mapa de cadenas.
+        meta.update({str(k): (json.dumps([str(x) for x in v], ensure_ascii=False)
+                              if isinstance(v, list) else str(v))
+                     for k, v in fm["metadata"].items()})
     bajadas = []
     for k in KEYS_A_METADATA:
         v = fm.get(k)
