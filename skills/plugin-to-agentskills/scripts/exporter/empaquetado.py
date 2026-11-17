@@ -18,8 +18,14 @@ from exporter.i18n import t
 from exporter.modelo import Senal
 
 
-def copiar_skill(src: Path, dest: Path, ignorar: set) -> tuple:
+def copiar_skill(src: Path, dest: Path, ignorar: set,
+                 excluir_raiz=frozenset()) -> tuple:
     """Copia el arbol omitiendo enlaces simbolicos y nombres ignorados.
+
+    `ignorar` se aplica a cualquier profundidad (node_modules, .git...).
+    `excluir_raiz` solo a los ficheros de la raiz: es el SKILL.md de la
+    propia skill, que se escribe aparte ya adaptado. Si fuera por nombre a
+    cualquier profundidad, un SKILL.md anidado desapareceria del paquete.
 
     Devuelve `(senales, ilegibles)`: una Senal por cada enlace omitido, y una
     pareja `(ruta_relativa, motivo)` por cada fichero que no se pudo leer.
@@ -46,7 +52,7 @@ def copiar_skill(src: Path, dest: Path, ignorar: set) -> tuple:
         destino_base = dest if relativa == "." else dest / relativa
         destino_base.mkdir(parents=True, exist_ok=True)
         for nombre in sorted(ficheros):
-            if nombre in ignorar:
+            if nombre in ignorar or (relativa == "." and nombre in excluir_raiz):
                 continue
             origen = os.path.join(base, nombre)
             if os.path.islink(origen):

@@ -135,7 +135,11 @@ quiere paquetes si sólo pregunta por portabilidad.
 ## Qué hace el conversor
 
 - Encuentra todos los `SKILL.md` del repo (sin descender dentro de una skill ya
-  detectada, para no confundir `references/` con skills nuevas).
+  detectada, para no confundir `references/` con skills nuevas). Un `SKILL.md` en una
+  subcarpeta de otra skill no se exporta aparte: viaja dentro de ella como un fichero
+  más, y el informe lo avisa (`skill-anidada`). Dos ficheros de skill en la misma
+  carpeta (`SKILL.md` y `skill.md`) abortan la ejecución: no hay forma de saber cuál es
+  el bueno.
 - Normaliza el nombre a minúsculas-con-guiones. Si no coincide con el de la carpeta de
   origen, avisa (`nombre-vs-carpeta`) y exporta la carpeta con el nombre del frontmatter.
 - Retira del frontmatter las claves que sólo existen en Claude (`allowed-tools`,

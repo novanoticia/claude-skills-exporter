@@ -219,6 +219,33 @@ def _relativa(ruta: Path, raiz: Path) -> str:
         return str(ruta)
 
 
+def comprobar_skill_md_unico(skill_files, raiz: Path) -> None:
+    """Aborta si un directorio de skill tiene mas de un fichero de skill.
+
+    En un sistema de ficheros sensible a mayusculas pueden convivir
+    `SKILL.md` y `skill.md`. discover_skills se quedaba con uno segun el
+    orden en que el sistema listara el directorio, y el otro viajaba al
+    paquete sin adaptar. No hay forma de saber cual es el bueno, asi que se
+    aborta en vez de elegir.
+    """
+    dobles = []
+    for sf in skill_files:
+        nombres = sorted(n for n in os.listdir(str(sf.parent))
+                         if n.lower() == "skill.md"
+                         and os.path.isfile(os.path.join(str(sf.parent), n)))
+        if len(nombres) > 1:
+            dobles.append((sf.parent, nombres))
+    if not dobles:
+        return
+    lineas = [t("error.skill_md_duplicado.cabecera")]
+    for carpeta, nombres in dobles:
+        lineas.append(t("error.skill_md_duplicado.linea",
+                        directorio=_relativa(carpeta, raiz),
+                        ficheros=", ".join(nombres)))
+    lineas.append(t("error.skill_md_duplicado.pie"))
+    sys.exit("\n".join(lineas))
+
+
 def comprobar_nombres_unicos(skill_files, raiz: Path) -> None:
     """Aborta si dos skills reclaman el mismo nombre publicado.
 
@@ -384,7 +411,7 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     # sensible a mayusculas); en macOS los dos nombres colapsaban en uno y el
     # paquete se quedaba sin ningun `SKILL.md`.
     enlaces, ilegibles_al_copiar = copiar_skill(
-        src_dir, dest, ignorar=set(IGNORED_DIRS) | {skill_md.name})
+        src_dir, dest, ignorar=set(IGNORED_DIRS), excluir_raiz={skill_md.name})
     for s in enlaces:
         res.findings.append(Finding("alta", "enlace-simbolico",
             t("portabilidad.enlace-simbolico", ubicacion=s.ubicacion,
@@ -410,6 +437,14 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
     for p in sorted(dest.rglob("*")):
         if p.is_file():
             res.extra_files.append(str(p.relative_to(dest)))
+    # Un SKILL.md dentro de una subcarpeta no se exporta como skill propia:
+    # discover_skills no desciende por debajo de una skill. Viaja dentro de
+    # esta como un fichero mas, y quien lo puso ahi quiza esperaba otra cosa.
+    anidados = [f.replace(os.sep, "/") for f in res.extra_files
+                if os.path.basename(f).lower() == "skill.md"]
+    if anidados:
+        res.findings.append(Finding("media", "skill-anidada",
+            t("portabilidad.skill-anidada", rutas=", ".join(anidados))))
     if any(f.startswith("scripts/") for f in res.extra_files):
         res.findings.append(Finding("media", "scripts",
             t("portabilidad.scripts")))
@@ -985,6 +1020,10 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         # asi que no puede atribuir mal ningun veredicto. Y es justo el
         # comando al que uno acude para diagnosticar este problema: abortarlo
         # dejaria al usuario sin la herramienta que se lo enseña.
+        # Esta si aplica tambien a `inspect`: con dos ficheros de skill en
+        # la misma carpeta no hay una skill que describir, sino dos
+        # candidatas, y elegir una al azar seria diagnosticar la equivocada.
+        comprobar_skill_md_unico(seleccionadas, root)
         if args.comando != "inspect":
             comprobar_nombres_unicos(seleccionadas, root)
 
