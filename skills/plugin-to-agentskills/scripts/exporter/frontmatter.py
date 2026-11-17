@@ -127,6 +127,7 @@ _TIPADO_IMPLICITO_RX = re.compile(r"""^(?:
       [-+]?[0-9][0-9_]*                                   # entero, tambien 017
     | [-+]?0[xXoObB][0-9a-fA-F_]+                         # hex, octal, binario
     | [-+]?(?:\.[0-9]+|[0-9][0-9_]*(?:\.[0-9_]*)?)(?:[eE][-+]?[0-9]+)?   # decimal
+    | [-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+(?:\.[0-9_]*)?     # sexagesimal (YAML 1.1): 1:30 es 90
     | [-+]?\.(?:inf|Inf|INF) | \.(?:nan|NaN|NAN)
     | y|Y|yes|Yes|YES|n|N|no|No|NO
     | true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF

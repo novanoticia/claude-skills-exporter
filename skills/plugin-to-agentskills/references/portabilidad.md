@@ -173,7 +173,8 @@ máximo del estándar— el informe lo avisa con el hallazgo `compatibility-larg
 recorta, porque cortar una lista de requisitos la falsea.
 
 Los valores salen siempre como **cadenas**. Un escalar que YAML leería como número,
-booleano, nulo o fecha —`4.1`, `123`, `true`, `null`, `2026-10-07`— se escribe entre
+booleano, nulo o fecha —`4.1`, `123`, `true`, `null`, `2026-10-07`, y también `1:30`, que un
+lector YAML 1.1 convierte en el número 90— se escribe entre
 comillas, también en `name` y `description`: el estándar pide cadenas, y un
 `version: 4.1` sin comillas llega al destino convertido en número. Las comillas del
 origen se leen con sus escapes (`\"` entre comillas dobles, `''` entre simples), de modo
