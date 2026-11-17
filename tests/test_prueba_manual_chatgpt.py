@@ -119,10 +119,6 @@ class ElEsquemaExigeMotivoSoloSinProbar(unittest.TestCase):
                                       "fuente": "https://a.invalid/x"}))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class ElRegistroCuentaElEscritorio(unittest.TestCase):
     """El importador de Claude Code del escritorio y la diferencia de catalogos.
 
@@ -137,3 +133,7 @@ class ElRegistroCuentaElEscritorio(unittest.TestCase):
                      "Catálogos de la web y del escritorio",
                      "Que una skill importada funcione"):
             self.assertIn(dato, texto, dato)
+
+
+if __name__ == "__main__":
+    unittest.main()
