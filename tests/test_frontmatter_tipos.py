@@ -39,7 +39,7 @@ CONVERT = RAIZ_SCRIPTS / "convert.py"
 
 # Escalares que YAML convertiria en otra cosa si van sin comillas.
 TIPADO_IMPLICITO = [
-    "123", "-7", "+7", "1_000", "0x1F", "0o17", "017",
+    "0", "123", "-7", "+7", "1_000", "0x1F", "0o17", "017",
     "4.1", "-0.5", ".5", "1e3", "6.02E23", ".inf", "-.INF", ".nan",
     "true", "True", "FALSE", "yes", "No", "on", "OFF", "y", "N",
     "null", "Null", "NULL", "~",

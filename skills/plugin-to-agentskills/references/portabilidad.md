@@ -159,9 +159,18 @@ destino rechace la skill entera:
 metadata:
   autor: Pablo
   version: "4.1"
-  depends:
-    - otra-skill
+  depends: "[\"otra-skill\"]"
 ```
+
+`depends` es una lista en el origen, pero el estándar define `metadata` como un mapa de
+**cadenas**: sale como texto JSON (`["otra-skill"]`), que cualquier lector convierte de
+nuevo en lista sin ambigüedad. Si el `metadata` de origen ya traía su propio `depends`,
+se respeta y no se pisa.
+
+`name` se normaliza a minúsculas, cifras y guiones, y se recorta a 64 caracteres sin
+dejar un guion al final. `compatibility` no se toca, pero si pasa de 500 caracteres —el
+máximo del estándar— el informe lo avisa con el hallazgo `compatibility-larga`: no se
+recorta, porque cortar una lista de requisitos la falsea.
 
 Los valores salen siempre como **cadenas**. Un escalar que YAML leería como número,
 booleano, nulo o fecha —`4.1`, `123`, `true`, `null`, `2026-10-07`— se escribe entre
