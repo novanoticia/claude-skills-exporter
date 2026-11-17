@@ -20,6 +20,10 @@ jobs:
       # Debe coincidir con la etiqueta de `uses:` (version fija de mistral-review).
       ref: v1.3
       model: ${{ vars.MISTRAL_MODEL }}
+      # Vacio (sin la variable) = Mistral. Para OpenRouter: MISTRAL_PROVIDER=openrouter,
+      # MISTRAL_MODEL con forma organizacion/modelo y el secreto OPENROUTER_API_KEY.
+      provider: ${{ vars.MISTRAL_PROVIDER }}
+      openrouter_provider: ${{ vars.OPENROUTER_PROVIDER }}
       # Golden generados: se regeneran con scripts, no se revisan.
       excluded: |
         tests/golden/**
@@ -27,3 +31,4 @@ jobs:
         tests/golden-i18n/**
     secrets:
       MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
