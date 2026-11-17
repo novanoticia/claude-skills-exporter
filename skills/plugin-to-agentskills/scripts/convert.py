@@ -120,9 +120,13 @@ PORTABLE_KEYS = ["name", "description", "license", "compatibility"]
 # nunca sobrevivía: el filtro exigía valores str y un mapa no lo es.
 # `depends` es una lista YAML (`depends: [- una, - otra]`), no un str: el mismo
 # filtro la dejaba fuera en silencio pese a que references/portabilidad.md
-# prometía que se conservaba. write_skill_md() sabe emitir listas anidadas
-# bajo metadata, así que aquí basta con no descartarlas.
+# prometía que se conservaba. Se guarda como texto JSON (`["una", "otra"]`)
+# porque el estándar define `metadata` como un mapa de cadenas; anidada como
+# lista, además, parse_simple_yaml perdía el `metadata` entero al reexportar.
 KEYS_A_METADATA = ["version", "depends"]
+
+# Longitud maxima de `compatibility` segun el estandar, en caracteres.
+COMPATIBILITY_MAX = 500
 
 
 # --------------------------------------------------------------------------
@@ -187,7 +191,11 @@ def discover_skills(root: Path) -> list:
 def sanitize_name(raw: str) -> str:
     n = re.sub(r"[^a-z0-9\-]+", "-", str(raw).strip().lower())
     n = re.sub(r"-{2,}", "-", n).strip("-")
-    return n[:64] or "skill"
+    # El guion final se quita DESPUES del corte: 63 letras seguidas de `-b`
+    # quedaban en `aaa...a-`, y el estandar prohibe que el nombre acabe en
+    # guion. nombre_publicado() pasa por aqui, asi que la comprobacion de
+    # unicidad ve exactamente el mismo nombre que se escribe.
+    return n[:64].rstrip("-") or "skill"
 
 
 def nombre_publicado(skill_md: Path) -> str:
@@ -411,6 +419,15 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
                     if k not in ("name", "description")
                     and isinstance(fm.get(k), str) and fm.get(k)}
 
+    # El estandar limita `compatibility` a 500 caracteres. No se recorta:
+    # cortar una lista de requisitos la falsea. Se cuentan caracteres, no
+    # bytes, que es la unidad que fija el estandar.
+    compat = res.fm_extra.get("compatibility", "")
+    if len(compat) > COMPATIBILITY_MAX:
+        res.findings.append(Finding("media", "compatibility-larga",
+            t("portabilidad.compatibility-larga", caracteres=len(compat),
+              maximo=COMPATIBILITY_MAX)))
+
     # Lo que no es del estándar pero vale la pena conservar baja a `metadata`,
     # fusionado con el `metadata` de origen si lo hubiera. Sin esto, `version`
     # salía al nivel superior y el destino rechazaba la skill entera.
@@ -424,7 +441,7 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
             meta.setdefault(k, v)
             bajadas.append(k)
         elif isinstance(v, list) and v:
-            meta.setdefault(k, list(v))
+            meta.setdefault(k, json.dumps([str(x) for x in v], ensure_ascii=False))
             bajadas.append(k)
     if meta:
         res.fm_meta = meta
@@ -441,17 +458,12 @@ def write_skill_md(res: SkillResult, dest: Path, description: str) -> None:
     fm_out = {"name": res.name, "description": description}
     fm_out.update(res.fm_extra)
     lines = ["---"] + [f"{k}: {yaml_escape(v)}" for k, v in fm_out.items()]
-    # `metadata` es un mapa, no un escalar: va como bloque anidado. Un valor
-    # que sea lista (p. ej. `depends`) se anida a su vez como lista YAML: no
-    # se aplana a texto porque `parse_simple_yaml` sabe leer justo esa forma.
+    # `metadata` es un mapa de cadenas: va como bloque anidado de un nivel.
+    # Las listas (p. ej. `depends`) llegan ya convertidas en texto JSON.
     if res.fm_meta:
         lines.append("metadata:")
         for k, v in res.fm_meta.items():
-            if isinstance(v, list):
-                lines.append(f"  {k}:")
-                lines += [f"    - {yaml_escape(item)}" for item in v]
-            else:
-                lines.append(f"  {k}: {yaml_escape(v)}")
+            lines.append(f"  {k}: {yaml_escape(v)}")
     lines.append("---")
     (dest / "SKILL.md").write_text(
         "\n".join(lines) + "\n" + res.body.rstrip() + render_notes(res), encoding="utf-8")

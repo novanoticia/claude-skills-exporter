@@ -147,13 +147,15 @@ class CasosConcretos(unittest.TestCase):
         # `depends` es una lista YAML, no un str: el filtro que solo aceptaba
         # str la descartaba en silencio pese a que references/portabilidad.md
         # promete que se conserva. La fixture ya declara `depends: [otra-skill]`.
+        # Sale como texto JSON y no como lista anidada: el estandar define
+        # `metadata` como un mapa de cadenas.
         tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp)
         exportar("skill-frontmatter-exotico", Path(tmp))
         texto = (Path(tmp) / "frontmatter-exotico" / "SKILL.md").read_text(encoding="utf-8")
         frontmatter = texto.split("---")[1]
-        self.assertIn("depends:", frontmatter)
-        self.assertIn("- otra-skill", frontmatter)
+        self.assertIn('  depends: "[\\"otra-skill\\"]"\n', frontmatter)
+        self.assertNotIn("- otra-skill", frontmatter)
 
     def test_las_senales_de_skill_md_citan_la_linea_real_del_fichero(self):
         # skill-con-mcp dispara "mcp-tool" en la linea 8 del SKILL.md real

@@ -143,7 +143,10 @@ quiere paquetes si sólo pregunta por portabilidad.
   `description`, `license` y `compatibility`. Lo que no es del estándar pero merece
   conservarse —`version`, `depends`— **baja dentro de `metadata`**, fusionado con el
   `metadata` de origen si lo hubiera. Al nivel superior el destino no las ignora:
-  rechaza la skill entera con *«Unexpected key(s) in SKILL.md frontmatter»*.
+  rechaza la skill entera con *«Unexpected key(s) in SKILL.md frontmatter»*. Como
+  `metadata` es un mapa de cadenas, `depends` viaja como texto JSON (`["otra-skill"]`).
+  Una `compatibility` de más de 500 caracteres se avisa (`compatibility-larga`), sin
+  recortarla.
 - **Reordena la descripción: primero CUÁNDO cargar la skill, después qué hace.** Trocea
   en frases (sin romper dentro de comillas ni paréntesis), detecta las que marcan
   activación —`Cárgala cuando`, `Actívalo cuando`, `cuando el usuario`, `Use when`…— y

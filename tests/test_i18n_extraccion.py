@@ -66,7 +66,8 @@ class Marcadores(unittest.TestCase):
         codigos = ["sin-frontmatter", "sin-description", "nombre-vs-carpeta",
                    "description-sin-activacion", "description-larga",
                    "description-densa", "senal", "herramientas-claude",
-                   "cuerpo-largo", "enlace-simbolico", "fichero-ilegible", "scripts"]
+                   "cuerpo-largo", "enlace-simbolico", "fichero-ilegible", "scripts",
+                   "compatibility-larga"]
         faltan = {"portabilidad." + c for c in codigos} - set(claves("es"))
         self.assertEqual(faltan, set())
 
