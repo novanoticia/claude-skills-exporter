@@ -117,7 +117,7 @@ class DependsComoTextoJSON(unittest.TestCase):
         out = exportar("---\nname: deps\n" + DESCRIPCION
                        + "depends:\n  - una\n  - otra\n---\n# X\n\nHaz algo.\n", self)
         fm = frontmatter_de(out / "deps" / "SKILL.md")
-        self.assertIn('  depends: "[\\"una\\", \\"otra\\"]"\n', fm)
+        self.assertIn("  depends: '[\"una\", \"otra\"]'\n", fm)
         self.assertNotIn("    - ", fm)
         leido, _, _ = split_frontmatter((out / "deps" / "SKILL.md").read_text(encoding="utf-8"))
         self.assertEqual(json.loads(leido["metadata"]["depends"]), ["una", "otra"])
@@ -130,7 +130,7 @@ class DependsComoTextoJSON(unittest.TestCase):
         out = exportar("---\nname: deps\n" + DESCRIPCION
                        + "depends:\n  - cálculo\n---\n# X\n\nHaz algo.\n", self)
         fm = frontmatter_de(out / "deps" / "SKILL.md")
-        self.assertIn('  depends: "[\\"cálculo\\"]"\n', fm)
+        self.assertIn("  depends: '[\"cálculo\"]'\n", fm)
 
     def test_no_pisa_un_depends_previo_en_metadata(self):
         out = exportar("---\nname: deps\n" + DESCRIPCION

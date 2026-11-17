@@ -159,7 +159,7 @@ destino rechace la skill entera:
 metadata:
   autor: Pablo
   version: "4.1"
-  depends: "[\"otra-skill\"]"
+  depends: '["otra-skill"]'
 ```
 
 `depends` es una lista en el origen, pero el estándar define `metadata` como un mapa de
@@ -173,11 +173,20 @@ máximo del estándar— el informe lo avisa con el hallazgo `compatibility-larg
 recorta, porque cortar una lista de requisitos la falsea.
 
 Los valores salen siempre como **cadenas**. Un escalar que YAML leería como número,
-booleano, nulo o fecha —`4.1`, `123`, `true`, `null`, `2026-10-07`— se escribe entre
+booleano, nulo o fecha —`4.1`, `123`, `true`, `null`, `2026-10-07`, y también `1:30`, que un
+lector YAML 1.1 convierte en el número 90— se escribe entre
 comillas, también en `name` y `description`: el estándar pide cadenas, y un
 `version: 4.1` sin comillas llega al destino convertido en número. Las comillas del
 origen se leen con sus escapes (`\"` entre comillas dobles, `''` entre simples), de modo
 que exportar dos veces la misma skill da el mismo frontmatter.
+
+Al escribir, en cambio, el conversor **no produce barras invertidas**. Solo entrecomilla lo
+que YAML exige —un indicador al principio, `: ` o ` #` dentro, un `:` final y los
+escalares de tipado implícito—, así que una descripción como `diga "pásame esta fecha a
+ISO"` sale tal cual, sin comillas alrededor. Si hay que entrecomillar un valor que lleva
+`"` o una barra, se usan comillas simples. El motivo es una prueba manual del 17 de
+noviembre de 2026: ChatGPT web aceptó el zip, pero mostraba la descripción con las barras
+de `\"` dentro, porque su lector no decodifica esos escapes.
 
 El parser es deliberadamente limitado: una clave por línea, escalares en bloque, listas y
 mapas de un nivel. No cubre YAML entero; anclas, etiquetas, mapas en línea (`{a: b}`) o

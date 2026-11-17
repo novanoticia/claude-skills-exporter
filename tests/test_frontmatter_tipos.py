@@ -44,13 +44,15 @@ TIPADO_IMPLICITO = [
     "true", "True", "FALSE", "yes", "No", "on", "OFF", "y", "N",
     "null", "Null", "NULL", "~",
     "2026-10-07", "2026-10-07T10:00:00Z", "2026-10-07 10:00:00",
+    # Sexagesimales de YAML 1.1: PyYAML lee `1:30` como el entero 90.
+    "1:30", "12:34:56", "-1:30", "+1:30", "1:30.5", "190:20:30", "0:05",
 ]
 
 # Texto corriente: no debe ganar comillas que antes no llevaba.
 TEXTO_LLANO = [
     "mi-skill", "fechas", "Carga un fichero", "v1.2.3", "1.2.3", "abc123",
     "123abc", "2026-10", "nulo", "yesterday", "online", "truth", "MIT",
-    "Apache-2.0", "áéíóú ñ", "-con-guion-inicial",
+    "Apache-2.0", "áéíóú ñ", "-con-guion-inicial", "a:b", "v1:2", "10:00 h",
 ]
 
 
@@ -67,7 +69,9 @@ class EscalaresDeTipadoImplicito(unittest.TestCase):
     def test_lo_que_ya_se_entrecomillaba_sigue_igual(self):
         self.assertEqual(yaml_escape("con: dos puntos"), '"con: dos puntos"')
         self.assertEqual(yaml_escape(""), '""')
-        self.assertEqual(yaml_escape('dice "hola"'), '"dice \\"hola\\""')
+        # Una comilla en mitad del texto ya no obliga a entrecomillar: ver
+        # test_frontmatter_sin_barras.
+        self.assertEqual(yaml_escape('dice "hola"'), 'dice "hola"')
 
     def test_un_indicador_de_lista_o_clave_al_principio_se_protege(self):
         for v in ("- uno", "? dos", "-", "?"):

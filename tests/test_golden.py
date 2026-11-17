@@ -154,7 +154,7 @@ class CasosConcretos(unittest.TestCase):
         exportar("skill-frontmatter-exotico", Path(tmp))
         texto = (Path(tmp) / "frontmatter-exotico" / "SKILL.md").read_text(encoding="utf-8")
         frontmatter = texto.split("---")[1]
-        self.assertIn('  depends: "[\\"otra-skill\\"]"\n', frontmatter)
+        self.assertIn("  depends: '[\"otra-skill\"]'\n", frontmatter)
         self.assertNotIn("- otra-skill", frontmatter)
 
     def test_las_senales_de_skill_md_citan_la_linea_real_del_fichero(self):
