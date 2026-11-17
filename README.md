@@ -140,7 +140,7 @@ es una URL de repositorio, no si ya tienes la carpeta descargada.
 
 | Código | Cuándo |
 |---|---|
-| `0` | Nada que reportar. También `inspect`, que no evalúa destinos y siempre sale con 0 |
+| `0` | Nada que reportar. También `inspect`, que no evalúa destinos y sale con 0 salvo por un error de entrada del código 1 (por ejemplo, dos ficheros de skill en la misma carpeta) |
 | `1` | Error de uso o de entrada: el origen no existe, no contiene ningún `SKILL.md`, `--target` desconocido, `--only` sin coincidencias, dos skills que reclaman el mismo nombre, dos ficheros de skill en la misma carpeta, un `--out` que la herramienta se niega a borrar, o un `--lang` desconocido |
 | `2` | Se ha alcanzado el umbral de `--fail-on`, **o** el nivel de riesgo de seguridad no es `bajo` |
 | `3` | Sólo en `export`: el *gate* de seguridad ha impedido escribir los artefactos de al menos una skill |
