@@ -121,3 +121,19 @@ class ElEsquemaExigeMotivoSoloSinProbar(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElRegistroCuentaElEscritorio(unittest.TestCase):
+    """El importador de Claude Code del escritorio y la diferencia de catalogos.
+
+    No toca ningun perfil: el escritorio no es destino del conversor. Se fija
+    para que nadie lo borre creyendo que es la prueba de la web.
+    """
+
+    def test_el_registro_cuenta_el_importador_y_los_catalogos(self):
+        texto = REGISTRO.read_text(encoding="utf-8")
+        for dato in ("Importador de Claude Code", "Ajustes → Personal → Importar",
+                     "does not match marketplace plugin name",
+                     "Catálogos de la web y del escritorio",
+                     "Que una skill importada funcione"):
+            self.assertIn(dato, texto, dato)

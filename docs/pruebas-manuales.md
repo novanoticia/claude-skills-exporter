@@ -69,6 +69,41 @@ con la anterior.
 | Invocación explícita (`@minima pásame esta fecha a ISO…`) | ✅ Respuesta `2026-11-17` |
 | Habilidades → Añadir | Solo «Crear habilidad» y «Grabar una habilidad»: no hay subida de zip |
 
-La app y la web muestran catálogos distintos: la web, las habilidades de la cuenta; la
-app, además, los complementos de los *marketplaces* añadidos en ese equipo. Es una
-hipótesis por lo que se ve en pantalla, sin confirmar.
+### Importador de Claude Code
+
+**Ajustes → Personal → Importar**, sección «Importar desde otra aplicación de IA», fila
+**Claude Code**, botón **Importar**. Encima hay una «Sincronización automática» («Mantener
+las importaciones sincronizadas») cuyo botón **Personalizar** deja elegir qué categorías
+se sincronizan: Chats, Instrucciones, Ajustes, Habilidades, Complementos, Servidores MCP,
+Agentes y Hooks.
+
+| Prueba | Resultado |
+|---|---|
+| Qué pide | Nada: ni cuenta de Claude ni archivo. Lee la configuración local de Claude Code en el mismo Mac; el diálogo cita `~/.claude/settings.json` y las sesiones de chat recientes |
+| Qué importa | Plugins enteros, no solo skills. Una importación anterior (2026-08-18) registra configuración, instrucciones, 3 habilidades sueltas, 31 complementos y 11 sesiones |
+| Dónde los deja | En la ficha de un complemento importado, «Origen» apunta a una carpeta bajo `~/.codex/.tmp/marketplaces/`: los copia, no los enlaza |
+| Validación | Rechaza un plugin cuyo `name` en `plugin.json` no coincide con el de su `marketplace.json`: «plugin.json name `chrome-devtools` does not match marketplace plugin name `chrome-devtools-mcp`». Este repositorio cumple: los dos dicen `claude-skills-exporter` |
+| Cómo se ven las skills | Descripción íntegra, en español, con tildes y comillas. El título sale de `name` («Alternancia Modelos»). El cuerpo se presenta como Markdown, pero los comentarios HTML se ven literales (`<!-- … -->`) |
+| Cómo se ve el complemento | Versión, categoría (*Other*), desarrollador, tienda y sitio web, tomados del manifiesto |
+
+### Catálogos de la web y del escritorio
+
+Misma cuenta Plus, el mismo día, a las 13:45:
+
+| | Web (`chatgpt.com`) | App de escritorio |
+|---|---|---|
+| Habilidades | Solo `skill-creator` | Una treintena, entre sueltas e incluidas en complementos |
+| Complementos «Creados por ti» | Los mismos 6 | Los mismos 6 |
+| Complementos importados de Claude Code | No aparecen | Aparecen, agrupados por *marketplace* |
+
+Lo creado en la cuenta se comparte; lo que trae el importador de Claude Code se queda en
+el escritorio. La skill `minima` que se subió a la web por la mañana ya no figura porque
+se desinstaló a mano entre ambas observaciones.
+
+### Lo que esto no demuestra
+
+- **Que una skill importada funcione.** Hay un botón «Probar ahora», pero no se usó.
+- **Que la sincronización recoja una versión nueva.** No se sabe si compara `version` o
+  el contenido.
+- **Por qué la web no ve lo importado**: puede ser una decisión de producto o que la copia
+  sea local. Solo se ha observado el efecto.
