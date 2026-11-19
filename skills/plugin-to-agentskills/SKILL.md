@@ -150,7 +150,9 @@ quiere paquetes si sólo pregunta por portabilidad.
   rechaza la skill entera con *«Unexpected key(s) in SKILL.md frontmatter»*. Como
   `metadata` es un mapa de cadenas, `depends` viaja como texto JSON (`["otra-skill"]`).
   Una `compatibility` de más de 500 caracteres se avisa (`compatibility-larga`), sin
-  recortarla.
+  recortarla. Lo que el lector de frontmatter no sabe leer —un mapa de más de un
+  nivel, un bloque que mezcla lista y mapa, una `compatibility` en lista vacía— no viaja,
+  y el informe lo nombra (`frontmatter-ignorado`).
 - **Reordena la descripción: primero CUÁNDO cargar la skill, después qué hace.** Trocea
   en frases (sin romper dentro de comillas ni paréntesis), detecta las que marcan
   activación —`Cárgala cuando`, `Actívalo cuando`, `cuando el usuario`, `Use when`…— y

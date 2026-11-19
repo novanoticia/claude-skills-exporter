@@ -284,7 +284,9 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
                     presupuesto_zip: int, reorder: bool = True) -> SkillResult:
     src_dir = skill_md.parent
     text = skill_md.read_text(encoding="utf-8", errors="replace")
-    fm, _raw_fm, body = split_frontmatter(text)
+    # Lo que el lector no sabe leer se apunta aqui y se avisa mas abajo.
+    perdidas = []
+    fm, _raw_fm, body = split_frontmatter(text, perdidas)
 
     orig_name = str(fm.get("name") or src_dir.name)
     name = sanitize_name(orig_name)
@@ -464,6 +466,12 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
             res.fm_extra["compatibility"] = ", ".join(elementos)
             res.adaptations.append(t("adaptacion.compatibility-lista",
                                      elementos=len(elementos)))
+        else:
+            perdidas.append("compatibility")
+    if perdidas:
+        res.findings.append(Finding("media", "frontmatter-ignorado",
+            t("portabilidad.frontmatter-ignorado",
+              claves=", ".join("`" + p + "`" for p in perdidas))))
 
     # El estandar limita `compatibility` a 500 caracteres. No se recorta:
     # cortar una lista de requisitos la falsea. Se cuentan caracteres, no
