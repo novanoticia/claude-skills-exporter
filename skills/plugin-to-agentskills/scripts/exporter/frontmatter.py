@@ -10,8 +10,12 @@ from __future__ import annotations
 import re
 
 
-def split_frontmatter(text: str):
-    """Devuelve (dict_frontmatter, texto_frontmatter_bruto, cuerpo)."""
+def split_frontmatter(text: str, perdidas=None):
+    """Devuelve (dict_frontmatter, texto_frontmatter_bruto, cuerpo).
+
+    `perdidas`, si se pasa, recibe lo que el lector no ha sabido leer (ver
+    parse_simple_yaml).
+    """
     if not text.startswith("---"):
         return {}, "", text
     lines = text.splitlines(keepends=True)
@@ -24,11 +28,18 @@ def split_frontmatter(text: str):
         return {}, "", text
     raw = "".join(lines[1:end])
     body = "".join(lines[end + 1:])
-    return parse_simple_yaml(raw), raw, body
+    return parse_simple_yaml(raw, perdidas), raw, body
 
 
-def parse_simple_yaml(raw: str) -> dict:
-    """Parser de nivel superior: clave: valor, escalares en bloque (| >) y listas."""
+def parse_simple_yaml(raw: str, perdidas=None) -> dict:
+    """Parser de nivel superior: clave: valor, escalares en bloque (| >) y listas.
+
+    Lo que queda fuera del subconjunto se descarta, pero si se pasa la lista
+    `perdidas` se anota en ella la ruta de cada clave descartada
+    (`metadata`, `metadata.a`) para que el informe lo avise.
+    """
+    if perdidas is None:
+        perdidas = []
     data, key, buf, mode, indent = {}, None, [], None, 0
 
     def flush():
@@ -47,8 +58,12 @@ def parse_simple_yaml(raw: str) -> dict:
             if items and items[0].startswith("- "):
                 data[key] = [unquote(x[2:].strip()) for x in items
                              if x.startswith("- ")]
+                # Un bloque que empieza como lista y sigue como mapa no es
+                # YAML valido: se queda la lista y el resto se pierde.
+                if any(not x.startswith("- ") for x in items):
+                    perdidas.append(key)
             else:
-                data[key] = _mapa_anidado(buf)
+                data[key] = _mapa_anidado(buf, key, perdidas)
         key, buf, mode = None, [], None
 
     for line in raw.splitlines():
@@ -86,16 +101,16 @@ def parse_simple_yaml(raw: str) -> dict:
     return data
 
 
-def _mapa_anidado(lineas) -> dict:
+def _mapa_anidado(lineas, clave, perdidas) -> dict:
     """Mapa de un nivel bajo una clave sin valor, con listas por subclave.
 
     `lineas` son pares (sangria, texto). Una subclave sin valor recoge los
     `- item` que la siguen: `metadata:` / `deps:` / `- a` da
     {"deps": ["a"]}. Antes esa lista convertia el mapa entero en lista y las
-    claves hermanas se perdian. Lo que no encaja (mapas mas hondos) se ignora,
-    como el resto del subconjunto.
+    claves hermanas se perdian. Un mapa mas hondo no se lee: la subclave que
+    lo abre se descarta y se anota en `perdidas` como `clave.subclave`.
     """
-    mapa, abierta, base = {}, None, None
+    mapa, abierta, base, ultima = {}, None, None, None
     for sangria, texto in lineas:
         if texto.startswith("- "):
             if abierta is not None:
@@ -106,12 +121,23 @@ def _mapa_anidado(lineas) -> dict:
         if base is None:
             base = sangria
         if sangria > base:
+            # Lo que cuelga mas hondo de una subclave no se lee. Si la
+            # subclave no tenia valor propio se descarta (antes salia como
+            # cadena vacia); si lo tenia, se conserva. En ambos casos se
+            # anota una sola vez.
+            if abierta is not None and mapa.get(abierta) == "":
+                del mapa[abierta]
+            ruta = clave + "." + ultima if ultima else clave
+            if ruta not in perdidas:
+                perdidas.append(ruta)
+            abierta = None
             continue
         m = re.match(r"^([A-Za-z0-9_\-.]+)\s*:\s*(.*)$", texto)
         if not m:
             abierta = None
             continue
         valor = m.group(2).strip()
+        ultima = m.group(1)
         if valor:
             mapa[m.group(1)] = unquote(valor)
             abierta = None
