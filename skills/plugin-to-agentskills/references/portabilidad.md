@@ -177,6 +177,12 @@ máximo del estándar— el informe lo avisa con el hallazgo `compatibility-larg
 recorta, porque cortar una lista de requisitos la falsea. Si viene escrita como lista
 YAML, se une con comas en una sola cadena y el cambio se anota al final del `SKILL.md`.
 
+El lector de frontmatter cubre un subconjunto pequeño de YAML a propósito. Lo que queda
+fuera —un mapa de más de un nivel dentro de `metadata`, un bloque que empieza como lista
+y sigue como mapa, una `compatibility` en lista sin ningún elemento, una `license` o una
+`compatibility` escritas como mapa— no se exporta, y el
+hallazgo `frontmatter-ignorado` dice qué claves se han quedado fuera.
+
 Los valores salen siempre como **cadenas**. Un escalar que YAML leería como número,
 booleano, nulo o fecha —`4.1`, `123`, `true`, `null`, `2026-10-07`, y también `1:30`, que un
 lector YAML 1.1 convierte en el número 90— se escribe entre

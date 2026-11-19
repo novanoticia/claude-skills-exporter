@@ -67,7 +67,8 @@ class Marcadores(unittest.TestCase):
                    "description-sin-activacion", "description-larga",
                    "description-densa", "senal", "herramientas-claude",
                    "cuerpo-largo", "enlace-simbolico", "fichero-ilegible", "scripts",
-                   "compatibility-larga", "skill-anidada"]
+                   "compatibility-larga", "skill-anidada",
+                   "frontmatter-ignorado"]
         faltan = {"portabilidad." + c for c in codigos} - set(claves("es"))
         self.assertEqual(faltan, set())
 
