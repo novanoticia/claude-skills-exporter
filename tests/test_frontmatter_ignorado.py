@@ -60,6 +60,18 @@ class ElLectorApuntaLoQueNoLee(unittest.TestCase):
         self.assertEqual(fm["metadata"], {"autor": "Ana"})
         self.assertEqual(perdidas, ["metadata.a"])
 
+    def test_linea_mas_honda_bajo_una_clave_con_valor(self):
+        # No es YAML valido, pero se perdia sin aviso: `b` no viajaba.
+        perdidas = []
+        fm = parse_simple_yaml("metadata:\n  a: x\n    b: c\n  autor: Ana\n", perdidas)
+        self.assertEqual(fm["metadata"], {"a": "x", "autor": "Ana"})
+        self.assertEqual(perdidas, ["metadata.a"])
+
+    def test_cada_clave_se_anota_una_vez(self):
+        perdidas = []
+        parse_simple_yaml("metadata:\n  a:\n    b: c\n    d: e\n", perdidas)
+        self.assertEqual(perdidas, ["metadata.a"])
+
     def test_lista_seguida_de_mapa(self):
         perdidas = []
         fm = parse_simple_yaml("metadata:\n  - a\n  autor: Ana\n", perdidas)

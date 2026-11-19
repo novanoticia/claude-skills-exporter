@@ -110,7 +110,7 @@ def _mapa_anidado(lineas, clave, perdidas) -> dict:
     claves hermanas se perdian. Un mapa mas hondo no se lee: la subclave que
     lo abre se descarta y se anota en `perdidas` como `clave.subclave`.
     """
-    mapa, abierta, base = {}, None, None
+    mapa, abierta, base, ultima = {}, None, None, None
     for sangria, texto in lineas:
         if texto.startswith("- "):
             if abierta is not None:
@@ -121,9 +121,15 @@ def _mapa_anidado(lineas, clave, perdidas) -> dict:
         if base is None:
             base = sangria
         if sangria > base:
+            # Lo que cuelga mas hondo de una subclave no se lee. Si la
+            # subclave no tenia valor propio se descarta (antes salia como
+            # cadena vacia); si lo tenia, se conserva. En ambos casos se
+            # anota una sola vez.
             if abierta is not None and mapa.get(abierta) == "":
                 del mapa[abierta]
-                perdidas.append(clave + "." + abierta)
+            ruta = clave + "." + ultima if ultima else clave
+            if ruta not in perdidas:
+                perdidas.append(ruta)
             abierta = None
             continue
         m = re.match(r"^([A-Za-z0-9_\-.]+)\s*:\s*(.*)$", texto)
@@ -131,6 +137,7 @@ def _mapa_anidado(lineas, clave, perdidas) -> dict:
             abierta = None
             continue
         valor = m.group(2).strip()
+        ultima = m.group(1)
         if valor:
             mapa[m.group(1)] = unquote(valor)
             abierta = None
