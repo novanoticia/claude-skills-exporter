@@ -109,6 +109,20 @@ class ElInformeLoAvisa(unittest.TestCase):
         self.assertEqual(len(h), 1)
         self.assertIn("metadata", h[0]["mensaje"])
 
+    def test_compatibility_como_mapa(self):
+        h = ignorado(exportar("compatibility:\n  python: 3.8+\n", self))
+        self.assertEqual(len(h), 1)
+        self.assertIn("`compatibility`", h[0]["mensaje"])
+
+    def test_license_como_lista(self):
+        h = ignorado(exportar("license:\n  - MIT\n", self))
+        self.assertEqual(len(h), 1)
+        self.assertIn("`license`", h[0]["mensaje"])
+
+    def test_cada_clave_sale_una_vez_en_el_aviso(self):
+        h = ignorado(exportar("compatibility:\n  - ''\n  foo: bar\n", self))
+        self.assertEqual(h[0]["mensaje"].count("`compatibility`"), 1)
+
     def test_un_frontmatter_normal_no_avisa(self):
         out = exportar("metadata:\n  autor: Ana\ncompatibility: Python 3.8+\n", self)
         self.assertEqual(ignorado(out), [])

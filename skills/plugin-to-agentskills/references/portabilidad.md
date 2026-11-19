@@ -179,7 +179,8 @@ YAML, se une con comas en una sola cadena y el cambio se anota al final del `SKI
 
 El lector de frontmatter cubre un subconjunto pequeño de YAML a propósito. Lo que queda
 fuera —un mapa de más de un nivel dentro de `metadata`, un bloque que empieza como lista
-y sigue como mapa, una `compatibility` en lista sin ningún elemento— no se exporta, y el
+y sigue como mapa, una `compatibility` en lista sin ningún elemento, una `license` o una
+`compatibility` escritas como mapa— no se exporta, y el
 hallazgo `frontmatter-ignorado` dice qué claves se han quedado fuera.
 
 Los valores salen siempre como **cadenas**. Un escalar que YAML leería como número,

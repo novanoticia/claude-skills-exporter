@@ -466,12 +466,18 @@ def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
             res.fm_extra["compatibility"] = ", ".join(elementos)
             res.adaptations.append(t("adaptacion.compatibility-lista",
                                      elementos=len(elementos)))
-        else:
-            perdidas.append("compatibility")
+    # `license` y `compatibility` son cadenas en el estandar. Si traen otra
+    # cosa (un mapa, una lista sin texto) y no han llegado a fm_extra, no
+    # viajan: se avisa en vez de perderlas en silencio.
+    for k in ("license", "compatibility"):
+        if fm.get(k) and not isinstance(fm.get(k), str) and k not in res.fm_extra:
+            perdidas.append(k)
     if perdidas:
+        # Una clave puede anotarse dos veces (en el lector y aqui).
+        unicas = list(dict.fromkeys(perdidas))
         res.findings.append(Finding("media", "frontmatter-ignorado",
             t("portabilidad.frontmatter-ignorado",
-              claves=", ".join("`" + p + "`" for p in perdidas))))
+              claves=", ".join("`" + p + "`" for p in unicas))))
 
     # El estandar limita `compatibility` a 500 caracteres. No se recorta:
     # cortar una lista de requisitos la falsea. Se cuentan caracteres, no
