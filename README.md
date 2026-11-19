@@ -276,12 +276,13 @@ vio cada señal—: el informe en Markdown se queda en la matriz y los motivos.
 > tu skill tiene esa forma, revisa el contenido del zip o saca la skill anidada a su
 > propia carpeta.
 >
-> **En la matriz, ChatGPT sigue saliendo «no verificable»**, aunque el zip esté bien
-> formado. Su perfil declara la instalación modo por modo. El **zip** está probado desde
-> el 17 de noviembre de 2026 y se evalúa como cualquier otro destino. La **URL de
-> repositorio** sigue sin probar, porque el conversor no valida que el origen sea un
-> plugin instalable. La celda de la matriz resume los dos modos con el peor, y el detalle
-> por skill solo lista los modos que tienen algún motivo. Tiene una consecuencia en CI:
+> **En la matriz, la casilla de ChatGPT separa sus dos modos de instalación** cuando dan
+> resultados distintos, por ejemplo `🟢 zip: compatible · 🔵 URL del repo: no
+> verificable`. El **zip** está probado desde el 17 de noviembre de 2026 y se evalúa como
+> cualquier otro destino. La **URL de repositorio** sigue sin probar, porque el conversor
+> no valida que el origen sea un plugin instalable. Si los dos modos coinciden, la
+> casilla muestra un solo estado, y el detalle por skill solo lista los modos que tienen
+> algún motivo. `--fail-on` sigue contando el peor de los dos, con una consecuencia en CI:
 > `--fail-on degradado` devuelve 2 por ChatGPT con cualquier skill (`--fail-on
 > no_compatible`, no). Si no exportas para ChatGPT, limita la auditoría con
 > `audit --target`.
