@@ -38,6 +38,11 @@ ICONO = {
 }
 
 
+# Orden de los modos dentro de una casilla: primero lo que escribe el
+# conversor (zip, carpeta), despues lo que no depende de el.
+ORDEN_MODOS = ["zip", "carpeta", "directorio_local", "url_repositorio"]
+
+
 def etiqueta_estado(estado: str) -> str:
     return t("estado." + estado)
 
@@ -116,6 +121,19 @@ def _celda(evaluaciones, anulado: bool = False) -> str:
         if not anulado:
             return t("informe.matriz.bloqueado")
         return t("informe.matriz.con_bloqueo", estado=etiqueta_estado(estado))
+    # Un destino con varios modos de instalacion (ChatGPT: zip y URL del
+    # repositorio) que dan estados distintos se muestra modo por modo. Con
+    # solo el peor, ChatGPT salia "no verificable" aunque el zip que produce
+    # el conversor estuviera probado a mano. Los artefactos van primero.
+    if len({e.estado for e in evaluaciones}) > 1:
+        orden = sorted(evaluaciones,
+                       key=lambda e: ORDEN_MODOS.index(e.modo_instalacion)
+                       if e.modo_instalacion in ORDEN_MODOS else len(ORDEN_MODOS))
+        return " · ".join(
+            t("informe.matriz.por_modo", icono=ICONO[e.estado],
+              modo=t("modo." + e.modo_instalacion),
+              estado=etiqueta_estado(e.estado))
+            for e in orden)
     return "{} {}".format(ICONO[estado], etiqueta_estado(estado))
 
 
