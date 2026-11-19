@@ -73,9 +73,13 @@ class CasillaPorModo(unittest.TestCase):
         self.assertIn("🟢 compatible", f)
 
     def test_un_destino_de_un_solo_modo_no_cambia(self):
+        # La columna de claude.ai (un solo modo, `zip`) conserva el formato
+        # de siempre aunque ChatGPT, en la misma fila, se separe por modos.
         f = self.informe(chatgpt(Estado.COMPATIBLE, Estado.NO_VERIFICABLE))
         celdas = [c.strip() for c in f.strip("|").split("|")]
-        self.assertIn("🟢 compatible", celdas)
+        ids = list(self.perfiles)
+        self.assertEqual(celdas[1 + ids.index("claude-ai")], "🟢 compatible")
+        self.assertIn("zip:", celdas[1 + ids.index("chatgpt")])
 
     def test_el_bloqueo_sigue_ocupando_la_casilla(self):
         f = self.informe(chatgpt(Estado.COMPATIBLE, Estado.NO_VERIFICABLE,
