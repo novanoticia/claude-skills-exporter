@@ -1,0 +1,53 @@
+name: Mistral Reply to AI Reviews
+
+# Contrasta con Mistral los hallazgos que otras IAs dejan en los PR.
+# El script vive en novanoticia/mistral-review; aqui solo se llama.
+
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Numero del PR (puede estar cerrado para un contraste historico)
+        required: true
+      review_comment_id:
+        description: ID del hallazgo de linea de otra IA al que responder
+        required: true
+
+# Serializa eventos repetidos de la misma fuente; las reviews diferentes
+# conservan sus propias ejecuciones y no se expulsan de la cola entre si.
+concurrency:
+  group: mistral-reply-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}-${{ github.event.review.id || github.event.comment.pull_request_review_id || github.event.comment.id || inputs.review_comment_id }}
+  cancel-in-progress: false
+
+jobs:
+  mistral-reply:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: novanoticia/mistral-review/.github/workflows/reply.yml@v1.4
+    with:
+      # Debe coincidir con la etiqueta de `uses:` (version fija de mistral-review).
+      ref: v1.4
+      # Proveedor (ver README de mistral-review, "Usar OpenRouter"): sin la variable MISTRAL_PROVIDER,
+      # o con `mistral`, revisa Mistral con MISTRAL_MODEL; con `openrouter`, OpenRouter
+      # con OPENROUTER_MODEL. Cambiar de proveedor = cambiar solo MISTRAL_PROVIDER.
+      model: ${{ vars.MISTRAL_PROVIDER == 'openrouter' && vars.OPENROUTER_MODEL || vars.MISTRAL_PROVIDER != 'openrouter' && vars.MISTRAL_MODEL || '' }}
+      # MISTRAL_REPLY_MODEL (opcional) es un modelo de Mistral solo para el contraste;
+      # con OpenRouter no se usa y el contraste toma el modelo de la revision.
+      reply_model: ${{ vars.MISTRAL_PROVIDER != 'openrouter' && vars.MISTRAL_REPLY_MODEL || '' }}
+      provider: ${{ vars.MISTRAL_PROVIDER }}
+      openrouter_provider: ${{ vars.OPENROUTER_PROVIDER }}
+      # Golden generados: se regeneran con scripts, no se revisan.
+      excluded: |
+        tests/golden/**
+        tests/golden-seguridad/**
+        tests/golden-i18n/**
+    secrets:
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

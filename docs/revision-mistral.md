@@ -32,6 +32,24 @@ y `tests/golden-i18n/` (parámetro `excluded` del workflow). Los fixtures siguen
 siendo datos de prueba inertes: el revisor no los ejecuta. Nada del revisor se
 distribuye dentro de la skill.
 
+## Contraste de revisiones de otras IAs
+
+El workflow `Mistral Reply to AI Reviews` (`.github/workflows/mistral-reply.yml`)
+llama a `reply.yml` del mismo revisor compartido. Cuando otra IA (Codex, Claude,
+Copilot, CodeRabbit o Gemini) deja hallazgos en un PR, Mistral contrasta cada uno
+leyendo el código y responde con un dictamen: de acuerdo, no se sostiene, ya
+corregido o pendiente, con citas literales. Solo comenta: no aplica parches.
+Además del código, envía a Mistral el texto de esos hallazgos.
+
+Usa el mismo secreto y las mismas variables que la revisión. La variable
+opcional `MISTRAL_REPLY_MODEL` elige otro modelo de Mistral solo para el
+contraste. Aplica las mismas exclusiones que la revisión. También se puede lanzar a mano: **Actions → Mistral Reply to
+AI Reviews → Run workflow**, con el número del PR y el id del comentario.
+
+Los dos workflows están fijados en la misma versión del revisor: `@` de `uses:`
+y `ref:` deben coincidir en ambos archivos. El dictamen es otra opinión
+automatizada; compruébalo antes de actuar.
+
 ## Límites
 
 Es una segunda opinión barata, no un detector fiable. Una cita válida no
