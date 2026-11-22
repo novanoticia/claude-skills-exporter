@@ -30,10 +30,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: novanoticia/mistral-review/.github/workflows/reply.yml@v1.5
+    uses: novanoticia/mistral-review/.github/workflows/reply.yml@v1.6
     with:
       # Debe coincidir con la etiqueta de `uses:` (version fija de mistral-review).
-      ref: v1.5
+      ref: v1.6
       # Proveedor (ver README de mistral-review, "Usar OpenRouter"): sin la variable MISTRAL_PROVIDER,
       # o con `mistral`, revisa Mistral con MISTRAL_MODEL; con `openrouter`, OpenRouter
       # con OPENROUTER_MODEL. Cambiar de proveedor = cambiar solo MISTRAL_PROVIDER.
