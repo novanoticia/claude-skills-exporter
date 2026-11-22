@@ -8,16 +8,6 @@ Coge un repositorio con un plugin (o unas skills) de Claude, extrae las skills,
 instalarlas en **ChatGPT**, **claude.ai**, **Claude Code**, **Mistral Vibe Work** y
 **Perplexity Computer**.
 
-> **Compatible con [Agent Plugins 1.0.0](https://agent-plugins.org/specification)** —
-> el formato portátil de empaquetado de la Agentic AI Foundation (OpenAI, Amazon,
-> Microsoft, Cursor y Vercel, con Google como *core maintainer*). Este repositorio
-> es a la vez un plugin conforme a esa especificación y la herramienta que lleva
-> otros plugins hacia ella. Al exportar, el frontmatter se reduce a un conjunto
-> cerrado de claves de [Agent Skills](https://agentskills.io/specification): `name`,
-> `description`, `license`, `compatibility` y `metadata`. Eso es una condición de
-> formato, no una validación completa de cada paquete ni una garantía de que una
-> plataforma concreta acepte la subida: eso sólo lo acredita probarlo en el destino.
-
 👉 **Si no manejas GitHub, empieza por la [guía de uso](docs/guia.html)** — descárgala y
 ábrela con doble clic en el navegador. Cubre instalar la herramienta, exportar un
 repositorio y subir el resultado a cada plataforma.
@@ -25,6 +15,39 @@ repositorio y subir el resultado a cada plataforma.
 Para publicar y mantener tu propia copia del repositorio —subirlo a GitHub, instalarlo
 desde el marketplace, publicar cambios, aplicar parches— hay una
 [guía de mantenimiento](docs/mantenimiento.html) aparte.
+
+**En esta página:**
+[Inicio rápido](#inicio-rápido) ·
+[La advertencia importante](#la-advertencia-importante) ·
+[Instalación](#instalación) ·
+[Uso](#uso) ·
+[Qué genera](#qué-genera) ·
+[Dónde se sube cada cosa](#dónde-se-sube-cada-cosa) ·
+[Qué audita](#qué-audita) ·
+[Privacidad](#privacidad-y-datos) ·
+[Contribuir](#contribuir) ·
+[Limitaciones](#limitaciones-conocidas)
+
+## Inicio rápido
+
+1. **Instala el plugin** en Claude Code:
+
+   ```
+   /plugin marketplace add https://github.com/novanoticia/claude-skills-exporter
+   /plugin install claude-skills-exporter@pablo-skills-tools
+   /reload-plugins
+   ```
+
+2. **Exporta un repositorio**: `/exportar-skills https://github.com/usuario/repo`, o
+   pídelo con tus palabras: *«exporta las skills de este repo para ChatGPT»*.
+3. **Lee `INFORME-PORTABILIDAD.md`** en la carpeta de salida (`dist-agentskills/`): dice
+   qué se adaptó y qué no funcionará en cada destino.
+4. **Sube cada paquete a su plataforma**: el `.zip` a ChatGPT, claude.ai o Perplexity; la
+   carpeta a Mistral o Claude Code. Rutas exactas en
+   [Dónde se sube cada cosa](#dónde-se-sube-cada-cosa).
+
+¿Sin Claude Code? Funciona también con Python 3.8+ a secas: ver
+[Sin instalar nada](#sin-instalar-nada).
 
 ## La advertencia importante
 
@@ -43,6 +66,16 @@ Esta herramienta no arregla eso: lo **hace visible**. Cuando hay algo que declar
 skill exportada lleva incrustado un aviso que le dice al agente de destino qué
 instrucciones no va a poder cumplir, para que lo declare en vez de simular el resultado.
 Si no hubo adaptaciones ni hallazgos, el `SKILL.md` sale limpio, sin nota.
+
+> **Compatible con [Agent Plugins 1.0.0](https://agent-plugins.org/specification)** —
+> el formato portátil de empaquetado de la Agentic AI Foundation (OpenAI, Amazon,
+> Microsoft, Cursor y Vercel, con Google como *core maintainer*). Este repositorio
+> es a la vez un plugin conforme a esa especificación y la herramienta que lleva
+> otros plugins hacia ella. Al exportar, el frontmatter se reduce a un conjunto
+> cerrado de claves de [Agent Skills](https://agentskills.io/specification): `name`,
+> `description`, `license`, `compatibility` y `metadata`. Eso es una condición de
+> formato, no una validación completa de cada paquete ni una garantía de que una
+> plataforma concreta acepte la subida: eso sólo lo acredita probarlo en el destino.
 
 ## Instalación
 
@@ -83,11 +116,8 @@ ChatGPT»* o *«¿es portable esta skill?»*. La skill se activa sola porque su
 
 ### Actualizar
 
-Los manifiestos fijan `version` (hoy `1.2.1`). Claude Code sólo ofrece una
-actualización cuando ese número cambia, así que **cada publicación debe subirla** en
-`.claude-plugin/plugin.json` y en `plugin.json`: `1.0.1` para correcciones, `1.1.0` para
-funciones nuevas. Los commits intermedios no llegan a quien ya lo tiene instalado.
-Para forzar la actualización:
+Claude Code solo ofrece la actualización cuando se publica una versión nueva. Para
+buscarla y aplicarla:
 
 ```
 /plugin marketplace update pablo-skills-tools
@@ -444,6 +474,13 @@ Si tocas un perfil de `targets/*.json` y regeneras los golden, fija la fecha con
 `CSE_FECHA=AAAA-MM-DD python3 tests/generar_golden.py`: sin ella, en cuanto la fecha real
 supere el `revisar_tras` de un perfil, los veredictos pasan de `compatible` a `no
 verificable` y el CI se pone en rojo sin que nadie haya tocado una línea.
+
+### Al publicar una versión
+
+Los manifiestos fijan `version` (hoy `1.2.1`). Claude Code sólo ofrece una
+actualización cuando ese número cambia, así que **cada publicación debe subirla** en
+`.claude-plugin/plugin.json` y en `plugin.json`: `1.0.1` para correcciones, `1.1.0` para
+funciones nuevas. Los commits intermedios no llegan a quien ya lo tiene instalado.
 
 ## Limitaciones conocidas
 
