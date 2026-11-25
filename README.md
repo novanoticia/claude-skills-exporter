@@ -479,7 +479,7 @@ verificable` y el CI se pone en rojo sin que nadie haya tocado una línea.
 
 ### Al publicar una versión
 
-Los manifiestos fijan `version` (hoy `1.2.1`). Claude Code sólo ofrece una
+Los manifiestos fijan `version` (hoy `1.2.2`). Claude Code sólo ofrece una
 actualización cuando ese número cambia, así que **cada publicación debe subirla** en
 `.claude-plugin/plugin.json` y en `plugin.json`: `1.0.1` para correcciones, `1.1.0` para
 funciones nuevas. Los commits intermedios no llegan a quien ya lo tiene instalado.
