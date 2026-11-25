@@ -136,6 +136,8 @@ python3 skills/plugin-to-agentskills/scripts/convert.py https://github.com/usuar
 
 Sólo necesita Python 3.8+. Sin dependencias externas; `git` sólo hace falta si el origen
 es una URL de repositorio, no si ya tienes la carpeta descargada.
+Para un repositorio privado, configura el gestor de credenciales de Git o pasa una copia
+local. Usa URL HTTP(S) sin usuario, contraseña, parámetros de consulta ni fragmento.
 
 | Opción | Qué hace |
 |---|---|

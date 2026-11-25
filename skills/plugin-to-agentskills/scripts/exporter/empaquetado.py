@@ -14,13 +14,14 @@ import os
 import zipfile
 from pathlib import Path
 
+from exporter.deteccion import contiene_secreto, nombre_de_credencial
 from exporter.i18n import t
 from exporter.modelo import Senal
 
 
 def copiar_skill(src: Path, dest: Path, ignorar: set,
                  excluir_raiz=frozenset()) -> tuple:
-    """Copia el arbol omitiendo enlaces simbolicos y nombres ignorados.
+    """Copia el arbol omitiendo enlaces, credenciales y nombres ignorados.
 
     `ignorar` se aplica a cualquier profundidad (node_modules, .git...).
     `excluir_raiz` solo a los ficheros de la raiz: es el SKILL.md de la
@@ -52,7 +53,8 @@ def copiar_skill(src: Path, dest: Path, ignorar: set,
         destino_base = dest if relativa == "." else dest / relativa
         destino_base.mkdir(parents=True, exist_ok=True)
         for nombre in sorted(ficheros):
-            if nombre in ignorar or (relativa == "." and nombre in excluir_raiz):
+            if (nombre in ignorar or (relativa == "." and nombre in excluir_raiz)
+                    or nombre_de_credencial(nombre)):
                 continue
             origen = os.path.join(base, nombre)
             if os.path.islink(origen):
@@ -65,6 +67,8 @@ def copiar_skill(src: Path, dest: Path, ignorar: set,
             except OSError as e:
                 ilegibles.append((os.path.relpath(origen, str(src)),
                                   e.strerror or str(e)))
+                continue
+            if contiene_secreto(datos, nombre):
                 continue
             destino.write_bytes(datos)
             # read_bytes/write_bytes no conservan el modo del fichero, a

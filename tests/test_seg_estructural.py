@@ -1,3 +1,4 @@
+import json
 import shutil
 import tempfile
 import unittest
@@ -271,6 +272,39 @@ class Ambito(Base):
                             dirs_skill=["skills/x"])
         secretos = [h for h in hs if h.id == "SEC-SECRETO-EN-REPO-001"]
         self.assertEqual([h.ambito for h in secretos], ["exportado"])
+
+
+
+
+class CredencialesYControlesEstructurales(unittest.TestCase):
+
+    def analizar(self, ficheros):
+        with tempfile.TemporaryDirectory() as tmp:
+            raiz = Path(tmp)
+            for nombre, datos in ficheros.items():
+                (raiz / nombre).write_bytes(datos)
+            return analizar(raiz, recorrer(raiz, ["."]))
+
+    def test_manifest_sensible_conserva_avisos_npm_sin_citar_valores(self):
+        valor = "CSE_test_Q38PT2_literal"
+        paquete = json.dumps({
+            "client_secret": valor,
+            "scripts": {"postinstall": "echo control"},
+            "dependencies": {"paquete": "^1.0.0"},
+        }).encode()
+        hallazgos = self.analizar({"package.json": paquete})
+        self.assertEqual({h.id for h in hallazgos},
+                         {"SEC-SECRETO-EN-REPO-001", "SEC-POSTINSTALL-001", "SEC-DEP-SIN-FIJAR-001"})
+        self.assertNotIn(valor, str(hallazgos))
+
+    def test_un_readme_sensible_sigue_documentando_el_binario(self):
+        resultado = self.analizar({
+            "README.md": b"El ejecutable utilidad se usa para la consulta.\n"
+                         b"password= CSE_test_Q38PT2_literal\n",
+            "utilidad": b"\x00\xff",
+        })
+        self.assertIn("SEC-SECRETO-EN-REPO-001", {h.id for h in resultado})
+        self.assertNotIn("SEC-BINARIO-NO-DOCUMENTADO-001", {h.id for h in resultado})
 
 
 if __name__ == "__main__":

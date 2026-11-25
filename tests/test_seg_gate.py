@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from ayuda import RAIZ, RAIZ_SCRIPTS
@@ -36,6 +37,98 @@ class Base(unittest.TestCase):
             [sys.executable, str(CONVERT), "export", str(raiz), "--out", str(salida)] + list(args),
             capture_output=True, text=True, cwd=str(RAIZ),
             env=dict(os.environ, CSE_FECHA="2026-08-08"))
+
+
+class Credenciales(Base):
+
+    def test_python_conserva_las_referencias_a_configuracion(self):
+        codigo = "password = settings.password\ntoken = configured_token\n"
+        raiz, salida = self.montar({
+            "skills/fechas/SKILL.md": skill_md("fechas"),
+            "skills/fechas/consulta.py": codigo,
+        })
+        r = self.exportar(raiz, salida)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((salida / "fechas" / "consulta.py").read_text(encoding="utf-8"), codigo)
+        with zipfile.ZipFile(salida / "fechas.zip") as paquete:
+            self.assertEqual(paquete.read("fechas/consulta.py").decode("utf-8"), codigo)
+
+    def test_js_y_ts_conservan_referencias_y_excluyen_literales(self):
+        js = "const token = process.env.API_TOKEN;\n"
+        ts = "const password = settings.password;\n"
+        falso = "CSE_prueba_ZX9374_literal"
+        raiz, salida = self.montar({
+            "skills/fechas/SKILL.md": skill_md("fechas"),
+            "skills/fechas/config.mjs": js,
+            "skills/fechas/config.ts": ts,
+            "skills/fechas/literal.ts": f'const token = "{falso}";\n',
+        })
+        r = self.exportar(raiz, salida, "--anular-revision-seguridad")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse((salida / "fechas/literal.ts").exists())
+        with zipfile.ZipFile(salida / "fechas.zip") as paquete:
+            self.assertNotIn("fechas/literal.ts", paquete.namelist())
+            for nombre, texto in (("config.mjs", js), ("config.ts", ts)):
+                self.assertEqual(paquete.read("fechas/" + nombre).decode(), texto)
+                self.assertEqual((salida / "fechas" / nombre).read_text(), texto)
+
+    def test_python_sigue_excluyendo_las_credenciales_literales(self):
+        valor_ficticio = "CSE_test_R19Q4_literal"
+        raiz, salida = self.montar({
+            "skills/fechas/SKILL.md": skill_md("fechas"),
+            "skills/fechas/consulta.py": 'password = "' + valor_ficticio + '"\n',
+            "skills/fechas/consulta.cfg": "password= " + valor_ficticio + "\n",
+        })
+        r = self.exportar(raiz, salida, "--anular-revision-seguridad")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        resumen = (salida / "resumen.json").read_text(encoding="utf-8")
+        self.assertIn("SEC-SECRETO-EN-REPO-001", resumen)
+        self.assertNotIn(valor_ficticio, resumen + r.stdout + r.stderr)
+        with zipfile.ZipFile(salida / "fechas.zip") as paquete:
+            for nombre in ("consulta.py", "consulta.cfg"):
+                self.assertFalse((salida / "fechas" / nombre).exists())
+                self.assertNotIn("fechas/" + nombre, paquete.namelist())
+
+    def test_el_archivo_no_se_publica_ni_se_cita_aunque_se_anule_el_bloqueo(self):
+        valor_ficticio = "mcp__CSE_test_Q92MT7_example"
+        raiz, salida = self.montar({
+            "skills/fechas/SKILL.md": skill_md("fechas"),
+            "skills/fechas/ajustes.json": json.dumps({"client_secret": valor_ficticio}),
+            "skills/fechas/.ENV.LOCAL": "A=1\n",
+            "skills/fechas/.env.example": "CLIENT_SECRET=placeholder_value\n",
+        })
+        for opciones in ((), ("--anular-revision-seguridad",)):
+            with self.subTest(opciones=opciones):
+                r = self.exportar(raiz, salida, *opciones)
+                self.assertEqual(r.returncode, 0 if opciones else 3, r.stderr)
+                informe = (salida / "INFORME-PORTABILIDAD.md").read_text(encoding="utf-8")
+                resumen = (salida / "resumen.json").read_text(encoding="utf-8")
+                self.assertIn("SEC-SECRETO-EN-REPO-001", resumen)
+                self.assertIn("ajustes.json", informe)
+                self.assertNotIn(valor_ficticio, r.stdout + r.stderr + informe + resumen)
+                archivo = salida / "fechas.zip"
+                self.assertEqual(archivo.exists(), bool(opciones))
+                self.assertEqual((salida / "fechas").exists(), bool(opciones))
+                if opciones:
+                    self.assertFalse((salida / "fechas" / "ajustes.json").exists())
+                    self.assertFalse((salida / "fechas" / ".ENV.LOCAL").exists())
+                    self.assertTrue((salida / "fechas" / ".env.example").is_file())
+                    with zipfile.ZipFile(archivo) as paquete:
+                        self.assertNotIn("fechas/ajustes.json", paquete.namelist())
+                        self.assertNotIn("fechas/.ENV.LOCAL", paquete.namelist())
+                        self.assertIn("fechas/.env.example", paquete.namelist())
+
+    def test_el_documento_principal_con_credencial_se_rechaza_antes_de_adaptar(self):
+        valor_ficticio = "CSE_test_R7MV8Z_example"
+        raiz, salida = self.montar({
+            "skills/fechas/SKILL.md": skill_md("fechas") + "api_key: " + valor_ficticio,
+        })
+        r = self.exportar(raiz, salida, "--anular-revision-seguridad")
+        self.assertEqual(r.returncode, 1, r.stderr)
+        self.assertIn("SKILL.md", r.stderr)
+        self.assertNotIn(valor_ficticio, r.stdout + r.stderr)
+        self.assertFalse((salida / "fechas.zip").exists())
+        self.assertFalse((salida / "fechas").exists())
 
 
 class ElAmbitoDecide(Base):

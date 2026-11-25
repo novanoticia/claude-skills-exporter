@@ -15,6 +15,8 @@ destino elegido.
 
 from __future__ import annotations
 
+import codecs
+import io
 import os
 import re
 
@@ -29,6 +31,69 @@ EXTENSIONES_TEXTO = {".md", ".txt", ".py", ".sh", ".yaml", ".yml", ".json", ".to
 # avisar de senales dentro de ficheros -por ejemplo un README de
 # node_modules/- que nunca llegan a ningun paquete.
 IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+
+
+# Nombres de ficheros de credenciales y sufijos reservados para plantillas.
+NOMBRES_SECRETO = {".env", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
+                   "credentials.json", ".npmrc", ".pypirc"}
+SUFIJOS_SECRETO = (".pem", ".p12", ".pfx", ".keystore")
+ENV_PLANTILLA = {"example", "sample", "template", "dist", "defaults", "tpl"}
+
+CLAVE_PRIVADA = re.compile(r"-----" r"BEGIN (?:[A-Z0-9]{1,16} ){0,4}PRIVATE KEY-----")
+# La coincidencia debe caber en el solapamiento de dos bloques. La segunda
+# alternativa del valor permite identificar tambien credenciales mas largas.
+SOLAPAMIENTO_CREDENCIAL = 4096
+BLOQUE_CREDENCIAL = 64 * 1024
+EXTENSIONES_CODIGO = {".py", ".pyi", ".pyw", ".js", ".mjs", ".cjs", ".jsx",
+                      ".ts", ".mts", ".cts", ".tsx"}
+ASIGNACION_SECRETA = re.compile(
+    r"\b(?:[a-z0-9_.-]{0,64}(?:api[_-]?key|access[_-]?token|auth[_-]?token|"
+    r"client[_-]?secret|private[_-]?key|secret[_-]?key|password)|token|secret)"
+    r"""["']?[ \t]{0,64}[:=][ \t]{0,64}(?P<comilla>["'`]?)"""
+    r"(?P<valor>(?:[a-z0-9_+/=.:!@%-]{2048}(?=[a-z0-9_+/=.:!@%-])"
+    r"|[a-z0-9_+/=.:!@%-]{12,2048}(?=(?P=comilla)[ \t]{0,64}(?:\Z|[\r\n#,;}\]]))))",
+    re.I)
+MARCADOR_SECRETO = re.compile(
+    r"^(?:example|sample|dummy|placeholder|changeme|change[_-]?me|replace|your[_-]|[x*]+$)",
+    re.I)
+
+
+def nombre_de_credencial(nombre: str) -> bool:
+    nombre = nombre.casefold()
+    return (nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO)
+            or (nombre.startswith(".env.") and nombre.rsplit(".", 1)[-1] not in ENV_PLANTILLA))
+
+
+def contiene_secreto(datos: bytes, nombre: str) -> bool:
+    return flujo_contiene_secreto(io.BytesIO(datos), nombre)
+
+
+def flujo_contiene_secreto(fichero, nombre: str) -> bool:
+    """Busca indicios en bloques acotados sin devolver los valores."""
+    inicio = fichero.tell()
+    encoding = "utf-16" if fichero.read(2) in (b"\xff\xfe", b"\xfe\xff") else "utf-8"
+    fichero.seek(inicio)
+    decodificador = codecs.getincrementaldecoder(encoding)(errors="replace")
+    es_codigo = os.path.splitext(nombre.casefold())[1] in EXTENSIONES_CODIGO
+    anterior = ""
+    descartado = False
+    while True:
+        bloque = fichero.read(BLOQUE_CREDENCIAL)
+        texto = anterior + decodificador.decode(bloque, final=not bloque)
+        # El margen evita tratar un corte artificial como fin de valor.
+        hasta = len(texto) if not bloque else len(texto) - SOLAPAMIENTO_CREDENCIAL
+        desde = int(descartado)
+        if any(desde <= m.start() < hasta for m in CLAVE_PRIVADA.finditer(texto)):
+            return True
+        if any(desde <= m.start() < hasta and (not es_codigo or m.group("comilla"))
+               and not MARCADOR_SECRETO.match(m.group("valor"))
+               for m in ASIGNACION_SECRETA.finditer(texto)):
+            return True
+        if not bloque:
+            return False
+        descartado = descartado or len(texto) > SOLAPAMIENTO_CREDENCIAL + 1
+        anterior = texto[-(SOLAPAMIENTO_CREDENCIAL + 1):]
+
 
 CLAUDE_TOOL_NAMES = [
     "TodoWrite", "AskUserQuestion", "NotebookEdit", "SlashCommand",
@@ -114,7 +179,7 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> tuple:
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
         en_la_raiz = base == str(raiz)   # os.walk devuelve la raiz tal cual
         for nombre in sorted(ficheros):
-            if en_la_raiz and nombre in excluir:
+            if (en_la_raiz and nombre in excluir) or nombre_de_credencial(nombre):
                 continue
             ruta = os.path.join(base, nombre)
             if os.path.splitext(nombre)[1].lower() not in EXTENSIONES_TEXTO:
@@ -123,10 +188,11 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> tuple:
                 continue
             relativa = os.path.relpath(ruta, str(raiz))
             try:
-                with open(ruta, encoding="utf-8", errors="replace") as fh:
-                    texto = fh.read()
+                with open(ruta, "rb") as fh:
+                    datos = fh.read()
             except OSError as e:
                 ilegibles.append((relativa, e.strerror or str(e)))
                 continue
-            salida.extend(detectar(texto, relativa))
+            if not contiene_secreto(datos, nombre):
+                salida.extend(detectar(datos.decode("utf-8", errors="replace"), relativa))
     return salida, ilegibles

@@ -26,8 +26,12 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
-from ayuda import RAIZ, RAIZ_SCRIPTS
+from ayuda import RAIZ, RAIZ_SCRIPTS, importar_exporter
+
+importar_exporter()
+import convert
 
 CONVERT = RAIZ_SCRIPTS / "convert.py"
 
@@ -61,6 +65,53 @@ class Base(unittest.TestCase):
     def hallazgos(self, salida, skill=0):
         d = json.loads((salida / "resumen.json").read_text(encoding="utf-8"))
         return d["skills"][skill]["hallazgos"]
+
+
+class CapturaPortable(Base):
+
+    def test_exporta_un_archivo_regular(self):
+        raiz, salida = self.montar({"skills/x/SKILL.md": skill_md("fechas")})
+        r = self.correr("export", raiz, salida)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((salida / "fechas.zip").is_file())
+
+    def test_sin_dir_fd_puede_copiar_un_archivo_regular(self):
+        rel = Path("skills/x/SKILL.md")
+        raiz, salida = self.montar({rel: skill_md("fechas")})
+        with patch.object(convert.os, "supports_dir_fd", set()):
+            convert.copiar_skill_md(raiz, rel, salida)
+        self.assertEqual(salida.read_bytes(), (raiz / rel).read_bytes())
+
+    def test_sin_dir_fd_rechaza_un_componente_enlazado(self):
+        raiz, salida = self.montar({"skills/x/SKILL.md": skill_md("fechas")})
+        enlace = raiz / "enlace"
+        try:
+            enlace.symlink_to(raiz / "skills/x", target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("el sistema no permite crear enlaces")
+        with patch.object(convert.os, "supports_dir_fd", set()):
+            with self.assertRaises(SystemExit):
+                convert.copiar_skill_md(raiz, Path("enlace/SKILL.md"), salida)
+        self.assertFalse(salida.exists())
+
+
+class ArchivoPrincipalSeguro(Base):
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "el sistema no admite enlaces")
+    def test_rechaza_enlace_en_los_tres_comandos(self):
+        raiz, salida = self.montar({"skills/x/README.md": "Skill de prueba.\n"})
+        destino = raiz.parent / "destino.md"
+        destino.write_text(skill_md("fechas"), encoding="utf-8")
+        (raiz / "skills/x/Skill.md").symlink_to(destino)
+        for comando in ("inspect", "audit", "export"):
+            with self.subTest(comando=comando):
+                filtro = ("--only", "fechas") if comando == "export" else ()
+                r = self.correr(comando, raiz, salida, *filtro)
+                self.assertEqual(r.returncode, 1, r.stderr)
+                self.assertIn("skills/x/Skill.md", r.stderr)
+                self.assertIn("enlaces simbólicos", r.stderr)
+                self.assertFalse((salida / "fechas.zip").exists())
+                self.assertFalse((salida / "fechas" / "SKILL.md").exists())
 
 
 class EnElMismoDirectorioAborta(Base):

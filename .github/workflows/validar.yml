@@ -79,6 +79,19 @@ jobs:
           test -n "$(ls /tmp/salida/*.zip)"
           echo "El conversor se ejecuta y produce salida."
 
+  captura-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Capturar el archivo principal y exportarlo
+        env:
+          PYTHONUTF8: '1'
+          PYTHONPATH: tests
+        run: python -m unittest test_varios_skill_md.CapturaPortable -v
+
   # Publica en la rama `plugin` solo lo que se instala. El directorio de plugins
   # de Claude analiza el repositorio entero, y aqui viven el banco de pruebas
   # malicioso a proposito (tests/fixtures/) y la documentacion de sus patrones
