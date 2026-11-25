@@ -17,6 +17,7 @@ import os
 import re
 from pathlib import Path
 
+from exporter.deteccion import nombre_de_credencial
 from exporter.i18n import t
 from exporter.modelo import Hallazgo
 from exporter.seguridad.recorrido import leer_para_analisis
@@ -24,19 +25,6 @@ from exporter.seguridad.recorrido import leer_para_analisis
 HOOKS_NPM = ("preinstall", "install", "postinstall")
 
 EXTENSIONES_ARCHIVO = {".zip", ".tar", ".gz", ".tgz", ".7z", ".rar", ".bz2", ".xz"}
-
-# Nombres que casi nunca deberian estar versionados. `.env.example` y
-# similares quedan fuera a proposito: son plantillas, no secretos.
-NOMBRES_SECRETO = {".env", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
-                   "credentials.json", ".npmrc", ".pypirc"}
-SUFIJOS_SECRETO = (".pem", ".p12", ".pfx", ".keystore")
-
-# Sufijos de `.env.<algo>` que son PLANTILLA y no secreto. La lista es corta
-# a proposito: marcar un `.env.example` es el falso positivo que ensena a la
-# gente a ignorar los avisos, y ese coste es peor que el hallazgo que se
-# gana. Todo lo demas -.env.local, .env.production- se trata como un .env,
-# porque eso es lo que es: un fichero de entorno con valores de verdad.
-ENV_PLANTILLA = {"example", "sample", "template", "dist", "defaults", "tpl"}
 
 # Un valor de dependencia npm que NO fija una version. Ademas de los rangos
 # clasicos, cualquier especificador con protocolo -github:, file:, link:,
@@ -84,20 +72,6 @@ def _h(hid, familia, dimension, severidad, confianza, ambito,
                     severidad=severidad, confianza=confianza, ambito=ambito,
                     ubicacion=ubicacion, muestra=muestra,
                     titulo=titulo, mitigacion=mitigacion)
-
-
-def _es_env_con_valores(nombre: str) -> bool:
-    """True para `.env` y sus variantes reales, False para las plantillas.
-
-    NOMBRES_SECRETO comparaba por igualdad exacta, asi que `.env.local` y
-    `.env.production` -que son justo los que llevan valores de verdad, no
-    los huecos- no contaban como credencial.
-    """
-    if nombre == ".env":
-        return True
-    if not nombre.startswith(".env."):
-        return False
-    return nombre.rsplit(".", 1)[-1].lower() not in ENV_PLANTILLA
 
 
 def _leer_json(f):
@@ -272,7 +246,7 @@ def _indice_de_menciones(ficheros) -> set:
     """
     menciones = set()
     for f in ficheros:
-        if f.binario:
+        if f.binario or f.secreto:
             continue
         try:
             texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
@@ -302,6 +276,17 @@ def analizar(raiz, ficheros) -> list:
         nombre = os.path.basename(f.ruta)
         ext = os.path.splitext(nombre)[1].lower()
 
+        if f.secreto:
+            titulo = (t("estructural.SEC-SECRETO-EN-REPO-001.titulo")
+                      if nombre_de_credencial(nombre)
+                      else t("estructural.SEC-SECRETO-EN-REPO-001.contenido"))
+            salida.append(_h(
+                "SEC-SECRETO-EN-REPO-001", "permisos_y_acciones", "tecnico",
+                "alta", "alta", f.ambito, f.ruta + ":1", nombre,
+                titulo,
+                t("estructural.SEC-SECRETO-EN-REPO-001.mitigacion")))
+            continue
+
         if nombre == "package.json":
             salida.extend(_npm(f))
         elif nombre in ("requirements.txt", "requirements-dev.txt"):
@@ -315,14 +300,6 @@ def analizar(raiz, ficheros) -> list:
                 "media", "alta", f.ambito, f.ruta + ":1", nombre,
                 t("estructural.SEC-ARCHIVO-ANIDADO-001.titulo"),
                 t("estructural.SEC-ARCHIVO-ANIDADO-001.mitigacion")))
-
-        if (nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO)
-                or _es_env_con_valores(nombre)):
-            salida.append(_h(
-                "SEC-SECRETO-EN-REPO-001", "permisos_y_acciones", "tecnico",
-                "alta", "alta", f.ambito, f.ruta + ":1", nombre,
-                t("estructural.SEC-SECRETO-EN-REPO-001.titulo"),
-                t("estructural.SEC-SECRETO-EN-REPO-001.mitigacion")))
 
         # Un fichero que no se pudo abrir es el caso mas puro de contenido
         # opaco: no se sabe nada de el, ni siquiera si es texto. Antes se

@@ -18,7 +18,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from exporter.deteccion import IGNORED_DIRS
+from exporter.deteccion import IGNORED_DIRS, contiene_secreto, nombre_de_credencial
 
 # `.git` no se recorre: es historia, no contenido, y su tamano no representa
 # lo que se instala. `__pycache__` tampoco: no es contenido del paquete sino
@@ -68,6 +68,7 @@ class Fichero:
     # y un fichero sin permisos se contaba como "binario no documentado",
     # que dice algo que el motor no ha comprobado.
     legible: bool = True
+    secreto: bool = False
 
 
 def _cabecera(ruta: Path):
@@ -116,7 +117,7 @@ def _ambito(rel: str, dirs_skill) -> str:
     return "paquete"
 
 
-def recorrer(raiz, dirs_skill) -> list:
+def recorrer(raiz, dirs_skill, copias=None) -> list:
     """Devuelve todos los ficheros del arbol, en orden estable, con su ambito.
 
     No sigue enlaces simbolicos: uno que apunte a `/` haria el recorrido
@@ -124,7 +125,8 @@ def recorrer(raiz, dirs_skill) -> list:
     """
     raiz = Path(raiz)
     dirs = [str(d).replace(os.sep, "/").strip("/") for d in dirs_skill]
-    salida = []
+    copias = copias or {}
+    fuentes = dict(copias)
     for base, subdirs, ficheros in os.walk(str(raiz)):
         subdirs[:] = sorted(
             d for d in subdirs
@@ -132,12 +134,23 @@ def recorrer(raiz, dirs_skill) -> list:
             and not os.path.islink(os.path.join(base, d)))
         for nombre in sorted(ficheros):
             absoluta = Path(base) / nombre
-            if absoluta.is_symlink():
-                continue
             rel = os.path.relpath(str(absoluta), str(raiz)).replace(os.sep, "/")
-            cabecera = _cabecera(absoluta)
-            salida.append(Fichero(ruta=rel, absoluta=absoluta,
-                                  ambito=_ambito(rel, dirs),
-                                  binario=cabecera is None or b"\x00" in cabecera,
-                                  legible=cabecera is not None))
-    return sorted(salida, key=lambda f: f.ruta)
+            if rel not in copias and not absoluta.is_symlink():
+                fuentes[rel] = absoluta
+
+    # Los principales se auditan desde la misma copia que se va a adaptar,
+    # incluso si la entrada original desaparece durante el recorrido.
+    salida = []
+    for rel, absoluta in sorted(fuentes.items()):
+        nombre = Path(rel).name
+        nominal = nombre_de_credencial(nombre)
+        try:
+            datos = b"" if nominal else absoluta.read_bytes()
+        except OSError:
+            datos = None
+        salida.append(Fichero(ruta=rel, absoluta=absoluta,
+                              ambito=_ambito(rel, dirs),
+                              binario=datos is None or b"\x00" in datos[:CABECERA_BYTES],
+                              legible=datos is not None,
+                              secreto=nominal or (datos is not None and contiene_secreto(datos, nombre))))
+    return salida

@@ -63,6 +63,25 @@ class Base(unittest.TestCase):
         return d["skills"][skill]["hallazgos"]
 
 
+class ArchivoPrincipalSeguro(Base):
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "el sistema no admite enlaces")
+    def test_rechaza_enlace_en_los_tres_comandos(self):
+        raiz, salida = self.montar({"skills/x/README.md": "Skill de prueba.\n"})
+        destino = raiz.parent / "destino.md"
+        destino.write_text(skill_md("fechas"), encoding="utf-8")
+        (raiz / "skills/x/Skill.md").symlink_to(destino)
+        for comando in ("inspect", "audit", "export"):
+            with self.subTest(comando=comando):
+                filtro = ("--only", "fechas") if comando == "export" else ()
+                r = self.correr(comando, raiz, salida, *filtro)
+                self.assertEqual(r.returncode, 1, r.stderr)
+                self.assertIn("skills/x/Skill.md", r.stderr)
+                self.assertIn("enlaces simbólicos", r.stderr)
+                self.assertFalse((salida / "fechas.zip").exists())
+                self.assertFalse((salida / "fechas" / "SKILL.md").exists())
+
+
 class EnElMismoDirectorioAborta(Base):
 
     def montar_duplicado(self):

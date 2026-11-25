@@ -30,6 +30,45 @@ EXTENSIONES_TEXTO = {".md", ".txt", ".py", ".sh", ".yaml", ".yml", ".json", ".to
 # node_modules/- que nunca llegan a ningun paquete.
 IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
 
+
+# Nombres de ficheros de credenciales y sufijos reservados para plantillas.
+NOMBRES_SECRETO = {".env", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
+                   "credentials.json", ".npmrc", ".pypirc"}
+SUFIJOS_SECRETO = (".pem", ".p12", ".pfx", ".keystore")
+ENV_PLANTILLA = {"example", "sample", "template", "dist", "defaults", "tpl"}
+
+CLAVE_PRIVADA = re.compile(r"-----" r"BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----")
+ASIGNACION_SECRETA = re.compile(
+    r"\b(?:[a-z0-9_.-]{0,64}(?:api[_-]?key|access[_-]?token|auth[_-]?token|"
+    r"client[_-]?secret|private[_-]?key|secret[_-]?key|password)|token|secret)"
+    r"""["']?[ \t]*[:=][ \t]*(?P<comilla>["']?)(?P<valor>[a-z0-9_+/=.:!@%-]{12,})"""
+    r"""(?P=comilla)(?=[ \t]*(?:$|[\r\n#,;}\]]))""",
+    re.I)
+MARCADOR_SECRETO = re.compile(
+    r"^(?:example|sample|dummy|placeholder|changeme|change[_-]?me|replace|your[_-]|[x*]+$)",
+    re.I)
+
+
+def nombre_de_credencial(nombre: str) -> bool:
+    nombre = nombre.casefold()
+    return (nombre in NOMBRES_SECRETO or nombre.endswith(SUFIJOS_SECRETO)
+            or (nombre.startswith(".env.") and nombre.rsplit(".", 1)[-1] not in ENV_PLANTILLA))
+
+
+def contiene_secreto(datos: bytes, nombre: str) -> bool:
+    """Reconoce formatos de credencial sin devolver el valor detectado."""
+    encoding = "utf-16" if datos.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8"
+    texto = datos.decode(encoding, errors="replace")
+    if CLAVE_PRIVADA.search(texto):
+        return True
+    # Una asignacion en Python puede apuntar a una variable o un atributo.
+    # En configuraciones de texto el valor literal puede ir sin comillas.
+    es_python = nombre.casefold().endswith(".py")
+    return any((not es_python or m.group("comilla"))
+               and not MARCADOR_SECRETO.match(m.group("valor"))
+               for m in ASIGNACION_SECRETA.finditer(texto))
+
+
 CLAUDE_TOOL_NAMES = [
     "TodoWrite", "AskUserQuestion", "NotebookEdit", "SlashCommand",
     "ExitPlanMode", "WebFetch", "TaskCreate", "TaskUpdate", "ToolSearch",
@@ -114,7 +153,7 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> tuple:
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
         en_la_raiz = base == str(raiz)   # os.walk devuelve la raiz tal cual
         for nombre in sorted(ficheros):
-            if en_la_raiz and nombre in excluir:
+            if (en_la_raiz and nombre in excluir) or nombre_de_credencial(nombre):
                 continue
             ruta = os.path.join(base, nombre)
             if os.path.splitext(nombre)[1].lower() not in EXTENSIONES_TEXTO:
@@ -123,10 +162,11 @@ def detectar_en_arbol(raiz, excluir=frozenset()) -> tuple:
                 continue
             relativa = os.path.relpath(ruta, str(raiz))
             try:
-                with open(ruta, encoding="utf-8", errors="replace") as fh:
-                    texto = fh.read()
+                with open(ruta, "rb") as fh:
+                    datos = fh.read()
             except OSError as e:
                 ilegibles.append((relativa, e.strerror or str(e)))
                 continue
-            salida.extend(detectar(texto, relativa))
+            if not contiene_secreto(datos, nombre):
+                salida.extend(detectar(datos.decode("utf-8", errors="replace"), relativa))
     return salida, ilegibles
