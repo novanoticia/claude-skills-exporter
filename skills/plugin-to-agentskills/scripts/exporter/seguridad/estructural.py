@@ -106,7 +106,7 @@ def _npm(f) -> list:
             salida.append(_h(
                 "SEC-DEP-SIN-FIJAR-001", "cadena_de_suministro", "cadena_de_suministro",
                 "media", "alta", f.ambito, f.ruta + ":1",
-                ", ".join(sueltas[:6]),
+                "" if f.secreto else ", ".join(sueltas[:6]),
                 t("estructural.SEC-DEP-SIN-FIJAR-001.titulo"),
                 t("estructural.SEC-DEP-SIN-FIJAR-001.mitigacion")))
     return salida
@@ -133,7 +133,7 @@ def _python(f) -> list:
     numero, muestra = sueltas[0]
     return [_h("SEC-DEP-SIN-FIJAR-002", "cadena_de_suministro", "cadena_de_suministro",
                "media", "alta", f.ambito, "{}:{}".format(f.ruta, numero),
-               muestra[:120],
+               "" if f.secreto else muestra[:120],
                t("estructural.SEC-DEP-SIN-FIJAR-002.titulo"),
                t("estructural.SEC-DEP-SIN-FIJAR-002.mitigacion"))]
 
@@ -165,7 +165,7 @@ def _pyproject(f) -> list:
         if casa and not PIN_PYTHON.search(linea):
             return [_h("SEC-DEP-SIN-FIJAR-002", "cadena_de_suministro",
                        "cadena_de_suministro", "media", "media", f.ambito,
-                       "{}:{}".format(f.ruta, numero), cruda[:120],
+                       "{}:{}".format(f.ruta, numero), "" if f.secreto else cruda[:120],
                        t("estructural.SEC-DEP-SIN-FIJAR-002.titulo"),
                        t("estructural.SEC-DEP-SIN-FIJAR-002.mitigacion"))]
         if en_array and cruda.endswith("]"):
@@ -244,23 +244,30 @@ def _indice_de_menciones(ficheros) -> set:
     indexa cada token Y su nombre final: si el README cita `bin/util`, el
     binario `util` sigue estando documentado.
     """
+    nombres = {nombre for f in ficheros if f.binario
+               for nombre in (f.ruta, os.path.basename(f.ruta))}
     menciones = set()
     for f in ficheros:
-        if f.binario or f.secreto:
+        if f.binario:
             continue
         try:
             texto = f.absoluta.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        for token in TOKEN_RUTA.findall(texto):
-            token = token.replace("\\", "/")
+        for coincidencia in TOKEN_RUTA.finditer(texto):
+            token = coincidencia.group().replace("\\", "/")
             if token.startswith("./"):
                 token = token[2:]
             token = token.rstrip("/")
             if not token:
                 continue
-            menciones.add(token)
-            menciones.add(token.rsplit("/", 1)[-1])
+            # Solo se guardan nombres de binarios ya conocidos, nunca texto
+            # extraido del documento en el que aparecen.
+            if token in nombres:
+                menciones.add(token)
+            nombre = token.rsplit("/", 1)[-1]
+            if nombre in nombres:
+                menciones.add(nombre)
     return menciones
 
 
@@ -285,7 +292,6 @@ def analizar(raiz, ficheros) -> list:
                 "alta", "alta", f.ambito, f.ruta + ":1", nombre,
                 titulo,
                 t("estructural.SEC-SECRETO-EN-REPO-001.mitigacion")))
-            continue
 
         if nombre == "package.json":
             salida.extend(_npm(f))
@@ -316,7 +322,7 @@ def analizar(raiz, ficheros) -> list:
                 t("estructural.SEC-ILEGIBLE-001.mitigacion")))
             continue
 
-        if f.binario and ext not in EXTENSIONES_ARCHIVO:
+        if f.binario and not f.secreto and ext not in EXTENSIONES_ARCHIVO:
             salida.extend(_texto_con_nulos(f))
             if menciones is None:
                 menciones = _indice_de_menciones(ficheros)

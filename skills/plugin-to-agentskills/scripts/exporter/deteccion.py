@@ -15,6 +15,8 @@ destino elegido.
 
 from __future__ import annotations
 
+import codecs
+import io
 import os
 import re
 
@@ -37,12 +39,19 @@ NOMBRES_SECRETO = {".env", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
 SUFIJOS_SECRETO = (".pem", ".p12", ".pfx", ".keystore")
 ENV_PLANTILLA = {"example", "sample", "template", "dist", "defaults", "tpl"}
 
-CLAVE_PRIVADA = re.compile(r"-----" r"BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----")
+CLAVE_PRIVADA = re.compile(r"-----" r"BEGIN (?:[A-Z0-9]{1,16} ){0,4}PRIVATE KEY-----")
+# La coincidencia debe caber en el solapamiento de dos bloques. La segunda
+# alternativa del valor permite identificar tambien credenciales mas largas.
+SOLAPAMIENTO_CREDENCIAL = 4096
+BLOQUE_CREDENCIAL = 64 * 1024
+EXTENSIONES_CODIGO = {".py", ".pyi", ".pyw", ".js", ".mjs", ".cjs", ".jsx",
+                      ".ts", ".mts", ".cts", ".tsx"}
 ASIGNACION_SECRETA = re.compile(
     r"\b(?:[a-z0-9_.-]{0,64}(?:api[_-]?key|access[_-]?token|auth[_-]?token|"
     r"client[_-]?secret|private[_-]?key|secret[_-]?key|password)|token|secret)"
-    r"""["']?[ \t]*[:=][ \t]*(?P<comilla>["']?)(?P<valor>[a-z0-9_+/=.:!@%-]{12,})"""
-    r"""(?P=comilla)(?=[ \t]*(?:$|[\r\n#,;}\]]))""",
+    r"""["']?[ \t]{0,64}[:=][ \t]{0,64}(?P<comilla>["'`]?)"""
+    r"(?P<valor>(?:[a-z0-9_+/=.:!@%-]{2048}(?=[a-z0-9_+/=.:!@%-])"
+    r"|[a-z0-9_+/=.:!@%-]{12,2048}(?=(?P=comilla)[ \t]{0,64}(?:\Z|[\r\n#,;}\]]))))",
     re.I)
 MARCADOR_SECRETO = re.compile(
     r"^(?:example|sample|dummy|placeholder|changeme|change[_-]?me|replace|your[_-]|[x*]+$)",
@@ -56,17 +65,34 @@ def nombre_de_credencial(nombre: str) -> bool:
 
 
 def contiene_secreto(datos: bytes, nombre: str) -> bool:
-    """Reconoce formatos de credencial sin devolver el valor detectado."""
-    encoding = "utf-16" if datos.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8"
-    texto = datos.decode(encoding, errors="replace")
-    if CLAVE_PRIVADA.search(texto):
-        return True
-    # Una asignacion en Python puede apuntar a una variable o un atributo.
-    # En configuraciones de texto el valor literal puede ir sin comillas.
-    es_python = nombre.casefold().endswith(".py")
-    return any((not es_python or m.group("comilla"))
+    return flujo_contiene_secreto(io.BytesIO(datos), nombre)
+
+
+def flujo_contiene_secreto(fichero, nombre: str) -> bool:
+    """Busca indicios en bloques acotados sin devolver los valores."""
+    inicio = fichero.tell()
+    encoding = "utf-16" if fichero.read(2) in (b"\xff\xfe", b"\xfe\xff") else "utf-8"
+    fichero.seek(inicio)
+    decodificador = codecs.getincrementaldecoder(encoding)(errors="replace")
+    es_codigo = os.path.splitext(nombre.casefold())[1] in EXTENSIONES_CODIGO
+    anterior = ""
+    descartado = False
+    while True:
+        bloque = fichero.read(BLOQUE_CREDENCIAL)
+        texto = anterior + decodificador.decode(bloque, final=not bloque)
+        # El margen evita tratar un corte artificial como fin de valor.
+        hasta = len(texto) if not bloque else len(texto) - SOLAPAMIENTO_CREDENCIAL
+        desde = int(descartado)
+        if any(desde <= m.start() < hasta for m in CLAVE_PRIVADA.finditer(texto)):
+            return True
+        if any(desde <= m.start() < hasta and (not es_codigo or m.group("comilla"))
                and not MARCADOR_SECRETO.match(m.group("valor"))
-               for m in ASIGNACION_SECRETA.finditer(texto))
+               for m in ASIGNACION_SECRETA.finditer(texto)):
+            return True
+        if not bloque:
+            return False
+        descartado = descartado or len(texto) > SOLAPAMIENTO_CREDENCIAL + 1
+        anterior = texto[-(SOLAPAMIENTO_CREDENCIAL + 1):]
 
 
 CLAUDE_TOOL_NAMES = [

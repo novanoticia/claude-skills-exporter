@@ -1,3 +1,4 @@
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,6 +7,7 @@ from ayuda import importar_exporter
 
 importar_exporter()
 
+from exporter.deteccion import BLOQUE_CREDENCIAL, flujo_contiene_secreto
 from exporter.seguridad.recorrido import es_binario, recorrer  # noqa: E402
 
 
@@ -20,6 +22,27 @@ def construir(tmp, ficheros):
         else:
             p.write_text(contenido, encoding="utf-8")
     return raiz
+
+
+class CredencialesEnBloques(unittest.TestCase):
+
+    def test_no_necesita_una_lectura_completa_y_reconoce_un_valor_dividido(self):
+        class LecturaAcotada(io.BytesIO):
+            def read(self, size=-1):
+                if not 0 <= size <= BLOQUE_CREDENCIAL:
+                    raise AssertionError("lectura sin limite")
+                return super().read(size)
+
+        valor = b"\nclient_secret= CSE_test_Q38PT2_literal\n"
+        for pos in (BLOQUE_CREDENCIAL - 2, BLOQUE_CREDENCIAL - 4096, 2 * BLOQUE_CREDENCIAL + 5):
+            with self.subTest(pos=pos):
+                datos = b"\x00" * pos + valor + b"\x00" * BLOQUE_CREDENCIAL
+                self.assertTrue(flujo_contiene_secreto(LecturaAcotada(datos), "datos.bin"))
+
+    def test_una_lectura_dividida_tambien_detecta_utf16(self):
+        valor = "\nclient_secret: CSE_test_Q38PT2_literal\n"
+        datos = (" " * (BLOQUE_CREDENCIAL // 2 - 6) + valor).encode("utf-16")
+        self.assertTrue(flujo_contiene_secreto(io.BytesIO(datos), "datos.txt"))
 
 
 class Ambito(unittest.TestCase):

@@ -53,6 +53,25 @@ class Credenciales(Base):
         with zipfile.ZipFile(salida / "fechas.zip") as paquete:
             self.assertEqual(paquete.read("fechas/consulta.py").decode("utf-8"), codigo)
 
+    def test_js_y_ts_conservan_referencias_y_excluyen_literales(self):
+        js = "const token = process.env.API_TOKEN;\n"
+        ts = "const password = settings.password;\n"
+        falso = "CSE_prueba_ZX9374_literal"
+        raiz, salida = self.montar({
+            "skills/fechas/SKILL.md": skill_md("fechas"),
+            "skills/fechas/config.mjs": js,
+            "skills/fechas/config.ts": ts,
+            "skills/fechas/literal.ts": f'const token = "{falso}";\n',
+        })
+        r = self.exportar(raiz, salida, "--anular-revision-seguridad")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse((salida / "fechas/literal.ts").exists())
+        with zipfile.ZipFile(salida / "fechas.zip") as paquete:
+            self.assertNotIn("fechas/literal.ts", paquete.namelist())
+            for nombre, texto in (("config.mjs", js), ("config.ts", ts)):
+                self.assertEqual(paquete.read("fechas/" + nombre).decode(), texto)
+                self.assertEqual((salida / "fechas" / nombre).read_text(), texto)
+
     def test_python_sigue_excluyendo_las_credenciales_literales(self):
         valor_ficticio = "CSE_test_R19Q4_literal"
         raiz, salida = self.montar({

@@ -18,7 +18,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from exporter.deteccion import IGNORED_DIRS, contiene_secreto, nombre_de_credencial
+from exporter.deteccion import IGNORED_DIRS, flujo_contiene_secreto, nombre_de_credencial
 
 # `.git` no se recorre: es historia, no contenido, y su tamano no representa
 # lo que se instala. `__pycache__` tampoco: no es contenido del paquete sino
@@ -143,14 +143,19 @@ def recorrer(raiz, dirs_skill, copias=None) -> list:
     salida = []
     for rel, absoluta in sorted(fuentes.items()):
         nombre = Path(rel).name
-        nominal = nombre_de_credencial(nombre)
+        secreto = nombre_de_credencial(nombre)
+        cabecera = None
         try:
-            datos = b"" if nominal else absoluta.read_bytes()
+            with absoluta.open("rb") as fichero:
+                cabecera = fichero.read(CABECERA_BYTES)
+                if not secreto:
+                    fichero.seek(0)
+                    secreto = flujo_contiene_secreto(fichero, nombre)
         except OSError:
-            datos = None
+            cabecera = None
         salida.append(Fichero(ruta=rel, absoluta=absoluta,
                               ambito=_ambito(rel, dirs),
-                              binario=datos is None or b"\x00" in datos[:CABECERA_BYTES],
-                              legible=datos is not None,
-                              secreto=nominal or (datos is not None and contiene_secreto(datos, nombre))))
+                              binario=cabecera is None or b"\x00" in cabecera,
+                              legible=cabecera is not None,
+                              secreto=secreto))
     return salida

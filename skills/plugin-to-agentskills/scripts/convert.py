@@ -194,29 +194,70 @@ def discover_skills(root: Path) -> list:
     return sorted(found)
 
 
-def copiar_skill_md(raiz: Path, relativa: Path, destino: Path) -> None:
-    """Captura un fichero regular sin seguir enlaces en ningun componente."""
+def _ruta_regular_sin_enlaces(raiz: Path, relativa: Path):
+    """Comprueba cada componente con lstat, tambien los puntos de reanalisis."""
+    ruta = raiz
+    estados = []
+    for parte in ("", *relativa.parts):
+        ruta = ruta / parte
+        estado = ruta.lstat()
+        if (stat.S_ISLNK(estado.st_mode)
+                or getattr(estado, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT):
+            raise OSError("linked path")
+        estados.append(estado)
+    if (not all(stat.S_ISDIR(e.st_mode) for e in estados[:-1])
+            or not stat.S_ISREG(estados[-1].st_mode)):
+        raise OSError("not a regular file")
+    return estados
+
+
+def _abrir_skill_md_portable(raiz: Path, relativa: Path) -> int:
+    # En Windows no hay dir_fd. No se leen bytes hasta comprobar que el
+    # descriptor y todos los componentes siguen identificando el origen.
+    antes = _ruta_regular_sin_enlaces(raiz, relativa)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(raiz / relativa, flags)
+    try:
+        abierto = os.fstat(fd)
+        despues = _ruta_regular_sin_enlaces(raiz, relativa)
+        if (not stat.S_ISREG(abierto.st_mode) or not abierto.st_ino
+                or not os.path.samestat(antes[-1], abierto)
+                or not all(os.path.samestat(a, b) for a, b in zip(antes, despues))):
+            raise OSError("source changed")
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _abrir_skill_md(raiz: Path, relativa: Path) -> int:
+    if not relativa.parts or relativa.drive or relativa.is_absolute() or ".." in relativa.parts:
+        raise OSError("invalid relative path")
     if (not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY")
             or os.open not in os.supports_dir_fd):
-        sys.exit(t("error.skill_md_inseguro", ruta=relativa))
+        return _abrir_skill_md_portable(raiz, relativa)
     flags_dir = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    directorio = os.open(raiz, flags_dir)
     try:
-        directorio = os.open(raiz, flags_dir)
-        try:
-            for parte in relativa.parts[:-1]:
-                siguiente = os.open(parte, flags_dir, dir_fd=directorio)
-                os.close(directorio)
-                directorio = siguiente
-            # O_NONBLOCK evita quedar esperando si la entrada es una FIFO.
-            archivo = os.open(relativa.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                              dir_fd=directorio)
-            with os.fdopen(archivo, "rb") as origen:
-                if not stat.S_ISREG(os.fstat(origen.fileno()).st_mode):
-                    sys.exit(t("error.skill_md_inseguro", ruta=relativa))
-                with destino.open("xb") as copia:
-                    shutil.copyfileobj(origen, copia)
-        finally:
+        for parte in relativa.parts[:-1]:
+            siguiente = os.open(parte, flags_dir, dir_fd=directorio)
             os.close(directorio)
+            directorio = siguiente
+        # O_NONBLOCK evita quedar esperando si la entrada es una FIFO.
+        return os.open(relativa.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                       dir_fd=directorio)
+    finally:
+        os.close(directorio)
+
+
+def copiar_skill_md(raiz: Path, relativa: Path, destino: Path) -> None:
+    """Captura un fichero regular sin leer el contenido de enlaces."""
+    try:
+        with os.fdopen(_abrir_skill_md(raiz, relativa), "rb") as origen:
+            if not stat.S_ISREG(os.fstat(origen.fileno()).st_mode):
+                raise OSError("not a regular file")
+            with destino.open("xb") as copia:
+                shutil.copyfileobj(origen, copia)
     except OSError:
         sys.exit(t("error.skill_md_inseguro", ruta=relativa))
 
