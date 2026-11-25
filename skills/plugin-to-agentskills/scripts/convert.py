@@ -38,11 +38,13 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from exporter.compatibilidad import anotar_limites, evaluar
 from exporter.descripcion import (
@@ -55,6 +57,7 @@ from exporter.descripcion import (
 from exporter.deteccion import (
     CLAUDE_TOOL_NAMES,
     IGNORED_DIRS,
+    contiene_secreto,
     detectar,
     detectar_en_arbol,
 )
@@ -181,11 +184,82 @@ def discover_skills(root: Path) -> list:
     found = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRS]
+        for nombre in (*dirnames, *filenames):
+            if nombre.lower() == "skill.md" and (Path(dirpath) / nombre).is_symlink():
+                sys.exit(t("error.skill_md_inseguro", ruta=_relativa(Path(dirpath) / nombre, root)))
         names = {f.lower(): f for f in filenames}
         if "skill.md" in names:
             found.append(Path(dirpath) / names["skill.md"])
             dirnames[:] = []  # no descender: subcarpetas pertenecen a esta skill
     return sorted(found)
+
+
+def _ruta_regular_sin_enlaces(raiz: Path, relativa: Path):
+    """Comprueba cada componente con lstat, tambien los puntos de reanalisis."""
+    ruta = raiz
+    estados = []
+    for parte in ("", *relativa.parts):
+        ruta = ruta / parte
+        estado = ruta.lstat()
+        if (stat.S_ISLNK(estado.st_mode)
+                or getattr(estado, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT):
+            raise OSError("linked path")
+        estados.append(estado)
+    if (not all(stat.S_ISDIR(e.st_mode) for e in estados[:-1])
+            or not stat.S_ISREG(estados[-1].st_mode)):
+        raise OSError("not a regular file")
+    return estados
+
+
+def _abrir_skill_md_portable(raiz: Path, relativa: Path) -> int:
+    # En Windows no hay dir_fd. No se leen bytes hasta comprobar que el
+    # descriptor y todos los componentes siguen identificando el origen.
+    antes = _ruta_regular_sin_enlaces(raiz, relativa)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(raiz / relativa, flags)
+    try:
+        abierto = os.fstat(fd)
+        despues = _ruta_regular_sin_enlaces(raiz, relativa)
+        if (not stat.S_ISREG(abierto.st_mode) or not abierto.st_ino
+                or not os.path.samestat(antes[-1], abierto)
+                or not all(os.path.samestat(a, b) for a, b in zip(antes, despues))):
+            raise OSError("source changed")
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _abrir_skill_md(raiz: Path, relativa: Path) -> int:
+    if not relativa.parts or relativa.drive or relativa.is_absolute() or ".." in relativa.parts:
+        raise OSError("invalid relative path")
+    if (not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY")
+            or os.open not in os.supports_dir_fd):
+        return _abrir_skill_md_portable(raiz, relativa)
+    flags_dir = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    directorio = os.open(raiz, flags_dir)
+    try:
+        for parte in relativa.parts[:-1]:
+            siguiente = os.open(parte, flags_dir, dir_fd=directorio)
+            os.close(directorio)
+            directorio = siguiente
+        # O_NONBLOCK evita quedar esperando si la entrada es una FIFO.
+        return os.open(relativa.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                       dir_fd=directorio)
+    finally:
+        os.close(directorio)
+
+
+def copiar_skill_md(raiz: Path, relativa: Path, destino: Path) -> None:
+    """Captura un fichero regular sin leer el contenido de enlaces."""
+    try:
+        with os.fdopen(_abrir_skill_md(raiz, relativa), "rb") as origen:
+            if not stat.S_ISREG(os.fstat(origen.fileno()).st_mode):
+                raise OSError("not a regular file")
+            with destino.open("xb") as copia:
+                shutil.copyfileobj(origen, copia)
+    except OSError:
+        sys.exit(t("error.skill_md_inseguro", ruta=relativa))
 
 
 def sanitize_name(raw: str) -> str:
@@ -198,7 +272,7 @@ def sanitize_name(raw: str) -> str:
     return n[:64].rstrip("-") or "skill"
 
 
-def nombre_publicado(skill_md: Path) -> str:
+def nombre_publicado(skill_md: Path, copia: Path) -> str:
     """El identificador con el que la skill sale al mundo.
 
     Sale del `name` del frontmatter, NO del nombre de la carpeta, y de el
@@ -208,7 +282,7 @@ def nombre_publicado(skill_md: Path) -> str:
     todavia nada.
     """
     fm, _raw_fm, _body = split_frontmatter(
-        skill_md.read_text(encoding="utf-8", errors="replace"))
+        copia.read_text(encoding="utf-8", errors="replace"))
     return sanitize_name(str(fm.get("name") or skill_md.parent.name))
 
 
@@ -246,7 +320,7 @@ def comprobar_skill_md_unico(skill_files, raiz: Path) -> None:
     sys.exit("\n".join(lineas))
 
 
-def comprobar_nombres_unicos(skill_files, raiz: Path) -> None:
+def comprobar_nombres_unicos(skill_files, raiz: Path, copias) -> None:
     """Aborta si dos skills reclaman el mismo nombre publicado.
 
     Sin esto, la segunda skill machacaba los artefactos de la primera y solo
@@ -262,7 +336,7 @@ def comprobar_nombres_unicos(skill_files, raiz: Path) -> None:
     """
     por_nombre = {}
     for sf in skill_files:
-        por_nombre.setdefault(nombre_publicado(sf), []).append(sf.parent)
+        por_nombre.setdefault(nombre_publicado(sf, copias[sf]), []).append(sf.parent)
     colisiones = {n: ds for n, ds in por_nombre.items() if len(ds) > 1}
     if not colisiones:
         return
@@ -280,10 +354,11 @@ def comprobar_nombres_unicos(skill_files, raiz: Path) -> None:
 # Auditoría y adaptación
 # --------------------------------------------------------------------------
 
-def audit_and_adapt(skill_md: Path, out_dir: Path, presupuesto_carpeta: int,
-                    presupuesto_zip: int, reorder: bool = True) -> SkillResult:
+def audit_and_adapt(skill_md: Path, copia: Path, out_dir: Path,
+                    presupuesto_carpeta: int, presupuesto_zip: int,
+                    reorder: bool = True) -> SkillResult:
     src_dir = skill_md.parent
-    text = skill_md.read_text(encoding="utf-8", errors="replace")
+    text = copia.read_text(encoding="utf-8", errors="replace")
     # Lo que el lector no sabe leer se apunta aqui y se avisa mas abajo.
     perdidas = []
     fm, _raw_fm, body = split_frontmatter(text, perdidas)
@@ -577,9 +652,9 @@ def a_skill_portatil(res: SkillResult) -> SkillPortatil:
     return skill
 
 
-def auditar_seguridad(raiz, dirs_skill) -> VeredictoSeguridad:
+def auditar_seguridad(raiz, dirs_skill, copias=None) -> VeredictoSeguridad:
     """Audita el paquete entero: patrones, estructura y veredicto."""
-    ficheros = recorrer(raiz, dirs_skill)
+    ficheros = recorrer(raiz, dirs_skill, copias)
     hallazgos = seg_patrones.analizar(ficheros, seg_patrones.cargar_reglas())
     hallazgos += seg_estructural.analizar(raiz, ficheros)
     # `opaco` se deriva de los HALLAZGOS, no del recorrido. Si se activara
@@ -709,10 +784,7 @@ def comprobar_salida_segura(out: Path, src: str, forzar: bool) -> None:
     de esta herramienta consistia en borrar el destino y descubrir despues
     que el origen no servia para nada.
     """
-    p_origen = Path(src).expanduser()
-    # Un origen que no existe como ruta es una URL: se clonara en un temporal
-    # y no hay ningun arbol del usuario con el que <out> pueda solaparse.
-    origen = p_origen.resolve() if p_origen.exists() else None
+    origen = origen_local_o_validar_remoto(src)
 
     if origen is not None:
         # Estos dos casos no los salta ni --force. No son "borrar algo
@@ -740,13 +812,40 @@ def comprobar_salida_segura(out: Path, src: str, forzar: bool) -> None:
             t("error.out_no_propio", ruta=out, motivo=motivo, marca=NOMBRE_CENTINELA))
 
 
+def validar_origen_remoto(src: str) -> None:
+    """Acepta origenes remotos que se puedan mostrar sin credenciales."""
+    if any(ord(c) < 32 or ord(c) == 127 for c in src):
+        sys.exit(t("error.origen_invalido"))
+    if src.startswith(("http://", "https://")):
+        try:
+            url = urlsplit(src)
+            _ = url.port
+        except ValueError:
+            sys.exit(t("error.origen_invalido"))
+        if url.username is not None or "?" in src or "#" in src:
+            sys.exit(t("error.origen_con_credenciales"))
+        if not url.hostname or "%" in url.netloc or "\\" in src or any(c.isspace() for c in src):
+            sys.exit(t("error.origen_invalido"))
+        return
+    if not re.fullmatch(r"git@(?:\[[0-9a-fA-F:.]+\]|[^:/\\@?#\s]+):.+", src):
+        sys.exit(t("error.origen_invalido"))
+
+
+def origen_local_o_validar_remoto(src: str):
+    # Una URL explicita sigue siendolo aunque coincida con un nombre local.
+    if not re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", src):
+        ruta = Path(src).expanduser()
+        if ruta.exists():
+            return ruta.resolve()
+    validar_origen_remoto(src)
+    return None
+
+
 def resolve_source(src: str, workdir: Path) -> Path:
-    p = Path(src).expanduser()
-    if p.exists():
-        comprobar_tamano(p.resolve())
-        return p.resolve()
-    if not re.match(r"^(https?://|git@)", src):
-        sys.exit(t("error.origen_invalido", origen=src))
+    origen = origen_local_o_validar_remoto(src)
+    if origen is not None:
+        comprobar_tamano(origen)
+        return origen
     target = workdir / "repo"
     print(t("consola.clonando", origen=src))
     entorno = dict(os.environ)
@@ -760,7 +859,8 @@ def resolve_source(src: str, workdir: Path) -> Path:
     except subprocess.TimeoutExpired:
         sys.exit(t("error.clon_timeout", segundos=TIMEOUT_CLON))
     if r.returncode != 0:
-        sys.exit(t("error.clon_fallo", salida=r.stderr.strip()))
+        # Git puede imprimir otra URL al aplicar su propia configuracion.
+        sys.exit(t("error.clon_fallo", codigo=r.returncode))
     comprobar_tamano(target)
     return target
 
@@ -995,6 +1095,19 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         if not skill_files:
             sys.exit(t("error.sin_skills"))
 
+        directorio_copias = Path(tmp) / "_skill_md"
+        directorio_copias.mkdir()
+        copias = {}
+        copias_relativas = {}
+        for numero, sf in enumerate(skill_files):
+            relativa = sf.relative_to(root)
+            copia = directorio_copias / str(numero)
+            copiar_skill_md(root, relativa, copia)
+            if contiene_secreto(copia.read_bytes(), sf.name):
+                sys.exit(t("error.skill_md_con_credencial", ruta=relativa))
+            copias[sf] = copia
+            copias_relativas[relativa.as_posix()] = copia
+
         print(t("consola.skills_encontradas", n=len(skill_files)))
 
         # Va aquí, antes del bucle de audit_and_adapt. Desde que los
@@ -1004,7 +1117,7 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         # está, no como queda después de trabajar sobre él-, pero ha dejado
         # de ser una condición de la que dependa el veredicto.
         veredicto_seguridad = auditar_seguridad(
-            root, [str(sf.parent.relative_to(root)) for sf in skill_files])
+            root, [str(sf.parent.relative_to(root)) for sf in skill_files], copias_relativas)
 
         # Los TRES subcomandos preparan sus artefactos en un temporal que
         # desaparece con este bloque. `export` no es una excepción: publica a
@@ -1033,11 +1146,11 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         seleccionadas = [
             sf for sf in skill_files
             if not solo or pedidas & {sanitize_name(sf.parent.name),
-                                      nombre_publicado(sf)}]
+                                      nombre_publicado(sf, copias[sf])}]
         if not seleccionadas:
             sys.exit(
                 t("error.only_sin_coincidencia", disponibles=", ".join(sorted({
-                    "{} ({})".format(nombre_publicado(sf), sf.parent.name)
+                    "{} ({})".format(nombre_publicado(sf, copias[sf]), sf.parent.name)
                     for sf in skill_files}))))
 
         # Antes del primer audit_and_adapt, que ya escribe en work_dir. La
@@ -1054,11 +1167,11 @@ def ejecutar(args, perfiles, elegidos, hoy) -> int:
         # candidatas, y elegir una al azar seria diagnosticar la equivocada.
         comprobar_skill_md_unico(seleccionadas, root)
         if args.comando != "inspect":
-            comprobar_nombres_unicos(seleccionadas, root)
+            comprobar_nombres_unicos(seleccionadas, root, copias)
 
         results = []
         for sf in seleccionadas:
-            r = audit_and_adapt(sf, work_dir, presupuesto_carpeta, presupuesto_zip,
+            r = audit_and_adapt(sf, copias[sf], work_dir, presupuesto_carpeta, presupuesto_zip,
                                 reorder=not args.keep_description_order)
             results.append(r)
             print(t("consola.skill_riesgo", nombre="{:<40}".format(r.name),

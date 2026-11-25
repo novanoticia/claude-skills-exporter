@@ -199,6 +199,6 @@ def analizar(ficheros, reglas) -> list:
                     severidad=r["severidad"], confianza=r["confianza"],
                     ambito=f.ambito,
                     ubicacion="{}:{}".format(f.ruta, numero),
-                    muestra=m.group(0).strip()[:120],
+                    muestra="" if f.secreto else m.group(0).strip()[:120],
                     titulo=titulo_de(r), mitigacion=mitigacion_de(r)))
     return salida
