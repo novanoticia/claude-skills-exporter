@@ -168,7 +168,7 @@ def analizar(ficheros, reglas) -> list:
     # necesita reglas_aplicables para decidir.
     conocidas = {e.lower() for r in reglas for e in r["extensiones"]}
     for f in ficheros:
-        if f.secreto or _es_el_catalogo(f.absoluta):
+        if _es_el_catalogo(f.absoluta):
             continue
         ext = os.path.splitext(f.ruta)[1].lower()
         aplicables = reglas_aplicables(ext, reglas, conocidas)
@@ -199,6 +199,6 @@ def analizar(ficheros, reglas) -> list:
                     severidad=r["severidad"], confianza=r["confianza"],
                     ambito=f.ambito,
                     ubicacion="{}:{}".format(f.ruta, numero),
-                    muestra=m.group(0).strip()[:120],
+                    muestra="" if f.secreto else m.group(0).strip()[:120],
                     titulo=titulo_de(r), mitigacion=mitigacion_de(r)))
     return salida

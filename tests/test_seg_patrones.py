@@ -1,3 +1,4 @@
+import re
 import tempfile
 import time
 import unittest
@@ -68,6 +69,23 @@ class Reglas(unittest.TestCase):
             with self.assertRaises(ReglaInvalida) as ctx:
                 cargar_reglas(malo)
             self.assertIn("reglas.json", str(ctx.exception))
+
+
+class ArchivosConCredenciales(unittest.TestCase):
+
+    def test_se_conserva_el_hallazgo_por_patron_sin_citar_el_valor(self):
+        valor = "CSE_prueba_QX738_literal"
+        regla = dict(cargar_reglas()[0], extensiones=[".sh"],
+                     _rx=re.compile(re.escape(valor)))
+        for sensible in (False, True):
+            with tempfile.TemporaryDirectory() as tmp, self.subTest(sensible=sensible):
+                contenido = ("password=" if sensible else "# control ") + valor + "\n"
+                raiz = arbol(tmp, {"instalar.sh": contenido})
+                ficheros = recorrer(raiz, [])
+                self.assertEqual(ficheros[0].secreto, sensible)
+                (hallazgo,) = analizar(ficheros, [regla])
+                self.assertEqual(hallazgo.id, regla["id"])
+                self.assertEqual(hallazgo.muestra, "" if sensible else valor)
 
 
 class CoberturaDeInvocaciones(unittest.TestCase):
